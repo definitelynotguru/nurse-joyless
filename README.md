@@ -120,9 +120,9 @@ It should not be marketed as a perfect all-generation simulator, legality valida
 
 ## Fan-project disclaimer
 
-Fan-made prototype. Not affiliated with Nintendo, Game Freak, Creatures, The Pokémon Company, Pokémon Showdown, Foul Play, Nous Research, or Kimi. Inspired by battle-state inference concepts; no Foul Play code copied.
+Fan-made prototype. Not affiliated with Nintendo, Game Freak, Creatures, The Pokémon Company, Pokémon Showdown, Foul Play. Inspired by battle-state inference concepts; no Foul Play code copied.
 
-## V3.2 Local Run Note
+## V1 Local Run Note
 
 Opening `index.html` directly still works for the offline deterministic demo. For online PokeAPI enrichment in the Team Builder Assistant, run a local server:
 
