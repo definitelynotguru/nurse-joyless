@@ -1,133 +1,75 @@
 # Nurse Joyless
 
-![JavaScript](https://img.shields.io/badge/JavaScript-yellow)
-![HTML5](https://img.shields.io/badge/HTML5-orange)
+![JavaScript](https://img.shields.io/badge/language-JavaScript-yellow)
+![HTML5](https://img.shields.io/badge/language-HTML5-orange)
 ![Status](https://img.shields.io/badge/status-MVP-green)
 
 **Nurse Joyless** is a fan-made, retro pixel-art Pokémon Showdown team clinic. Paste a Showdown import and it diagnoses team structure, calculates KO odds, parses replay evidence, detects hidden-info clues, suggests additions, validates sets, and exports a shareable report.
 
 > Nurse Joy heals Pokémon. Nurse Joyless heals bad decisions.
 
-## What is new in this build
+## 🚀 Features
 
-The project now treats **Sparring Lab** as the main analytical engine rather than a simple archetype card grid.
+### 🧪 Sparring Lab v2
+The core analytical engine that transforms imports into structured reports:
+- **Team Identity Detection**: Automatically identifies archetypes like Dragon Spam, Sun Room, Trick Room, Hyper Offense, Balance, Stall, Hazard Stack, and more.
+- **Evidence-Based Classification**: Uses a scoring system based on type stacking, speed tiers, weather setters, and offensive items.
+- **Structural Diagnosis**: Detects repeated weaknesses, missing roles, and dependency risks.
+- **Matchup Matrix**: Evaluates performance against common meta-archetypes.
+- **Synergy Scoring**: Rates type synergy, role balance, and win conditions.
+- **Precision Prescriptions**: Suggests Pokémon to patch structural gaps based on data, not just meta trends.
 
-### Sparring Lab v2
+### 🛠️ Team Builder Assistant
+Ranks suggested additions based on:
+- Gap coverage & archetype fit.
+- Matchup improvement & role compression.
+- Synergy with existing team members.
+- *Includes exportable Showdown sets.*
 
-Sparring Lab now builds a structured report with:
+### ✅ Move & Set Validation
+Ensures your team is viable by checking:
+- EV totals and per-stat caps.
+- Species, moves, abilities, and Tera types.
+- Item conflicts (e.g., Assault Vest + status moves).
+- Learnset confidence using full Dex data.
 
-- **Team Identity detection**: Dragon Spam, Sun Room, Trick Room, Hyper Offense, Balance, Stall, Hazard Stack, Weather teams, and more.
-- **Evidence-based archetype classification**: scoring uses type stacking, speed tiers, Trick Room setters, weather setters, offensive items, recovery, hazards, removal, pivots, and wallbreakers.
-- **Structural diagnosis**: identifies repeated weaknesses, missing roles, shallow defensive cores, overstacked archetypes, and dependency risks.
-- **Matchup Matrix**: evaluates performance into Rain, Sun, Stall, Hazard Stack, Hyper Offense, Bulky Balance, Trick Room mirrors, and Dragon Spam mirrors.
-- **Synergy scoring**: rates type synergy, role balance, offensive coverage, defensive backbone, hazard plan, speed control, and win conditions.
-- **Precision prescriptions**: suggests Pokémon that patch actual structural gaps, not generic meta picks.
+### 💥 KO Calculator
+A simplified modern singles damage engine featuring:
+- OHKO, 2HKO, and 3HKO probabilities.
+- Hazard chip and defensive Tera toggles.
+- Reverse KO risk tables.
 
-### Team Builder Assistant
-
-The assistant ranks additions by:
-
-- gap coverage
-- archetype fit
-- matchup improvement
-- role compression
-- synergy with the current team
-
-Suggested additions include exportable Showdown sets where available.
-
-### Move Validation
-
-Validation checks:
-
-- EV total and per-stat caps
-- unknown species, moves, abilities, and Tera types
-- Assault Vest + status-move conflicts
-- move count limits
-- learnset confidence when full Dex learnset data is available
-
-Learnset validation is intentionally conservative: if full learnset data is unavailable, it warns instead of pretending certainty.
-
-### KO Calculator Upgrades
-
-The KO calculator now includes:
-
-- OHKO odds
-- 2HKO probability
-- 3HKO probability
-- hazard chip
-- defensive Tera toggle
-- reverse KO risk table
-
-The damage engine remains a simplified modern singles calculator. It is not a perfect Pokémon Showdown simulator.
-
-### Export Formats
-
+## 📦 Export Formats
 Reports can be exported as:
+- **Markdown summary**: For quick sharing and documentation.
+- **JSON report**: For debugging or integration into other tools/agents.
 
-- Markdown summary
-- JSON report
+## 💻 Getting Started
 
-The JSON output is useful for debugging, building demos, or wiring the analysis into another agent/tool.
-
-## Running locally
+### Running Locally
+Since this is a frontend-driven application, no build step is required.
 
 ```bash
-cd nurse-joyless
+# Start a simple python server
 python3 -m http.server 8000
 ```
+Then open: `http://localhost:8000`
 
-Then open:
+*Note: For online Pokédex enrichment in the Team Builder Assistant, running a local server is required.*
 
-```text
-http://localhost:8000
-```
-
-No build step is required.
-
-## Testing
-
+### Testing
 ```bash
 npm test
 ```
+Individual checks:
+- `npm run check`: JS syntax & basic lookups.
+- `npm run smoke`: Core engine smoke tests.
+- `npm run dom-smoke`: UI rendering checks.
 
-Equivalent individual checks:
+## 📊 Data & Scope
+The app leverages `@pkmn/dex` for comprehensive data. 
 
-```bash
-npm run check
-npm run smoke
-npm run dom-smoke
-```
+**Key Disclaimer:** This is a modern singles-focused MVP. It uses simplified battle math and is not intended to be a perfect all-generation simulator or a legality validator.
 
-The test suite checks:
-
-- JS syntax
-- Dex-backed species and move lookup
-- damage calculation using Dex-only species/moves
-- Dragon Spam detection
-- Sun Room / Trick Room detection
-- Replay Observer evidence extraction
-- KO panel 3HKO rendering
-- Markdown report generation
-- team validation processing
-
-## Data and scope
-
-The app uses `@pkmn/dex` from the browser when available, with local fallback data for offline tests and demos. It is best described as:
-
-> **Modern singles-focused MVP with full Dex lookup and simplified battle math.**
-
-It should not be marketed as a perfect all-generation simulator, legality validator, or live battle bot.
-
-## Fan-project disclaimer
-
-Fan-made prototype. Not affiliated with Nintendo, Game Freak, Creatures, The Pokémon Company, Pokémon Showdown, Foul Play. Inspired by battle-state inference concepts; no Foul Play code copied.
-
-## V1 Local Run Note
-
-Opening `index.html` directly still works for the offline deterministic demo. For online PokeAPI enrichment in the Team Builder Assistant, run a local server:
-
-```bash
-python3 -m http.server 8080
-```
-
-Then open `http://localhost:8080`. The app does not fetch remote data on startup; online suggestions are requested only when you press **Suggest Additions** / **Use Online Pokédex**.
+## ⚖️ Fan-Project Disclaimer
+Fan-made prototype. Not affiliated with Nintendo, Game Freak, Creatures, The Pokémon Company, Pokémon Showdown, Foul Play, Nous Research, or Kimi. Inspired by battle-state inference concepts; no Foul Play code copied.
