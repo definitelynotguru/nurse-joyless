@@ -1,7 +1,7 @@
 # Nurse Joyless
 
-![JavaScript](https://img.shields.io/badge/language-JavaScript-yellow)
-![HTML5](https://img.shields.io/badge/language-HTML5-orange)
+![JavaScript](https://img.shields.io/badge/JavaScript-yellow)
+![HTML5](https://img.shields.io/badge/HTML5-orange)
 ![Status](https://img.shields.io/badge/status-MVP-green)
 
 **Nurse Joyless** is a fan-made, retro pixel-art Pokémon Showdown team clinic. Paste a Showdown import and it diagnoses team structure, calculates KO odds, parses replay evidence, detects hidden-info clues, suggests additions, validates sets, and exports a shareable report.
