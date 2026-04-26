@@ -1,0 +1,59 @@
+Charizard @ Heavy-Duty Boots
+Ability: Blaze
+Tera Type: Fire
+EVs: 4 Def / 252 SpA / 252 Spe
+Timid Nature
+- Flamethrower
+- Hurricane
+- Defog
+- Roost
+
+Dragonite @ Heavy-Duty Boots
+Ability: Multiscale
+Tera Type: Normal
+EVs: 252 Atk / 4 SpD / 252 Spe
+Adamant Nature
+- Dragon Dance
+- Extreme Speed
+- Earthquake
+- Fire Punch
+
+Garchomp @ Rocky Helmet
+Ability: Rough Skin
+Tera Type: Steel
+EVs: 252 HP / 164 Def / 92 Spe
+Impish Nature
+- Stealth Rock
+- Earthquake
+- Dragon Tail
+- Toxic
+
+Salamence @ Life Orb
+Ability: Moxie
+Tera Type: Flying
+EVs: 252 Atk / 4 SpD / 252 Spe
+Jolly Nature
+- Dragon Dance
+- Earthquake
+- Outrage
+- Stone Edge
+
+Hydreigon @ Choice Specs
+Ability: Levitate
+Tera Type: Steel
+EVs: 4 Def / 252 SpA / 252 Spe
+Timid Nature
+- Draco Meteor
+- Dark Pulse
+- Flamethrower
+- U-turn
+
+Dragapult @ Choice Band
+Ability: Infiltrator
+Tera Type: Dragon
+EVs: 252 Atk / 4 SpD / 252 Spe
+Jolly Nature
+- Dragon Darts
+- U-turn
+- Sucker Punch
+- Tera Blast

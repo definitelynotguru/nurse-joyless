@@ -1,0 +1,13 @@
+{
+  "scenario": "Dragapult hidden-info read",
+  "opponent": "Dragapult",
+  "observed_move": "Shadow Ball",
+  "observed_damage_percent": 43,
+  "hard_tells": {
+    "took_hazard_damage": true,
+    "used_status_move": false,
+    "repeated_damaging_move": false,
+    "moved_first": false
+  },
+  "expected_read": "Heavy-Duty Boots should be impossible; special/offensive Dragapult candidates should rise or fall based on damage fit."
+}

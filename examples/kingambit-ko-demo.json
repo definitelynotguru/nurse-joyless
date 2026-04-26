@@ -1,0 +1,8 @@
+{
+  "scenario": "Great Tusk Close Combat into Kingambit at 71%",
+  "attacker": "Great Tusk",
+  "defender": "Kingambit",
+  "move": "Close Combat",
+  "defender_hp_percent": 71,
+  "use_in_app": "Load demo, then open Battle ER. The app preselects this matchup."
+}

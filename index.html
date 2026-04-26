@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Nurse Joyless</title>
+<link rel="stylesheet" href="src/styles.css" />
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+</head>
+<body>
+<div class="app-shell">
+  <aside class="side-console" aria-label="Nurse Joyless navigation">
+    <div class="brand-chip">
+      <span class="brand-heart">♥</span>
+      <div>
+        <strong>NURSE<br/>JOYLESS</strong>
+        <small>No mercy. Only data.</small>
+      </div>
+    </div>
+    <nav class="pixel-menu">
+      <button class="nav-btn active" data-jump="hero"><span>●</span>Start</button>
+      <button class="nav-btn" data-jump="team-clinic"><span>◆</span>Build your team</button>
+      <button class="nav-btn" data-jump="diagnosis-section"><span>▣</span>Analyze weakness</button>
+      <button class="nav-btn" data-jump="ko-section"><span>⚡</span>Calculate KO odds</button>
+      <button class="nav-btn" data-jump="detective-section"><span>⌕</span>Detect hidden info</button>
+      <button class="nav-btn" data-jump="observer-section"><span>⧉</span>Observer</button>
+      <button class="nav-btn" data-jump="sim-section"><span>▰</span>Sparring Lab</button>
+      <button class="nav-btn" data-jump="identity-section"><span>◇</span>Identity</button>
+      <button class="nav-btn" data-jump="synergy-section"><span>◆</span>Synergy</button>
+      <button class="nav-btn" data-jump="assistant-section"><span>✚</span>Assistant</button>
+      <button class="nav-btn" data-jump="validation-section"><span>✓</span>Validate</button>
+      <button class="nav-btn" data-jump="exports-section"><span>{}</span>Exports</button>
+    </nav>
+    <div class="status-cartridge">
+      <span>Patient status</span>
+      <strong id="status">No patient loaded</strong>
+      <p id="statusText">Paste a team before I start judging you.</p>
+    </div>
+    <div class="mini-note">Fan project · Modern Singles MVP · Full Dex lookup</div>
+  </aside>
+
+  <main class="main-stage">
+    <header class="hero" id="hero">
+      <div class="hero-art frame">
+        <img src="assets/splash.png" alt="Pixel art Nurse Joyless splash screen" />
+      </div>
+      <section class="hero-copy frame glow">
+        <p class="eyebrow">Hackathon MVP · Agentic battle clinic</p>
+        <h1>Nurse Joyless</h1>
+        <p class="tagline">Paste a Showdown team, get roasted by deterministic math, then leave with KO odds, hidden-set reads, and a less embarrassing export.</p>
+        <div class="actions">
+          <button id="loadDemo" class="primary">Load demo patient</button>
+          <button id="reset" class="ghost">Wipe chart</button>
+        </div>
+        <div class="actions test-teams">
+          <span class="meta">Test teams:</span>
+          <button id="testDragonSpam" class="small">Dragon Spam</button>
+          <button id="testHazardStack" class="small">Hazard Stack</button>
+          <button id="testSunRoom" class="small">Sun Room</button>
+        </div>
+      </section>
+    </header>
+
+    <section class="feature-strip" aria-label="Feature overview">
+      <article class="feature-card" data-jump="team-clinic"><img src="assets/build-team.png" alt="Build team pixel interface"/><strong>Build</strong><span>Parse Showdown imports.</span></article>
+      <article class="feature-card" data-jump="diagnosis-section"><img src="assets/analyze-weaknesses.png" alt="Weakness analysis pixel interface"/><strong>Diagnose</strong><span>Type and role triage.</span></article>
+      <article class="feature-card" data-jump="ko-section"><img src="assets/ko-odds.png" alt="KO odds pixel calculator"/><strong>Calculate</strong><span>OHKO, 2HKO, 3HKO, Tera.</span></article>
+      <article class="feature-card" data-jump="sim-section"><img src="assets/team-identity.png" alt="Team identity analysis"/><strong>Reason</strong><span>Archetype + matchup brain.</span></article>
+      <article class="feature-card" data-jump="assistant-section"><img src="assets/team-builder-assistant.png" alt="Team builder assistant"/><strong>Suggest</strong><span>Patch gaps with additions.</span></article>
+      <article class="feature-card" data-jump="validation-section"><img src="assets/move-validation.png" alt="Move validation console"/><strong>Validate</strong><span>Rules, EVs, moves, items.</span></article>
+    </section>
+
+    <section class="panel stage-panel" id="team-clinic">
+      <div class="panel-banner">
+        <div><p class="eyebrow">01 · Team Clinic</p><h2>Build your team</h2><p>Paste a Showdown import. Nurse Joyless parses the patient and flags structural injuries.</p></div>
+        <button id="analyze" class="primary small">Analyze patient</button>
+      </div>
+      <div class="workbench two-column">
+        <div class="terminal-card">
+          <label class="label-title" for="teamInput">Showdown import</label>
+          <textarea id="teamInput" spellcheck="false"></textarea>
+        </div>
+        <div class="terminal-card">
+          <div class="label-title">Current team</div>
+          <div id="teamCards" class="cards"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel stage-panel" id="diagnosis-section">
+      <div class="section-art"><img src="assets/analyze-weaknesses.png" alt="Analyze weaknesses concept art" /></div>
+      <div class="panel-banner compact"><div><p class="eyebrow">02 · Diagnosis</p><h2>Analyze weaknesses</h2><p>Type-chart liability, missing roles, and redundancy summarized like a hospital chart.</p></div></div>
+      <div id="diagnosis" class="empty">No diagnosis yet.</div>
+    </section>
+
+    <section class="panel stage-panel" id="ko-section">
+      <div class="section-art"><img src="assets/ko-odds.png" alt="KO odds calculator concept art" /></div>
+      <div class="panel-banner">
+        <div><p class="eyebrow">03 · Battle ER</p><h2>Calculate KO odds</h2><p>16-roll damage logic with hazards, weather, screens, and reverse danger reads.</p></div>
+        <button id="calcKo" class="primary small">Run calc</button>
+      </div>
+      <div class="form pixel-form">
+        <label>Attacker<select id="attacker"></select></label>
+        <label>Move<select id="move"></select></label>
+        <label>Defender<select id="defender"></select></label>
+        <label>Defender HP %<input id="hp" type="number" min="1" max="100" value="71" /></label>
+        <label>Hazards<select id="hazards"><option value="none">None</option><option value="rocks">Stealth Rock</option><option value="spikes1">1 Spikes</option><option value="spikes2">2 Spikes</option><option value="spikes3">3 Spikes</option></select></label>
+        <label>Field<select id="field"><option value="none">Neutral</option><option value="rain">Rain</option><option value="sun">Sun</option><option value="reflect">Reflect</option><option value="screen">Light Screen</option></select></label>
+        <label class="check"><input id="attackerTera" type="checkbox" /> Attacker Tera</label>
+        <label>Attacker Tera Type<select id="attackerTeraType"></select></label>
+        <label class="check"><input id="defenderTera" type="checkbox" /> Defender Tera</label>
+        <label>Defender Tera Type<select id="defenderTeraType"></select></label>
+      </div>
+      <div id="ko" class="empty">No KO read yet.</div>
+    </section>
+
+    <section class="panel stage-panel" id="detective-section">
+      <div class="section-art"><img src="assets/hidden-info.png" alt="Hidden info detective console" /></div>
+      <div class="panel-banner">
+        <div><p class="eyebrow">04 · Hidden Info Detective</p><h2>Detect hidden info</h2><p>Update likely items, natures, and spreads from damage rolls and hard tells.</p></div>
+        <button id="detect" class="primary small">Update read</button>
+      </div>
+      <div class="form detective pixel-form">
+        <label>Opponent<select id="oppSpecies"></select></label>
+        <label>Evidence<select id="evidence"><option value="they_hit_me">They hit me</option><option value="i_hit_them">I hit them</option></select></label>
+        <label>Move<select id="obsMove"></select></label>
+        <label>Observed damage %<input id="obsPct" type="number" min="1" max="100" value="43" /></label>
+        <label class="check"><input id="statusMove" type="checkbox" /> Used status move</label>
+        <label class="check"><input id="hazardTell" type="checkbox" checked /> Took hazard damage</label>
+        <label class="check"><input id="repeatTell" type="checkbox" /> Repeated damaging move</label>
+        <label class="check"><input id="speedTell" type="checkbox" /> Moved first</label>
+      </div>
+      <div id="detective" class="empty">No detective read yet.</div>
+    </section>
+
+    <section class="panel stage-panel" id="prescription-section">
+      <div class="panel-banner">
+        <div><p class="eyebrow">04 · Prescription</p><h2>Preserve favorites, fix the crime scene</h2><p>Keep the emotional core. Patch the roles. Export a team that has seen a doctor.</p></div>
+        <button id="rebuild" class="primary small">Prescribe rebuild</button>
+      </div>
+      <div id="favorites" class="empty">Analyze a team first.</div>
+      <div id="prescription" class="empty">No prescription yet.</div>
+    </section>
+
+    <section class="panel stage-panel" id="observer-section">
+      <div class="section-art wide-art"><img src="assets/observer.png" alt="Replay Observer concept art" /></div>
+      <div class="panel-banner">
+        <div><p class="eyebrow">05 · Replay Observer</p><h2>Battle log autopsy</h2><p>Paste a Showdown replay log or battle state. Extract turn-by-turn evidence and hidden-item tells.</p></div>
+        <button id="analyzeReplay" class="primary small">Analyze log</button>
+      </div>
+      <div class="workbench">
+        <div class="terminal-card">
+          <label class="label-title" for="replayInput">Showdown replay log or battle state</label>
+          <textarea id="replayInput" spellcheck="false" placeholder="Paste |turn| lines, |-damage|, |move|, etc.&#10;&#10;Example:&#10;|turn|3&#10;|move|p2a: Dragapult|Shadow Ball|p1a: Great Tusk&#10;|-damage|p1a: Great Tusk|43/100&#10;|upkeep&#10;|-damage|p2a: Dragapult|88/100|[from] Stealth Rock&#10;..."></textarea>
+        </div>
+        <div id="replayResults" class="empty">Paste a replay log to see turn-by-turn evidence.</div>
+      </div>
+    </section>
+
+    <section class="panel stage-panel" id="sim-section">
+      <div class="section-art wide-art"><img src="assets/matchup-matrix.png" alt="Advanced matchup matrix concept art" /></div>
+      <div class="panel-banner"><div><p class="eyebrow">06 · Sparring Lab</p><h2>Advanced team reasoning</h2><p>Ultimate analytical layer: team identity, structural diagnosis, matchup matrix, win conditions, and precision prescriptions.</p></div><button id="calcArchetypes" class="primary small">Run Advanced Lab</button></div>
+      <div id="archetypeResults" class="empty">Analyze a team first to run the advanced Sparring Lab.</div>
+    </section>
+
+    <section class="panel stage-panel" id="identity-section">
+      <div class="section-art wide-art"><img src="assets/team-identity.png" alt="Team identity archetype detector" /></div>
+      <div class="panel-banner compact"><div><p class="eyebrow">07 · Team Identity</p><h2>Archetype detector</h2><p>Classifies the team by structure instead of guessing from one or two roles.</p></div></div>
+      <div id="identityResults" class="empty">Analyze a team first.</div>
+    </section>
+
+    <section class="panel stage-panel" id="synergy-section">
+      <div class="section-art wide-art"><img src="assets/synergy-checker.png" alt="Synergy checker pixel interface" /></div>
+      <div class="panel-banner compact"><div><p class="eyebrow">08 · Synergy Checker</p><h2>Structural scoring</h2><p>Scores type synergy, role balance, offensive coverage, defensive backbone, hazard plan, speed control, and win conditions.</p></div></div>
+      <div id="synergyResults" class="empty">Run Sparring Lab first.</div>
+    </section>
+
+    <section class="panel stage-panel" id="assistant-section">
+      <div class="section-art wide-art"><img src="assets/team-builder-assistant.png" alt="Team builder assistant concept art" /></div>
+      <div class="panel-banner"><div><p class="eyebrow">09 · Team Builder Assistant</p><h2>Suggest a Pokémon</h2><p>Patch actual team gaps while respecting your archetype and preserving your favorites.</p></div><div class="actions"><button id="suggestPokemon" class="primary small">Suggest Additions</button><button id="loadOnlineDex" class="ghost small">Use Online Pokédex</button></div></div>
+      <div id="assistantResults" class="empty">Run Sparring Lab or analyze a team to receive targeted additions.</div>
+    </section>
+
+    <section class="panel stage-panel" id="validation-section">
+      <div class="section-art wide-art"><img src="assets/move-validation.png" alt="Move validation concept art" /></div>
+      <div class="panel-banner"><div><p class="eyebrow">10 · Move Validation</p><h2>Validate sets</h2><p>Check EV limits, move existence, item conflicts, abilities, and learnset confidence.</p></div><button id="validateMoves" class="primary small">Validate Team</button></div>
+      <div id="validationResults" class="empty">Analyze a team first, then validate its sets.</div>
+    </section>
+
+    <section class="panel stage-panel" id="exports-section">
+      <div class="section-art wide-art"><img src="assets/exports-reports.png" alt="Export and reports concept art" /></div>
+      <div class="panel-banner"><div><p class="eyebrow">11 · Exports</p><h2>Export reports</h2><p>Copy a Markdown report for sharing or JSON for programmatic analysis.</p></div><div class="actions"><button id="exportMarkdown" class="primary small">Copy Markdown</button><button id="exportJson" class="ghost small">Download JSON</button></div></div>
+      <div id="exportsResults" class="empty">Run Sparring Lab first to generate a structured report.</div>
+    </section>
+
+
+
+    <footer>Fan-made prototype. Modern singles-focused MVP with simplified battle math. Not affiliated with Nintendo, Game Freak, Creatures, The Pokemon Company, Pokemon Showdown, Foul Play, Nous Research, or Kimi. Inspired by Foul Play concepts; no Foul Play code copied.</footer>
+  </main>
+
+  <!-- Agent Console Panel -->
+  <aside id="agentConsole" class="agent-panel" aria-label="Agent Console">
+    <div class="agent-header">
+      <h3>AGENT CONSOLE</h3>
+      <button id="closeAgent" class="ghost small">✕</button>
+    </div>
+    <div class="agent-tabs">
+      <button class="agent-tab active" data-agent="surgeon">Surgeon</button>
+      <button class="agent-tab" data-agent="actuary">Actuary</button>
+      <button class="agent-tab" data-agent="detective">Detective</button>
+      <button class="agent-tab" data-agent="goblin">Goblin</button>
+      <button class="agent-tab" data-agent="summary">Summary</button>
+    </div>
+    <div id="agentOutput" class="agent-terminal">
+      <div class="agent-welcome">Select an agent to analyze your data.</div>
+    </div>
+    <div class="agent-settings">
+      <label>Agent Mode</label>
+      <div class="mode-toggle">
+        <button class="mode-btn active" data-mode="local">● Local</button>
+        <button class="mode-btn" data-mode="kimi">○ Kimi</button>
+        <button class="mode-btn" data-mode="ollama">○ Ollama</button>
+      </div>
+      <div id="apiSettings" class="api-settings hidden">
+        <label>Kimi API Key<input type="password" id="kimiKey" placeholder="sk-..." /></label>
+        <label>Ollama URL<input type="text" id="ollamaUrl" value="http://localhost:11434" /></label>
+        <button id="saveApi" class="primary small">Save</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Agent Toggle Button -->
+  <button id="openAgent" class="agent-fab" title="Open Agent Console">⌘</button>
+</div>
+<script src="src/app.js"></script>
+<script>
+document.addEventListener('click', function(e){
+  const target = e.target.closest('[data-jump]');
+  if(!target) return;
+  const id = target.getAttribute('data-jump');
+  const el = document.getElementById(id);
+  if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
+  document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.toggle('active', btn === target));
+});
+</script>
+</body>
+</html>
