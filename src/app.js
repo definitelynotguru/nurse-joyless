@@ -334,13 +334,58 @@ class ReplayParser{
     if(state.damageObservations.length>6)state.damageObservations=state.damageObservations.slice(-6);
   }
   bestDamageObservation(state){
-    const observations=(state?.damageObservations||[]).map((obs,index)=>({...obs,_index:index}));
-    if(!observations.length)return null;
-    observations.sort((a,b)=>{
-      const anchorA=(a.targetSpecies?1:0)+(a.userSpecies?1:0), anchorB=(b.targetSpecies?1:0)+(b.userSpecies?1:0);
-      return (anchorB-anchorA)||((b.turn||0)-(a.turn||0))||(b._index-a._index);
-    });
-    return observations[0];
+    return this.detectiveInputsFromState(state)[0]||null;
+  }
+  detectiveInputsFromState(state){
+    const baseInputs=(state?.damageObservations||[]).map((obs,index)=>({
+      species:state.species,
+      move:obs.move,
+      observedDamage:obs.observedDamage,
+      evidence:obs.evidence,
+      targetSpecies:obs.targetSpecies,
+      userSpecies:obs.userSpecies,
+      usedStatusMove:state.usedStatusMove,
+      tookHazardDamage:state.tookHazardDamage,
+      repeatedDamagingMove:state.repeatedDamagingMove,
+      movedFirst:state.movedFirst,
+      movedSecond:state.movedSecond,
+      speedContext:state.speedContext?{...state.speedContext}:null,
+      choiceContradiction:state.choiceContradiction,
+      revealedItem:state.revealedItem||undefined,
+      _index:index,
+      _turn:obs.turn||0
+    }));
+    if(!baseInputs.length)return [];
+    const deduped=[];
+    const seen=new Set();
+    baseInputs
+      .sort((a,b)=>{
+        const anchorA=(a.targetSpecies?1:0)+(a.userSpecies?1:0), anchorB=(b.targetSpecies?1:0)+(b.userSpecies?1:0);
+        return (anchorB-anchorA)||((b._turn||0)-(a._turn||0))||(b._index-a._index);
+      })
+      .forEach(input=>{
+        const key=[
+          input.evidence||'',
+          input.move||'',
+          input.observedDamage,
+          input.targetSpecies||'',
+          input.userSpecies||''
+        ].join('|');
+        if(seen.has(key))return;
+        seen.add(key);
+        deduped.push(input);
+      });
+    return deduped.map(({_index,_turn,...input})=>input);
+  }
+  detectiveInputLabel(input){
+    if(!input)return 'Replay clue';
+    if(input.evidence==='they_hit_me'){
+      return input.targetSpecies?`${input.move} into ${input.targetSpecies}`:`${input.move} damage clue`;
+    }
+    if(input.evidence==='i_hit_them'){
+      return input.userSpecies?`${input.userSpecies} into ${input.species}`:`${input.species} took ${input.move}`;
+    }
+    return `${input.move} clue`;
   }
   pctFromFraction(value){
     const match=String(value||'').match(/(\d+)\/(\d+)/);
@@ -440,7 +485,8 @@ class ReplayParser{
     const targets=Object.values(this.slotState)
       .filter(state=>state.species&&state.evidence.length)
       .map(state=>{
-        const bestObservation=this.bestDamageObservation(state);
+        const detectiveInputs=this.detectiveInputsFromState(state);
+        const bestObservation=detectiveInputs[0]||null;
         const uniqueNotes=unique([
           state.revealedItem?`${state.revealedItem} confirmed`:null,
           ...state.abilityHints.map(a=>`${a} revealed`),
@@ -453,26 +499,11 @@ class ReplayParser{
           state.movedFirst&&!state.speedContext?.opponentSpecies?'Moved first in a neutral-priority exchange':null,
           state.movedSecond&&!state.speedContext?.opponentSpecies?'Moved after a neutral-priority exchange':null
         ]);
-        const detectiveInput=bestObservation?{
-          species:state.species,
-          move:bestObservation.move,
-          observedDamage:bestObservation.observedDamage,
-          evidence:bestObservation.evidence,
-          targetSpecies:bestObservation.targetSpecies,
-          userSpecies:bestObservation.userSpecies,
-          usedStatusMove:state.usedStatusMove,
-          tookHazardDamage:state.tookHazardDamage,
-          repeatedDamagingMove:state.repeatedDamagingMove,
-          movedFirst:state.movedFirst,
-          movedSecond:state.movedSecond,
-          speedContext:state.speedContext?{...state.speedContext}:null,
-          choiceContradiction:state.choiceContradiction,
-          revealedItem:state.revealedItem||undefined
-        }:null;
         return {
           species:state.species,
           score:state.score,
           evidenceCount:state.evidence.length,
+          detectiveBranchCount:detectiveInputs.length,
           notes:uniqueNotes,
           revealedItem:state.revealedItem,
           abilityHints:state.abilityHints.slice(),
@@ -483,11 +514,15 @@ class ReplayParser{
           movedFirst:state.movedFirst,
           movedSecond:state.movedSecond,
           speedContext:state.speedContext?{...state.speedContext}:null,
-          detectiveInput,
+          detectiveInput:bestObservation,
+          detectiveInputs:detectiveInputs.map(input=>({
+            ...input,
+            label:this.detectiveInputLabel(input)
+          })),
           evidence:state.evidence.slice()
         };
       })
-      .sort((a,b)=>b.score-a.score||b.evidenceCount-a.evidenceCount);
+      .sort((a,b)=>b.score-a.score||b.detectiveBranchCount-a.detectiveBranchCount||b.evidenceCount-a.evidenceCount);
     return {targets,strongest:targets[0]||null};
   }
 }
@@ -497,8 +532,12 @@ function replayEvidenceIcon(source){
 function replayStrongestHtml(strongest){
   if(!strongest)return '<p class="muted">No single target had enough structured evidence to preload the detective.</p>';
   const noteBadges=(strongest.notes||[]).map(note=>reasonBadge(note,/confirmed|revealed/i.test(note)?'good':'warn')).join('');
-  const detectiveButton=strongest.detectiveInput?'<button class="primary small" onclick="loadReplayDetective()">Load strongest read into detective</button>':'';
-  return `<div class="box"><h4>Strongest target</h4><p><strong>${html(strongest.species)}</strong> is the best detective handoff right now with ${strongest.evidenceCount} clue(s).</p><div class="badges">${noteBadges||reasonBadge('Damage-only clue pool','warn')}</div><div class="actions"><button class="ghost small" onclick="copyReplaySummary()">Copy read</button>${detectiveButton}</div></div>`;
+  const detectiveInputs=strongest.detectiveInputs||[];
+  const detectiveButtons=detectiveInputs.length
+    ? detectiveInputs.map((input,index)=>`<button class="${index===0?'primary':'ghost'} small" onclick="loadReplayDetective(${index})">${html(index===0?`Load primary read: ${input.label}`:`Load alternate read: ${input.label}`)}</button>`).join('')
+    : '';
+  const branchText=detectiveInputs.length>1?` It has ${detectiveInputs.length} detective-ready branches instead of a single collapsed clue.`:'';
+  return `<div class="box"><h4>Strongest target</h4><p><strong>${html(strongest.species)}</strong> is the best detective handoff right now with ${strongest.evidenceCount} clue(s).${branchText}</p><div class="badges">${noteBadges||reasonBadge('Damage-only clue pool','warn')}</div><div class="actions"><button class="ghost small" onclick="copyReplaySummary()">Copy read</button>${detectiveButtons}</div></div>`;
 }
 function analyzeReplay(){
   const log=$('replayInput').value;
@@ -525,9 +564,10 @@ function analyzeReplay(){
   $('replayResults').className='replay-results';
   $('replayResults').innerHTML=`<div class="timeline">${turnHTML}</div><div class="replay-summary"><h4>Summary</h4><p>${parser.evidence.length} evidence points across ${turns.length} turns</p>${replayStrongestHtml(parser.replayRead.strongest)}</div>`;
 }
-function loadReplayDetective(){
+function loadReplayDetective(index=0){
   const strongest=lastReplayRead?.strongest;
-  const input=strongest?.detectiveInput;
+  const inputs=strongest?.detectiveInputs||[];
+  const input=inputs[index]||strongest?.detectiveInput;
   if(!strongest||!input)return;
   const opp=$('oppSpecies'), move=$('obsMove');
   if(opp?._items){
@@ -611,7 +651,7 @@ function getAgentFacts(agent){
       facts.topNature=replay.movedFirst?'fast line favored':'nature still open';
       facts.prob=0.5;
       facts.confidence='Replay-only';
-      facts.verdict=`Replay Observer has ${replay.evidenceCount} structured clue(s) on ${replay.species}.`;
+      facts.verdict=`Replay Observer has ${replay.evidenceCount} structured clue(s) on ${replay.species}${replay.detectiveBranchCount>1?`, including ${replay.detectiveBranchCount} detective-ready branches`:''}.`;
       facts.notes=replay.notes||[];
     }
   }

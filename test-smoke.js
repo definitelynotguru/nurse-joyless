@@ -128,12 +128,17 @@ const tests = String.raw`
   assert(defenseParser.replayRead.strongest?.detectiveInput?.userSpecies === 'Great Tusk', 'ReplayParser strongest read lost the attacking teammate on defender-side evidence');
   document.getElementById('replayInput').value = log; analyzeReplay();
   assert(document.getElementById('replayResults').innerHTML.includes('Heavy-Duty Boots'), 'Replay Observer did not render evidence');
-  assert(document.getElementById('replayResults').innerHTML.includes('Load strongest read into detective'), 'Replay Observer did not offer a detective handoff');
+  assert(document.getElementById('replayResults').innerHTML.includes('Load primary read:'), 'Replay Observer did not offer a detective handoff');
   loadReplayDetective();
   assert(document.getElementById('detective').innerHTML.includes('Choice Specs'), 'Replay handoff did not anchor the detective read');
   const detectiveFacts = getAgentFacts('detective');
   assert(detectiveFacts.species === 'Dragapult', 'Detective agent facts did not use the live detective read');
   assert(/Choice Specs/.test(detectiveFacts.verdict || '') || detectiveFacts.topItem === 'Choice Specs', 'Detective agent facts did not carry the anchored item read');
+  const branchLog = '|turn|1\n|switch|p1a: Great Tusk|Great Tusk, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|move|p2a: Gholdengo|Make It Rain|p1a: Great Tusk\n|-damage|p1a: Great Tusk|58/100\n|move|p1a: Great Tusk|Headlong Rush|p2a: Gholdengo\n|-damage|p2a: Gholdengo|29/100\n|-item|p2a: Gholdengo|Leftovers';
+  document.getElementById('replayInput').value = branchLog; analyzeReplay();
+  assert(document.getElementById('replayResults').innerHTML.includes('Load alternate read:'), 'Replay Observer did not surface alternate detective branches');
+  loadReplayDetective(1);
+  assert(lastDetectiveRead?.input?.move === 'Make It Rain', 'alternate replay detective branch did not stay loadable');
 
   document.getElementById('attacker').value = '0'; document.getElementById('attacker')._items = [mt];
   document.getElementById('defender').value = '0'; document.getElementById('defender')._items = [bl];

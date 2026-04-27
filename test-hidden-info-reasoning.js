@@ -222,4 +222,29 @@ const defenderLoadedRead = vm.runInContext('lastDetectiveRead', context, { timeo
 assert(defenderLoadedRead.input.user.species === 'Great Tusk', 'replay defender-side handoff should use the attacking teammate as the reference mon');
 assert(defenderLoadedRead.input.evidence === 'i_hit_them', 'replay defender-side handoff should preserve the defensive evidence direction');
 
+const multiBranchLog = '|turn|1\n|switch|p1a: Great Tusk|Great Tusk, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|move|p2a: Gholdengo|Make It Rain|p1a: Great Tusk\n|-damage|p1a: Great Tusk|58/100\n|move|p1a: Great Tusk|Headlong Rush|p2a: Gholdengo\n|-damage|p2a: Gholdengo|29/100\n|-item|p2a: Gholdengo|Leftovers';
+const multiBranchParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(multiBranchLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const multiBranchTarget = multiBranchParser.targets.find(t => t.species === 'Gholdengo');
+assert(multiBranchTarget?.detectiveBranchCount === 2, 'ReplayParser should keep both detective-ready branches for the same species');
+assert(multiBranchTarget?.detectiveInputs?.[0]?.label.includes('Great Tusk into Gholdengo'), 'ReplayParser should label defender-side detective branches');
+assert(multiBranchTarget?.detectiveInputs?.[1]?.label.includes('Make It Rain'), 'ReplayParser should keep the alternate offensive branch');
+
+vm.runInContext(
+  `team=[
+    preset("Great Tusk","Heavy-Duty Boots","Impish",{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},["Close Combat","Headlong Rush","Rapid Spin","Knock Off"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: multiBranchTarget })};
+  loadReplayDetective(1);`,
+  context,
+  { timeout: 10000 }
+);
+
+const alternateReplayRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(alternateReplayRead.input.evidence === 'they_hit_me', 'alternate replay detective branch should stay loadable');
+assert(alternateReplayRead.input.move === 'Make It Rain', 'alternate replay detective branch should preserve its move context');
+
 console.log('[OK] hidden info detective reasoning passed');
