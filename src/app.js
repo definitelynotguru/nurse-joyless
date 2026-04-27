@@ -317,9 +317,11 @@ class ReplayParser{
         repeatedDamagingMove:false,
         choiceContradiction:false,
         movedFirst:false,
+        movedSecond:false,
         revealedItem:'',
         abilityHints:[],
         damageObservation:null,
+        speedContext:null,
         lastDamagingMove:'',
         lastMoveTurn:0
       };
@@ -368,8 +370,13 @@ class ReplayParser{
         const [first,second]=this.turnMoves;
         if(first.species!==second.species&&first.priority===second.priority&&first.priority===0){
           const firstState=this.ensureState(first.slot);
+          const secondState=this.ensureState(second.slot);
           firstState.movedFirst=true;
-          this.addEvidence(firstState,turn,'damage',`${firstState.species} moved before an opposing neutral-priority move`,'Soft speed clue',1,{soft:true});
+          firstState.speedContext={relation:'fasterThan',opponentSpecies:second.species};
+          this.addEvidence(firstState,turn,'damage',`${firstState.species} moved before ${second.species} in a neutral-priority exchange`,'Soft speed clue',1,{soft:true,opponentSpecies:second.species});
+          secondState.movedSecond=true;
+          secondState.speedContext={relation:'slowerThan',opponentSpecies:first.species};
+          this.addEvidence(secondState,turn,'damage',`${secondState.species} moved after ${first.species} in a neutral-priority exchange`,'Soft speed clue',1,{soft:true,opponentSpecies:first.species});
         }
       }
       return;
@@ -384,9 +391,9 @@ class ReplayParser{
       const pct=this.pctFromFraction(event.damage);
       const moveEvent=[...this.turnMoves].reverse().find(x=>x.species&&state.slot!==x.slot);
       if(pct!==null&&moveEvent){
-        this.addEvidence(this.ensureState(moveEvent.slot),turn,'damage',`${moveEvent.species} dealt ${pct}% with ${moveEvent.move}`,'Damage-roll evidence available',1,{move:moveEvent.move,observedDamage:pct,evidenceType:'they_hit_me'});
+        this.addEvidence(this.ensureState(moveEvent.slot),turn,'damage',`${moveEvent.species} dealt ${pct}% with ${moveEvent.move}`,'Damage-roll evidence available',1,{move:moveEvent.move,observedDamage:pct,evidenceType:'they_hit_me',targetSpecies:state.species});
         const attackerState=this.ensureState(moveEvent.slot);
-        attackerState.damageObservation={move:moveEvent.move,observedDamage:pct,evidence:'they_hit_me'};
+        attackerState.damageObservation={move:moveEvent.move,observedDamage:pct,evidence:'they_hit_me',targetSpecies:state.species};
       }else if(pct!==null){
         this.addEvidence(state,turn,'damage',`${state.species} changed to ${pct}% HP`,'Damage-roll evidence available',0.5,{observedDamage:pct});
       }
@@ -424,17 +431,23 @@ class ReplayParser{
           state.usedStatusMove?'Assault Vest ruled out':null,
           state.choiceContradiction?'Choice items contradicted':null,
           state.repeatedDamagingMove?'Repeated move hints at Choice locking':null,
-          state.movedFirst?'Moved first in a neutral-priority exchange':null
+          state.speedContext?.relation==='fasterThan'&&state.speedContext?.opponentSpecies?`Moved before ${state.speedContext.opponentSpecies} in a neutral-priority exchange`:null,
+          state.speedContext?.relation==='slowerThan'&&state.speedContext?.opponentSpecies?`Moved after ${state.speedContext.opponentSpecies} in a neutral-priority exchange`:null,
+          state.movedFirst&&!state.speedContext?.opponentSpecies?'Moved first in a neutral-priority exchange':null,
+          state.movedSecond&&!state.speedContext?.opponentSpecies?'Moved after a neutral-priority exchange':null
         ]);
         const detectiveInput=state.damageObservation?{
           species:state.species,
           move:state.damageObservation.move,
           observedDamage:state.damageObservation.observedDamage,
           evidence:state.damageObservation.evidence,
+          targetSpecies:state.damageObservation.targetSpecies,
           usedStatusMove:state.usedStatusMove,
           tookHazardDamage:state.tookHazardDamage,
           repeatedDamagingMove:state.repeatedDamagingMove,
           movedFirst:state.movedFirst,
+          movedSecond:state.movedSecond,
+          speedContext:state.speedContext?{...state.speedContext}:null,
           choiceContradiction:state.choiceContradiction,
           revealedItem:state.revealedItem||undefined
         }:null;
@@ -450,6 +463,8 @@ class ReplayParser{
           repeatedDamagingMove:state.repeatedDamagingMove,
           choiceContradiction:state.choiceContradiction,
           movedFirst:state.movedFirst,
+          movedSecond:state.movedSecond,
+          speedContext:state.speedContext?{...state.speedContext}:null,
           detectiveInput,
           evidence:state.evidence.slice()
         };
@@ -1172,8 +1187,29 @@ function detectiveEvidenceNotes(input){
   if(input.choiceContradiction){notes.push('Changed damaging moves without switching, so Choice item lines are dead.'); hardBlocks.push('Choice items impossible')}
   if(input.revealedItem){notes.push(`${input.revealedItem} is already revealed, so non-${input.revealedItem} lines are dead.`); hardBlocks.push(`${input.revealedItem} confirmed`)}
   if(input.repeatedDamagingMove)notes.push('Repeated damage leans toward Choice locking, but does not prove it.');
-  if(input.movedFirst)notes.push('Moving first boosts fast natures and Scarf lines, but only as a soft speed clue.');
+  if(input.speedContext?.relation==='fasterThan'&&input.speedContext?.opponentSpecies)notes.push(`Moved before ${input.speedContext.opponentSpecies} in a neutral-priority exchange, so clearly slower lines are weak fits.`);
+  else if(input.speedContext?.relation==='slowerThan'&&input.speedContext?.opponentSpecies)notes.push(`Moved after ${input.speedContext.opponentSpecies} in a neutral-priority exchange, so clearly faster lines are weak fits.`);
+  else if(input.movedFirst)notes.push('Moving first boosts fast natures and Scarf lines, but only as a soft speed clue.');
   return {notes,hardBlocks};
+}
+function detectiveSpeedFit(candidate,input){
+  const relation=input.speedContext?.relation||'';
+  const opponentSpecies=input.speedContext?.opponentSpecies||input.user?.species||'the opposing Pokemon';
+  if(!relation||!input.user)return null;
+  const candidateSpeed=stats(candSet(candidate)).spe;
+  const opponentSpeed=stats(input.user).spe;
+  if(!candidateSpeed||!opponentSpeed)return null;
+  if(relation==='fasterThan'){
+    if(candidateSpeed<opponentSpeed)return {mult:.01,tag:`speed clue clashes with moving before ${opponentSpecies} (${candidateSpeed} < ${opponentSpeed})`,quality:'miss'};
+    if(candidateSpeed===opponentSpeed)return {mult:1.05,tag:`speed tie remains possible with ${opponentSpecies} (${candidateSpeed})`,quality:'near'};
+    return {mult:1.28,tag:`speed clue fits moving before ${opponentSpecies} (${candidateSpeed} > ${opponentSpeed})`,quality:'fit'};
+  }
+  if(relation==='slowerThan'){
+    if(candidateSpeed>opponentSpeed)return {mult:.01,tag:`speed clue clashes with moving after ${opponentSpecies} (${candidateSpeed} > ${opponentSpeed})`,quality:'miss'};
+    if(candidateSpeed===opponentSpeed)return {mult:1.05,tag:`speed tie remains possible with ${opponentSpecies} (${candidateSpeed})`,quality:'near'};
+    return {mult:1.28,tag:`speed clue fits moving after ${opponentSpecies} (${candidateSpeed} < ${opponentSpeed})`,quality:'fit'};
+  }
+  return null;
 }
 function scoreDetectiveDamageFit(obs,roll){
   const center=(roll.minp+roll.maxp)/2, slack=3, dist=Math.abs(obs-center), width=Math.max(4,((roll.maxp-roll.minp)/2)+slack);
@@ -1209,6 +1245,8 @@ function buildDetectiveRead(input){
     if(input.revealedItem&&c.item===input.revealedItem){c.prob*=1.8;c.reasons.push(`hard anchor: revealed item is ${input.revealedItem}`)}
     if(input.repeatedDamagingMove&&['Choice Band','Choice Specs','Choice Scarf'].includes(c.item)){c.prob*=1.35;c.reasons.push('soft boost: repeated damage points toward a Choice item')}
     if(input.movedFirst&&(['Timid','Jolly'].includes(c.nature)||c.item==='Choice Scarf')){c.prob*=1.22;c.reasons.push('soft boost: speed clue supports fast lines')}
+    const speedFit=detectiveSpeedFit(c,input);
+    if(speedFit){c.prob*=speedFit.mult;c.reasons.push(speedFit.tag)}
     try{
       const roll=input.evidence==='they_hit_me'?dmg(candSet(c),input.user,input.move,{hpPct:100}):dmg(input.user,candSet(c),input.move,{hpPct:100});
       roll.mv=input.move;
@@ -1239,7 +1277,16 @@ function renderDetectiveRead(read){
   $('detective').className='diag';
   $('detective').innerHTML=`<div class="box"><h3>Read on ${html(read.input.species)}</h3><p>Observed ${read.input.observedDamage}% from ${html(read.input.move)}. <strong>${html(read.summary.confidence.label)} confidence.</strong> ${html(read.summary.verdict)}</p><div class="badges">${noteBadges||reasonBadge(read.summary.confidence.reason,'good')}</div></div><div class="threecol"><div class="box"><h3>Likely items</h3>${bars(read.itemRows)}</div><div class="box"><h3>Likely natures</h3>${bars(read.natureRows)}</div><div class="box"><h3>Likely spreads</h3>${bars(read.profileRows)}</div></div><div class="box"><h3>Top candidates</h3><table><thead><tr><th>Set</th><th>Item</th><th>Nature</th><th>Prob</th><th>Evidence</th></tr></thead><tbody>${top.map(c=>`<tr><td>${html(c.profile)}</td><td>${html(c.item)}</td><td>${html(c.nature)}</td><td>${(c.prob*100).toFixed(1)}%</td><td>${html(c.reasons.slice(0,3).join('; '))}</td></tr>`).join('')}</tbody></table></div>${read.eliminated.length?`<div class="box"><h3>Hard eliminations</h3><div class="badges">${read.eliminated.slice(0,6).map(c=>reasonBadge(`${c.item} ${c.nature} ${c.profile}`,'bad')).join('')}</div><p class="muted">These lines conflict with hard evidence and were removed from the live pool.</p></div>`:''}`
 }
-function detect(overrides={}){const oppItems=$('oppSpecies')?._items||[],moveItems=$('obsMove')?._items||[],oppHit=oppItems[$('oppSpecies')?.value],moveHit=moveItems[$('obsMove')?.value],sp=overrides.species||oppHit?.species||oppItems[0]?.species,e=overrides.evidence||$('evidence')?.value||'they_hit_me',mv=overrides.move||moveHit?.species||moveItems[0]?.species,obs=overrides.observedDamage??(+$('obsPct')?.value||43),used=overrides.usedStatusMove??!!$('statusMove')?.checked,haz=overrides.tookHazardDamage??!!$('hazardTell')?.checked,rep=overrides.repeatedDamagingMove??!!$('repeatTell')?.checked,spd=overrides.movedFirst??!!$('speedTell')?.checked,user=overrides.user||team[0]||preset('Great Tusk','Heavy-Duty Boots','Impish',{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},['Close Combat','Headlong Rush','Rapid Spin','Knock Off']);if(!sp||!mv)return null;const read=buildDetectiveRead({...overrides,species:sp,evidence:e,move:mv,observedDamage:obs,usedStatusMove:used,tookHazardDamage:haz,repeatedDamagingMove:rep,movedFirst:spd,user});lastDetectiveRead=read;renderDetectiveRead(read);return read}
+function detectiveReferenceUser(overrides={}){
+  if(overrides.user)return overrides.user;
+  const wanted=[overrides.targetSpecies,overrides.speedContext?.opponentSpecies,overrides.userSpecies].filter(Boolean).map(x=>DexAdapter.id(x));
+  if(team?.length&&wanted.length){
+    const hit=team.find(mon=>wanted.includes(DexAdapter.id(mon.species)));
+    if(hit)return hit;
+  }
+  return team[0]||preset('Great Tusk','Heavy-Duty Boots','Impish',{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},['Close Combat','Headlong Rush','Rapid Spin','Knock Off']);
+}
+function detect(overrides={}){const oppItems=$('oppSpecies')?._items||[],moveItems=$('obsMove')?._items||[],oppHit=oppItems[$('oppSpecies')?.value],moveHit=moveItems[$('obsMove')?.value],sp=overrides.species||oppHit?.species||oppItems[0]?.species,e=overrides.evidence||$('evidence')?.value||'they_hit_me',mv=overrides.move||moveHit?.species||moveItems[0]?.species,obs=overrides.observedDamage??(+$('obsPct')?.value||43),used=overrides.usedStatusMove??!!$('statusMove')?.checked,haz=overrides.tookHazardDamage??!!$('hazardTell')?.checked,rep=overrides.repeatedDamagingMove??!!$('repeatTell')?.checked,spd=overrides.movedFirst??!!$('speedTell')?.checked,user=detectiveReferenceUser(overrides);if(!sp||!mv)return null;const read=buildDetectiveRead({...overrides,species:sp,evidence:e,move:mv,observedDamage:obs,usedStatusMove:used,tookHazardDamage:haz,repeatedDamagingMove:rep,movedFirst:spd,user});lastDetectiveRead=read;renderDetectiveRead(read);return read}
 function renderFavs(){if(!$('favorites'))return;$('favorites').className='';$('favorites').innerHTML=`<div class="favlist">${team.map((p,i)=>`<label class="fav"><input class="favBox" value="${html(p.species)}" type="checkbox" ${i<3?'checked':''}/> Keep ${html(p.species)}</label>`).join('')}</div>`}
 function evText(e){let lab={hp:'HP',atk:'Atk',def:'Def',spa:'SpA',spd:'SpD',spe:'Spe'};return Object.entries(e||{}).filter(([k,v])=>v).map(([k,v])=>`${v} ${lab[k]}`).join(' / ')||'4 HP / 252 Atk / 252 Spe'}
 function exportSet(p){return`${p.species} @ ${p.item||'Leftovers'}\nAbility: ${p.ability||'Pressure'}\n${p.tera?`Tera Type: ${p.tera}\n`:''}EVs: ${evText(p.evs)}\n${p.nature||'Hardy'} Nature\n${p.moves.slice(0,4).map(m=>`- ${m}`).join('\n')}`}

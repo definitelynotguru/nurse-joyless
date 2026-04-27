@@ -114,6 +114,11 @@ const tests = String.raw`
   assert(parser.evidence.some(e => e.conclusion.includes('Choice items contradicted')), 'ReplayParser did not detect a same-stay Choice contradiction');
   assert(parser.replayRead.strongest?.species === 'Dragapult', 'ReplayParser did not select the strongest detective target');
   assert(parser.replayRead.strongest?.revealedItem === 'Choice Specs', 'ReplayParser did not keep revealed item context');
+  assert(parser.replayRead.strongest?.detectiveInput?.targetSpecies === 'Blastoise', 'ReplayParser did not keep the actual replay target for detective math');
+  const speedLog = '|turn|1\n|switch|p1a: Dragonite|Dragonite, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|move|p2a: Gholdengo|Make It Rain|p1a: Dragonite\n|-damage|p1a: Dragonite|55/100\n|move|p1a: Dragonite|Earthquake|p2a: Gholdengo\n|-damage|p2a: Gholdengo|41/100';
+  const speedParser = new ReplayParser(); speedParser.parse(speedLog);
+  const gholdengoSpeedTarget = speedParser.replayRead.targets.find(t => t.species === 'Gholdengo');
+  assert(gholdengoSpeedTarget?.detectiveInput?.speedContext?.opponentSpecies === 'Dragonite', 'ReplayParser did not keep neutral-priority speed context');
   document.getElementById('replayInput').value = log; analyzeReplay();
   assert(document.getElementById('replayResults').innerHTML.includes('Heavy-Duty Boots'), 'Replay Observer did not render evidence');
   assert(document.getElementById('replayResults').innerHTML.includes('Load strongest read into detective'), 'Replay Observer did not offer a detective handoff');

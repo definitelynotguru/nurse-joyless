@@ -126,6 +126,32 @@ assert(!revealedRead.itemRows.some(([name]) => /^Choice (Band|Scarf)$/.test(name
 assert(revealedRead.summary.notes.some(x => /Choice items impossible/.test(x)), 'choice contradiction should be surfaced in detective notes');
 assert(revealedRead.summary.notes.some(x => /Choice Specs confirmed/.test(x)), 'revealed item should be surfaced in detective notes');
 
+const dragoniteUser = vm.runInContext(
+  "preset('Dragonite','Heavy-Duty Boots','Jolly',{hp:0,atk:252,def:4,spa:0,spd:0,spe:252},['Dragon Dance','Extreme Speed','Earthquake','Fire Punch'])",
+  context
+);
+
+const speedRead = vm.runInContext(
+  `buildDetectiveRead({
+    species:'Gholdengo',
+    evidence:'they_hit_me',
+    move:'Make It Rain',
+    observedDamage:45,
+    usedStatusMove:false,
+    tookHazardDamage:false,
+    repeatedDamagingMove:false,
+    movedFirst:true,
+    speedContext:{relation:'fasterThan',opponentSpecies:'Dragonite'},
+    user:${JSON.stringify(dragoniteUser)}
+  })`,
+  context,
+  { timeout: 10000 }
+);
+
+assert(speedRead.top[0].profile === 'speed physical', 'neutral-priority speed clue should push fast-enough lines to the front');
+assert(speedRead.top[1].profile === 'speed physical', 'neutral-priority speed clue should keep the second fast-enough line near the front');
+assert(speedRead.top[2].prob < speedRead.top[0].prob / 10, 'neutral-priority speed clue should sharply suppress clearly too-slow lines');
+
 const oppSpeciesEl = context.document.getElementById('oppSpecies');
 const evidenceEl = context.document.getElementById('evidence');
 const obsMoveEl = context.document.getElementById('obsMove');
@@ -150,5 +176,28 @@ speedTellEl.checked = false;
 vm.runInContext('team=[preset("Great Tusk","Heavy-Duty Boots","Impish",{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},["Close Combat","Headlong Rush","Rapid Spin","Knock Off"])]; detect();', context, { timeout: 10000 });
 assert(detectiveEl.innerHTML.includes('Hard eliminations'), 'detective panel should render the hard elimination section');
 assert(detectiveEl.innerHTML.includes('Likely spreads'), 'detective panel should render spread-level reasoning');
+
+vm.runInContext(
+  `team=[
+    preset("Great Tusk","Heavy-Duty Boots","Impish",{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},["Close Combat","Headlong Rush","Rapid Spin","Knock Off"]),
+    preset("Dragonite","Heavy-Duty Boots","Jolly",{hp:0,atk:252,def:4,spa:0,spd:0,spe:252},["Dragon Dance","Extreme Speed","Earthquake","Fire Punch"])
+  ];
+  lastReplayRead={strongest:{detectiveInput:{
+    species:"Gholdengo",
+    move:"Make It Rain",
+    observedDamage:45,
+    evidence:"they_hit_me",
+    targetSpecies:"Dragonite",
+    movedFirst:true,
+    speedContext:{relation:"fasterThan",opponentSpecies:"Dragonite"}
+  }}};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const replayLoadedRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(replayLoadedRead.input.user.species === 'Dragonite', 'replay detective handoff should use the actual replay target as the reference mon');
+assert(replayLoadedRead.top[0].profile === 'speed physical', 'replay detective handoff should preserve structured speed context');
 
 console.log('[OK] hidden info detective reasoning passed');
