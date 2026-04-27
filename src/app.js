@@ -812,7 +812,75 @@ function normC(c){let s=c.reduce((a,b)=>a+Math.max(0,b.prob),0)||1;c.forEach(x=>
 function defaultMoves(sp,c){let pool={Dragapult:c.profile.includes('special')?['Shadow Ball','Draco Meteor','Flamethrower','U-turn']:['Dragon Darts','U-turn','Sucker Punch','Tera Blast'],Kingambit:['Kowtow Cleave','Sucker Punch','Iron Head','Swords Dance'],'Great Tusk':['Close Combat','Headlong Rush','Rapid Spin','Knock Off'],'Iron Valiant':['Moonblast','Close Combat','Thunderbolt','Calm Mind'],Gholdengo:['Make It Rain','Shadow Ball','Focus Blast','Recover'],Corviknight:['Roost','Defog','U-turn','Body Press'],Dragonite:['Dragon Dance','Extreme Speed','Earthquake','Fire Punch']};return pool[sp]||['Earthquake','Ice Beam','Moonblast','Thunderbolt']}
 function candSet(c){return preset(c.species,c.item,c.nature,c.evs,defaultMoves(c.species,c))}
 function bars(rows){return rows.map(([n,p])=>`<p class="meta">${html(n)} · ${(p*100).toFixed(1)}%</p><div class="bar"><div style="width:${Math.max(2,p*100)}%"></div></div>`).join('')}
-function detect(){let sp=$('oppSpecies')._items[$('oppSpecies').value].species,e=$('evidence').value,mv=$('obsMove')._items[$('obsMove').value].species,obs=+$('obsPct').value,used=$('statusMove').checked,haz=$('hazardTell').checked,rep=$('repeatTell').checked,spd=$('speedTell').checked,user=team[0]||preset('Great Tusk','Heavy-Duty Boots','Impish',{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},['Close Combat','Headlong Rush','Rapid Spin','Knock Off']),cs=candidates(sp);cs.forEach(c=>{if(used&&c.item==='Assault Vest'){c.prob=0;c.reasons.push('impossible: used status move')}if(haz&&c.item==='Heavy-Duty Boots'){c.prob=0;c.reasons.push('impossible: took hazard damage')}if(rep&&['Choice Band','Choice Specs','Choice Scarf'].includes(c.item)){c.prob*=1.35;c.reasons.push('boosted: repeated move')}if(spd&&(['Timid','Jolly'].includes(c.nature)||c.item==='Choice Scarf')){c.prob*=1.25;c.reasons.push('boosted: moved first')}try{let r=e==='they_hit_me'?dmg(candSet(c),user,mv,{hpPct:100}):dmg(user,candSet(c),mv,{hpPct:100}),lo=r.minp-3,hi=r.maxp+3;if(obs>=lo&&obs<=hi){c.prob*=Math.max(.4,2.1-Math.abs(obs-(r.minp+r.maxp)/2)/8);c.reasons.push(`fits ${mv} (${r.minp.toFixed(1)}-${r.maxp.toFixed(1)}%)`)}else{c.prob*=.08;c.reasons.push(`bad fit ${mv} (${r.minp.toFixed(1)}-${r.maxp.toFixed(1)}%)`)}}catch(err){c.reasons.push('math skipped')}});normC(cs);cs.sort((a,b)=>b.prob-a.prob);let top=cs.slice(0,8),agg=k=>Object.entries(top.reduce((o,c)=>(o[c[k]]=(o[c[k]]||0)+c.prob,o),{})).sort((a,b)=>b[1]-a[1]);$('detective').className='diag';$('detective').innerHTML=`<div class="box"><h3>Read on ${html(sp)}</h3><p>Observed ${obs}% from ${html(mv)}. This is probability, not prophecy.</p></div><div class="twocol"><div class="box"><h3>Likely items</h3>${bars(agg('item'))}</div><div class="box"><h3>Likely natures</h3>${bars(agg('nature'))}</div></div><div class="box"><h3>Top candidates</h3><table><thead><tr><th>Set</th><th>Item</th><th>Nature</th><th>Prob</th><th>Evidence</th></tr></thead><tbody>${top.map(c=>`<tr><td>${html(c.profile)}</td><td>${html(c.item)}</td><td>${html(c.nature)}</td><td>${(c.prob*100).toFixed(1)}%</td><td>${html(c.reasons.slice(0,2).join('; '))}</td></tr>`).join('')}</tbody></table></div>`}
+function detectiveEvidenceNotes(input){
+  const notes=[], hardBlocks=[];
+  if(input.usedStatusMove){notes.push('Used a status move, so Assault Vest lines are dead.'); hardBlocks.push('Assault Vest impossible')}
+  if(input.tookHazardDamage){notes.push('Took hazard chip, so Heavy-Duty Boots is ruled out.'); hardBlocks.push('Heavy-Duty Boots impossible')}
+  if(input.repeatedDamagingMove)notes.push('Repeated damage leans toward Choice locking, but does not prove it.');
+  if(input.movedFirst)notes.push('Moving first boosts fast natures and Scarf lines, but only as a soft speed clue.');
+  return {notes,hardBlocks};
+}
+function scoreDetectiveDamageFit(obs,roll){
+  const center=(roll.minp+roll.maxp)/2, slack=3, dist=Math.abs(obs-center), width=Math.max(4,((roll.maxp-roll.minp)/2)+slack);
+  if(obs>=roll.minp-slack&&obs<=roll.maxp+slack)return {mult:Math.max(.55,2.2-dist/Math.max(6,width)), tag:`fits ${roll.mv} (${roll.minp.toFixed(1)}-${roll.maxp.toFixed(1)}%)`, quality:'fit'};
+  if(dist<=width+6)return {mult:.35, tag:`close but awkward ${roll.mv} fit (${roll.minp.toFixed(1)}-${roll.maxp.toFixed(1)}%)`, quality:'near'};
+  return {mult:.04, tag:`bad ${roll.mv} fit (${roll.minp.toFixed(1)}-${roll.maxp.toFixed(1)}%)`, quality:'miss'};
+}
+function detectiveConfidence(top){
+  const lead=top[0]?.prob||0, gap=lead-(top[1]?.prob||0);
+  if(lead>=.58&&gap>=.2)return {label:'High',reason:'one line clearly survives the evidence better than the rest'};
+  if(lead>=.36&&gap>=.1)return {label:'Medium',reason:'the best line is ahead, but there is still plausible competition'};
+  return {label:'Low',reason:'multiple lines still fit, so this read should guide play rather than lock it in'};
+}
+function detectiveSummary(top,input,notes){
+  const conf=detectiveConfidence(top);
+  const lead=top[0], itemLead=lead?`${lead.item} ${lead.nature} ${lead.profile}`:'no clean line';
+  const verdict=conf.label==='High'
+    ? `Best current read: ${itemLead}. The evidence is pointing in one direction.`
+    : conf.label==='Medium'
+      ? `Best current read: ${itemLead}. There is a lead, but it is not airtight.`
+      : `The read is still wide open. ${lead?`${lead.item} ${lead.nature} ${lead.profile} is only the front-runner.`:'Need more evidence.'}`;
+  return {confidence:conf,verdict,notes:[...notes.hardBlocks,...notes.notes]};
+}
+function aggregateDetective(top,key){return Object.entries(top.reduce((o,c)=>(o[c[key]]=(o[c[key]]||0)+c.prob,o),{})).sort((a,b)=>b[1]-a[1])}
+function buildDetectiveRead(input){
+  const cs=candidates(input.species).map(c=>({...c,reasons:[],eliminated:false,fitQuality:'unknown'}));
+  const notes=detectiveEvidenceNotes(input);
+  cs.forEach(c=>{
+    if(input.usedStatusMove&&c.item==='Assault Vest'){c.prob=0;c.eliminated=true;c.reasons.push('hard rule-out: used a status move')}
+    if(input.tookHazardDamage&&c.item==='Heavy-Duty Boots'){c.prob=0;c.eliminated=true;c.reasons.push('hard rule-out: took hazard damage')}
+    if(input.repeatedDamagingMove&&['Choice Band','Choice Specs','Choice Scarf'].includes(c.item)){c.prob*=1.35;c.reasons.push('soft boost: repeated damage points toward a Choice item')}
+    if(input.movedFirst&&(['Timid','Jolly'].includes(c.nature)||c.item==='Choice Scarf')){c.prob*=1.22;c.reasons.push('soft boost: speed clue supports fast lines')}
+    try{
+      const roll=input.evidence==='they_hit_me'?dmg(candSet(c),input.user,input.move,{hpPct:100}):dmg(input.user,candSet(c),input.move,{hpPct:100});
+      roll.mv=input.move;
+      const fit=scoreDetectiveDamageFit(input.observedDamage,roll);
+      c.prob*=fit.mult;
+      c.fitQuality=fit.quality;
+      c.reasons.push(fit.tag);
+    }catch(err){
+      c.reasons.push('damage math unavailable for this line');
+    }
+  });
+  normC(cs);
+  cs.sort((a,b)=>b.prob-a.prob);
+  const top=cs.slice(0,8), eliminated=cs.filter(c=>c.eliminated), summary=detectiveSummary(top,input,notes);
+  return {
+    input,
+    summary,
+    top,
+    eliminated,
+    itemRows:aggregateDetective(top,'item'),
+    natureRows:aggregateDetective(top,'nature'),
+    profileRows:aggregateDetective(top,'profile')
+  };
+}
+function renderDetectiveRead(read){
+  const top=read.top||[], noteBadges=(read.summary.notes||[]).map(x=>reasonBadge(x,/impossible/i.test(x)?'bad':'warn')).join('');
+  $('detective').className='diag';
+  $('detective').innerHTML=`<div class="box"><h3>Read on ${html(read.input.species)}</h3><p>Observed ${read.input.observedDamage}% from ${html(read.input.move)}. <strong>${html(read.summary.confidence.label)} confidence.</strong> ${html(read.summary.verdict)}</p><div class="badges">${noteBadges||reasonBadge(read.summary.confidence.reason,'good')}</div></div><div class="threecol"><div class="box"><h3>Likely items</h3>${bars(read.itemRows)}</div><div class="box"><h3>Likely natures</h3>${bars(read.natureRows)}</div><div class="box"><h3>Likely spreads</h3>${bars(read.profileRows)}</div></div><div class="box"><h3>Top candidates</h3><table><thead><tr><th>Set</th><th>Item</th><th>Nature</th><th>Prob</th><th>Evidence</th></tr></thead><tbody>${top.map(c=>`<tr><td>${html(c.profile)}</td><td>${html(c.item)}</td><td>${html(c.nature)}</td><td>${(c.prob*100).toFixed(1)}%</td><td>${html(c.reasons.slice(0,3).join('; '))}</td></tr>`).join('')}</tbody></table></div>${read.eliminated.length?`<div class="box"><h3>Hard eliminations</h3><div class="badges">${read.eliminated.slice(0,6).map(c=>reasonBadge(`${c.item} ${c.nature} ${c.profile}`,'bad')).join('')}</div><p class="muted">These lines conflict with hard evidence and were removed from the live pool.</p></div>`:''}`
+}
+function detect(){let sp=$('oppSpecies')._items[$('oppSpecies').value].species,e=$('evidence').value,mv=$('obsMove')._items[$('obsMove').value].species,obs=+$('obsPct').value,used=$('statusMove').checked,haz=$('hazardTell').checked,rep=$('repeatTell').checked,spd=$('speedTell').checked,user=team[0]||preset('Great Tusk','Heavy-Duty Boots','Impish',{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},['Close Combat','Headlong Rush','Rapid Spin','Knock Off']);const read=buildDetectiveRead({species:sp,evidence:e,move:mv,observedDamage:obs,usedStatusMove:used,tookHazardDamage:haz,repeatedDamagingMove:rep,movedFirst:spd,user});renderDetectiveRead(read);return read}
 function renderFavs(){if(!$('favorites'))return;$('favorites').className='';$('favorites').innerHTML=`<div class="favlist">${team.map((p,i)=>`<label class="fav"><input class="favBox" value="${html(p.species)}" type="checkbox" ${i<3?'checked':''}/> Keep ${html(p.species)}</label>`).join('')}</div>`}
 function evText(e){let lab={hp:'HP',atk:'Atk',def:'Def',spa:'SpA',spd:'SpD',spe:'Spe'};return Object.entries(e||{}).filter(([k,v])=>v).map(([k,v])=>`${v} ${lab[k]}`).join(' / ')||'4 HP / 252 Atk / 252 Spe'}
 function exportSet(p){return`${p.species} @ ${p.item||'Leftovers'}\nAbility: ${p.ability||'Pressure'}\n${p.tera?`Tera Type: ${p.tera}\n`:''}EVs: ${evText(p.evs)}\n${p.nature||'Hardy'} Nature\n${p.moves.slice(0,4).map(m=>`- ${m}`).join('\n')}`}
