@@ -151,7 +151,7 @@ IVs: 0 Atk / 0 Spe
 - Trick Room
 - Lunar Dance`
 };
-let team=[],analysis=null,reasoner=null,lastValidation=null;
+let team=[],analysis=null,reasoner=null,lastValidation=null,lastReplayRead=null,lastDetectiveRead=null;
 const $=id=>document.getElementById(id),keys=o=>Object.keys(o),pct=n=>`${Math.round(n)}/100`,html=s=>String(s??'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':'&quot;',"'":"&#39;"}[c]));
 const DexAdapter={dex:null,useDex:false,learnsets:null,init(){if(typeof window!=='undefined'&&window.pkmn?.Dex){this.dex=window.pkmn.Dex;this.useDex=true}else this.useDex=false},id(s){return String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'')},speciesNames(){if(!this.useDex)return keys(P);return this.dex.species.all().filter(s=>s&&s.exists!==false&&s.name&&!s.isNonstandard).map(s=>s.name)},moveNames(){if(!this.useDex)return keys(MOVES);return this.dex.moves.all().filter(m=>m&&m.exists!==false&&m.name&&!m.isNonstandard).map(m=>m.name)},resolveSpeciesName(name){let raw=String(name||'').trim();if(!raw)return'';let local=keys(P).find(k=>this.id(k)===this.id(raw));if(local)return local;let aliases={
   // Rotom forms
@@ -227,12 +227,365 @@ function matchupScores(t,a,s,primary){let w=tp=>weakCount(t,tp),r=tp=>resistCoun
 function riskList(t,a,s){let out=[];a.rows.slice(0,4).forEach(r=>{if(r.score>=4)out.push({level:r.sev,type:r.tp,detail:`${r.weak} weak, ${r.res} resist, ${r.imm} immune`})});if(Math.max(...Object.values(s.typeCounts))>=4){let [type,count]=Object.entries(s.typeCounts).sort((a,b)=>b[1]-a[1])[0];out.push({level:'crit',type:'Type stacking',detail:`${count} ${type}-type members create repeated matchup liabilities`})}if(!s.removal)out.push({level:'bad',type:'Hazard control',detail:'No removal detected'});if(!s.hazards)out.push({level:'warn',type:'Hazard pressure',detail:'No entry hazards detected'});if(s.trickRoom&&s.trickRoom<2)out.push({level:'warn',type:'Trick Room reliability',detail:'Only one Trick Room setter detected'});return out.slice(0,8)}
 const SUGGEST_SETS={Corviknight:`Corviknight @ Leftovers\nAbility: Pressure\nTera Type: Dragon\nEVs: 248 HP / 252 Def / 8 SpD\nImpish Nature\n- Roost\n- Defog\n- U-turn\n- Body Press`,Kingambit:`Kingambit @ Black Glasses\nAbility: Supreme Overlord\nTera Type: Dark\nEVs: 252 HP / 252 Atk / 4 SpD\nAdamant Nature\n- Swords Dance\n- Kowtow Cleave\n- Sucker Punch\n- Iron Head`,Heatran:`Heatran @ Leftovers\nAbility: Flash Fire\nTera Type: Grass\nEVs: 252 HP / 4 SpA / 252 SpD\nCalm Nature\n- Magma Storm\n- Earth Power\n- Stealth Rock\n- Protect`,"Rotom-Wash":`Rotom-Wash @ Leftovers\nAbility: Levitate\nTera Type: Steel\nEVs: 252 HP / 212 Def / 44 Spe\nBold Nature\n- Volt Switch\n- Hydro Pump\n- Will-O-Wisp\n- Protect`,Primarina:`Primarina @ Leftovers\nAbility: Torrent\nTera Type: Steel\nEVs: 252 HP / 252 SpA / 4 SpD\nModest Nature\n- Moonblast\n- Surf\n- Psychic Noise\n- Protect`,"Great Tusk":`Great Tusk @ Heavy-Duty Boots\nAbility: Protosynthesis\nTera Type: Water\nEVs: 252 HP / 4 Atk / 252 Def\nImpish Nature\n- Rapid Spin\n- Stealth Rock\n- Headlong Rush\n- Knock Off`,Hatterene:`Hatterene @ Leftovers\nAbility: Magic Bounce\nTera Type: Water\nEVs: 252 HP / 252 SpA / 4 SpD\nQuiet Nature\nIVs: 0 Spe\n- Psychic Noise\n- Dazzling Gleam\n- Trick Room\n- Healing Wish`,Pelipper:`Pelipper @ Damp Rock\nAbility: Drizzle\nTera Type: Steel\nEVs: 248 HP / 252 Def / 8 SpD\nBold Nature\n- Hurricane\n- Surf\n- U-turn\n- Roost`};
 const SETS=SUGGEST_SETS;
-class ReplayParser{constructor(){this.turns=[];this.evidence=[]}parse(log){const lines=log.split(/\r?\n/);let currentTurn=0;this.turns=[];this.evidence=[];lines.forEach(line=>{let trimmed=line.trim();if(!trimmed)return;if(trimmed.startsWith('|turn|')){currentTurn=parseInt(trimmed.split('|')[2])||0;this.turns.push({turn:currentTurn,events:[]});return}if(currentTurn<=0)return;let parts=trimmed.split('|').filter(Boolean);if(!parts.length)return;let event={type:parts[0],raw:trimmed};if(event.type==='switch'){event.pokemon=parts[1];event.details=parts[2]||''}else if(event.type==='move'){event.attacker=parts[1];event.move=parts[2];event.target=parts[3]||''}else if(event.type==='-damage'){event.target=parts[1];event.damage=parts[2];event.from=parts.find(p=>p.startsWith('[from]'))?.replace('[from] ','')||''}else if(event.type==='-heal'){event.target=parts[1];event.heal=parts[2]}else if(event.type==='-status'){event.target=parts[1];event.status=parts[2]}else if(event.type==='-item'){event.target=parts[1];event.item=parts[2]}else if(event.type==='-weather'){event.weather=parts[1]}this.turns[this.turns.length-1]?.events.push(event);this.extractEvidence(event,currentTurn)});return this.turns}extractEvidence(event,turn){if(event.type==='-damage'&&event.from&&/Stealth Rock|Spikes|Toxic Spikes/i.test(event.from)){this.evidence.push({turn,source:'hazard',text:`${event.target} took hazard damage`,conclusion:'Heavy-Duty Boots: IMPOSSIBLE'})}if(event.type==='move'&&event.move){let md=moveData(event.move);if(md&&md[1]==='Status')this.evidence.push({turn,source:'status',text:`${event.attacker} used status move ${event.move}`,conclusion:'Assault Vest: IMPOSSIBLE'})}if(event.type==='-damage'&&event.damage&&!event.from){let m=event.damage.match(/(\d+)\/(\d+)/);if(m){let pct=Math.round((+m[1])/(+m[2])*100);this.evidence.push({turn,source:'damage',text:`${event.target} changed to ${pct}% HP`,conclusion:'Damage-roll evidence available'})}}if(event.type==='-item'&&event.item)this.evidence.push({turn,source:'reveal',text:`${event.target} revealed ${event.item}`,conclusion:'Item confirmed'})}}
-function analyzeReplay(){const log=$('replayInput').value;if(!log.trim()){$('replayResults').className='empty';$('replayResults').textContent='Paste a replay log first.';return}const parser=new ReplayParser(),turns=parser.parse(log);if(!turns.length){$('replayResults').className='empty';$('replayResults').textContent='No valid turns found. Check format.';return}const by={};parser.evidence.forEach(ev=>{(by[ev.turn]||(by[ev.turn]=[])).push(ev)});let turnHTML=turns.map(t=>{let evs=by[t.turn]||[],evHTML=evs.map(e=>`<div class="evidence-item ${e.source}"><span class="evidence-icon">${e.source==='hazard'?'!':e.source==='status'?'X':e.source==='damage'?'*':'+'}</span><div><p>${html(e.text)}</p><strong>${html(e.conclusion)}</strong></div></div>`).join('');return`<div class="turn-card"><h4>Turn ${t.turn}</h4>${evs.length?`<div class="evidence-list">${evHTML}</div>`:'<p class="muted">No key evidence</p>'}</div>`}).join('');$('replayResults').className='replay-results';$('replayResults').innerHTML=`<div class="timeline">${turnHTML}</div><div class="replay-summary"><h4>Summary</h4><p>${parser.evidence.length} evidence points across ${turns.length} turns</p><button class="primary small" onclick="copyReplaySummary()">Copy read</button></div>`}function copyReplaySummary(){let text=$('replayResults').innerText;if(text)navigator.clipboard?.writeText(text)}
-const LocalAgents={surgeon:facts=>{const worst=facts.weaknesses?.[0];if(!worst)return'No weakness data available. Run team analysis first.';return`[TYPE SURGEON REPORT]\n\nCritical Finding: ${worst.weak} Pokemon vulnerable to ${worst.tp}.\nSeverity: ${worst.sev.toUpperCase()}.\n\nIdentity context: ${facts.identity||'unknown'}. Patch this before trusting the matchup spread.`},actuary:facts=>{if(!facts.move)return'No KO calculation data. Run damage calculator first.';let ko=+facts.koChance||0,rev=+facts.reverseKo||0;return`[KO ACTUARY REPORT]\n\n${facts.attacker} -> ${facts.defender} using ${facts.move}:\nOHKO ${facts.koChance}% / reverse ${facts.reverseKo}%${facts.reverseMove?` (${facts.reverseMove})`:''}.\n\n${ko>85&&rev<40?'Safe click.':ko>60?'Playable risk.':'Not lethal enough. Seek chip or pivot.'}`},detective:facts=>facts.species?`[SET DETECTIVE REPORT]\n\nSubject: ${facts.species}\nPrimary Hypothesis: ${facts.topItem} + ${facts.topNature}\nConfidence: ${(facts.prob*100).toFixed(1)}%`:'No detective data. Run hidden info detection first.',goblin:facts=>facts.status?`[LADDER GOBLIN REPORT]\n\n${facts.status==='Critical'?'This build needs adult supervision.':'The patient is breathing.'}\nIdentity: ${facts.identity||'unknown'}\nMissing: ${facts.missing?.join(', ')||'None'}\nRedundant: ${facts.redundancies?.join(', ')||'None'}`:'No team data. Analyze first.',summary:facts=>facts.status?`[NURSE JOYLESS PRESCRIPTION]\n\nStatus: ${facts.status}\nIdentity: ${facts.identity||'unknown'}\nWorst weakness: ${facts.worstType||'none'}\nBest suggestion: ${facts.topSuggestion||'none'}\n\nRun Sparring Lab before trusting your feelings.`:'Analyze a team and run Sparring Lab first.'};
-let currentAgentMode='local',currentAgent='surgeon';function getAgentFacts(agent){const facts={};if(analysis){runReasoner();facts.status=analysis.status;facts.weaknesses=analysis.rows?.slice(0,3);facts.typeCounts=analysis.typeCounts;facts.missing=analysis.missing;facts.redundancies=analysis.red;facts.worstType=analysis.rows?.[0]?.tp;facts.identity=reasoner?.identity?.primary?.name;facts.topSuggestion=reasoner?.suggestions?.[0]?.pokemon}if(agent==='actuary'){const atk=$('attacker')?.value,def=$('defender')?.value,move=$('move')?.value;if(atk&&def&&move){const a=$('attacker')._items?.[atk],d=$('defender')._items?.[def];if(a&&d){const r=dmg(a,d,move,{hpPct:+$('hp')?.value||100,hazards:$('hazards')?.value||'none',field:$('field')?.value||'none',attackerTera:$('attTera')?.checked,defenderTera:$('defTera')?.checked,attackerTeraType:$('attTeraType')?.value,defenderTeraType:$('defTeraType')?.value});facts.attacker=a.species;facts.defender=d.species;facts.move=move;facts.koChance=(r.ko*100).toFixed(1);try{const rm=d.moves.find(m=>moveData(m)&&moveCategory(m)!=='Status')||'Earthquake';const rev=dmg(d,a,rm,{hpPct:100});facts.reverseKo=(rev.ko*100).toFixed(1);facts.reverseMove=rm}catch(e){facts.reverseKo='?'}}}}if(agent==='detective'){const opp=$('oppSpecies')?.value;if(opp){const sp=$('oppSpecies')._items?.[opp]?.species;if(sp){facts.species=sp;facts.topItem='Choice Specs';facts.topNature='Timid';facts.prob=0.68}}}return facts}
+class ReplayParser{
+  constructor(){
+    this.turns=[];
+    this.evidence=[];
+    this.slotState={};
+    this.turnMoves=[];
+    this.replayRead={targets:[],strongest:null};
+  }
+  reset(){
+    this.turns=[];
+    this.evidence=[];
+    this.slotState={};
+    this.turnMoves=[];
+    this.replayRead={targets:[],strongest:null};
+  }
+  parse(log){
+    const lines=log.split(/\r?\n/);
+    let currentTurn=0;
+    this.reset();
+    lines.forEach(line=>{
+      const trimmed=line.trim();
+      if(!trimmed)return;
+      if(trimmed.startsWith('|turn|')){
+        currentTurn=parseInt(trimmed.split('|')[2],10)||0;
+        this.turns.push({turn:currentTurn,events:[]});
+        this.turnMoves=[];
+        return;
+      }
+      if(currentTurn<=0)return;
+      const parts=trimmed.split('|').filter(Boolean);
+      if(!parts.length)return;
+      const event={type:parts[0],raw:trimmed};
+      if(event.type==='switch'||event.type==='drag'){
+        event.pokemon=parts[1];
+        event.details=parts[2]||'';
+      }else if(event.type==='move'){
+        event.attacker=parts[1];
+        event.move=parts[2];
+        event.target=parts[3]||'';
+      }else if(event.type==='-damage'){
+        event.target=parts[1];
+        event.damage=parts[2];
+        event.from=parts.find(p=>p.startsWith('[from]'))?.replace('[from] ','')||'';
+      }else if(event.type==='-heal'){
+        event.target=parts[1];
+        event.heal=parts[2];
+      }else if(event.type==='-status'){
+        event.target=parts[1];
+        event.status=parts[2];
+      }else if(event.type==='-item'||event.type==='-enditem'){
+        event.target=parts[1];
+        event.item=parts[2];
+      }else if(event.type==='-immune'){
+        event.target=parts[1];
+        event.from=parts.find(p=>p.startsWith('[from]'))?.replace('[from] ','')||'';
+      }else if(event.type==='-activate'||event.type==='-ability'){
+        event.target=parts[1];
+        event.ability=(parts[2]||'').replace(/^ability: /,'');
+      }else if(event.type==='-weather'){
+        event.weather=parts[1];
+      }
+      this.turns[this.turns.length-1]?.events.push(event);
+      this.extractEvidence(event,currentTurn);
+    });
+    this.replayRead=this.buildReplayRead();
+    return this.turns;
+  }
+  slotId(token){
+    return String(token||'').split(':')[0].trim();
+  }
+  tokenSpecies(token){
+    return String(token||'').split(':').slice(1).join(':').trim()||'';
+  }
+  detailsSpecies(details){
+    return String(details||'').split(',')[0].trim()||'';
+  }
+  ensureState(token,details=''){
+    const slot=this.slotId(token);
+    const species=this.detailsSpecies(details)||this.tokenSpecies(token)||this.slotState[slot]?.species||'';
+    if(!this.slotState[slot]||this.slotState[slot].species!==species){
+      this.slotState[slot]={
+        slot,
+        species,
+        evidence:[],
+        score:0,
+        tookHazardDamage:false,
+        usedStatusMove:false,
+        repeatedDamagingMove:false,
+        choiceContradiction:false,
+        movedFirst:false,
+        revealedItem:'',
+        abilityHints:[],
+        damageObservation:null,
+        lastDamagingMove:'',
+        lastMoveTurn:0
+      };
+    }
+    return this.slotState[slot];
+  }
+  pctFromFraction(value){
+    const match=String(value||'').match(/(\d+)\/(\d+)/);
+    if(!match)return null;
+    return Math.round((+match[1])/(+match[2])*100);
+  }
+  addEvidence(state,turn,source,text,conclusion,score,extra={}){
+    if(!state||!state.species)return;
+    const item={turn,species:state.species,source,text,conclusion,score,...extra};
+    state.evidence.push(item);
+    state.score+=score||0;
+    this.evidence.push(item);
+  }
+  extractEvidence(event,turn){
+    if(event.type==='switch'||event.type==='drag'){
+      this.ensureState(event.pokemon,event.details);
+      return;
+    }
+    if(event.type==='move'&&event.attacker){
+      const state=this.ensureState(event.attacker);
+      const md=moveData(event.move);
+      if(md&&md[1]==='Status'){
+        state.usedStatusMove=true;
+        this.addEvidence(state,turn,'status',`${state.species} used status move ${event.move}`,'Assault Vest: IMPOSSIBLE',4,{hard:true});
+      }else if(md&&md[1]!=='Status'){
+        if(state.lastDamagingMove&&state.lastMoveTurn!==turn){
+          if(state.lastDamagingMove===event.move){
+            state.repeatedDamagingMove=true;
+            this.addEvidence(state,turn,'damage',`${state.species} repeated ${event.move} without switching`,'Choice item clue',1.5,{soft:true});
+          }else{
+            state.choiceContradiction=true;
+            this.addEvidence(state,turn,'status',`${state.species} used ${state.lastDamagingMove} and later ${event.move} without switching`,'Choice items contradicted',4,{hard:true});
+          }
+        }
+        state.lastDamagingMove=event.move;
+        state.lastMoveTurn=turn;
+      }
+      const moveEntry={slot:state.slot,species:state.species,move:event.move,priority:movePriority(event.move)};
+      this.turnMoves.push(moveEntry);
+      if(this.turnMoves.length===2){
+        const [first,second]=this.turnMoves;
+        if(first.species!==second.species&&first.priority===second.priority&&first.priority===0){
+          const firstState=this.ensureState(first.slot);
+          firstState.movedFirst=true;
+          this.addEvidence(firstState,turn,'damage',`${firstState.species} moved before an opposing neutral-priority move`,'Soft speed clue',1,{soft:true});
+        }
+      }
+      return;
+    }
+    if(event.type==='-damage'&&event.target){
+      const state=this.ensureState(event.target);
+      if(event.from&&/Stealth Rock|Spikes|Toxic Spikes/i.test(event.from)){
+        state.tookHazardDamage=true;
+        this.addEvidence(state,turn,'hazard',`${state.species} took hazard damage`,'Heavy-Duty Boots: IMPOSSIBLE',4,{hard:true});
+        return;
+      }
+      const pct=this.pctFromFraction(event.damage);
+      const moveEvent=[...this.turnMoves].reverse().find(x=>x.species&&state.slot!==x.slot);
+      if(pct!==null&&moveEvent){
+        this.addEvidence(this.ensureState(moveEvent.slot),turn,'damage',`${moveEvent.species} dealt ${pct}% with ${moveEvent.move}`,'Damage-roll evidence available',1,{move:moveEvent.move,observedDamage:pct,evidenceType:'they_hit_me'});
+        const attackerState=this.ensureState(moveEvent.slot);
+        attackerState.damageObservation={move:moveEvent.move,observedDamage:pct,evidence:'they_hit_me'};
+      }else if(pct!==null){
+        this.addEvidence(state,turn,'damage',`${state.species} changed to ${pct}% HP`,'Damage-roll evidence available',0.5,{observedDamage:pct});
+      }
+      return;
+    }
+    if((event.type==='-item'||event.type==='-enditem')&&event.target&&event.item){
+      const state=this.ensureState(event.target);
+      state.revealedItem=event.item;
+      this.addEvidence(state,turn,'reveal',`${state.species} revealed ${event.item}`,'Item confirmed',5,{hard:true,revealedItem:event.item});
+      return;
+    }
+    if((event.type==='-activate'||event.type==='-ability')&&event.target&&event.ability){
+      const state=this.ensureState(event.target);
+      if(!state.abilityHints.includes(event.ability))state.abilityHints.push(event.ability);
+      this.addEvidence(state,turn,'reveal',`${state.species} revealed ${event.ability}`,'Ability revealed',3.5,{hard:true,ability:event.ability});
+      return;
+    }
+    if(event.type==='-immune'&&event.target&&event.from){
+      const ability=event.from.replace(/^ability: /,'');
+      if(ability&&ability!==event.from){
+        const state=this.ensureState(event.target);
+        if(!state.abilityHints.includes(ability))state.abilityHints.push(ability);
+        this.addEvidence(state,turn,'reveal',`${state.species} was protected by ${ability}`,'Ability revealed',3.5,{hard:true,ability});
+      }
+    }
+  }
+  buildReplayRead(){
+    const targets=Object.values(this.slotState)
+      .filter(state=>state.species&&state.evidence.length)
+      .map(state=>{
+        const uniqueNotes=unique([
+          state.revealedItem?`${state.revealedItem} confirmed`:null,
+          ...state.abilityHints.map(a=>`${a} revealed`),
+          state.tookHazardDamage?'Boots ruled out':null,
+          state.usedStatusMove?'Assault Vest ruled out':null,
+          state.choiceContradiction?'Choice items contradicted':null,
+          state.repeatedDamagingMove?'Repeated move hints at Choice locking':null,
+          state.movedFirst?'Moved first in a neutral-priority exchange':null
+        ]);
+        const detectiveInput=state.damageObservation?{
+          species:state.species,
+          move:state.damageObservation.move,
+          observedDamage:state.damageObservation.observedDamage,
+          evidence:state.damageObservation.evidence,
+          usedStatusMove:state.usedStatusMove,
+          tookHazardDamage:state.tookHazardDamage,
+          repeatedDamagingMove:state.repeatedDamagingMove,
+          movedFirst:state.movedFirst,
+          choiceContradiction:state.choiceContradiction,
+          revealedItem:state.revealedItem||undefined
+        }:null;
+        return {
+          species:state.species,
+          score:state.score,
+          evidenceCount:state.evidence.length,
+          notes:uniqueNotes,
+          revealedItem:state.revealedItem,
+          abilityHints:state.abilityHints.slice(),
+          usedStatusMove:state.usedStatusMove,
+          tookHazardDamage:state.tookHazardDamage,
+          repeatedDamagingMove:state.repeatedDamagingMove,
+          choiceContradiction:state.choiceContradiction,
+          movedFirst:state.movedFirst,
+          detectiveInput,
+          evidence:state.evidence.slice()
+        };
+      })
+      .sort((a,b)=>b.score-a.score||b.evidenceCount-a.evidenceCount);
+    return {targets,strongest:targets[0]||null};
+  }
+}
+function replayEvidenceIcon(source){
+  return source==='hazard'?'!':source==='status'?'X':source==='damage'?'*':'+';
+}
+function replayStrongestHtml(strongest){
+  if(!strongest)return '<p class="muted">No single target had enough structured evidence to preload the detective.</p>';
+  const noteBadges=(strongest.notes||[]).map(note=>reasonBadge(note,/confirmed|revealed/i.test(note)?'good':'warn')).join('');
+  const detectiveButton=strongest.detectiveInput?'<button class="primary small" onclick="loadReplayDetective()">Load strongest read into detective</button>':'';
+  return `<div class="box"><h4>Strongest target</h4><p><strong>${html(strongest.species)}</strong> is the best detective handoff right now with ${strongest.evidenceCount} clue(s).</p><div class="badges">${noteBadges||reasonBadge('Damage-only clue pool','warn')}</div><div class="actions"><button class="ghost small" onclick="copyReplaySummary()">Copy read</button>${detectiveButton}</div></div>`;
+}
+function analyzeReplay(){
+  const log=$('replayInput').value;
+  if(!log.trim()){
+    $('replayResults').className='empty';
+    $('replayResults').textContent='Paste a replay log first.';
+    lastReplayRead=null;
+    return;
+  }
+  const parser=new ReplayParser(),turns=parser.parse(log);
+  lastReplayRead=parser.replayRead;
+  if(!turns.length){
+    $('replayResults').className='empty';
+    $('replayResults').textContent='No valid turns found. Check format.';
+    return;
+  }
+  const by={};
+  parser.evidence.forEach(ev=>{(by[ev.turn]||(by[ev.turn]=[])).push(ev)});
+  const turnHTML=turns.map(t=>{
+    const evs=by[t.turn]||[];
+    const evHTML=evs.map(e=>`<div class="evidence-item ${e.source}"><span class="evidence-icon">${replayEvidenceIcon(e.source)}</span><div><p>${html(e.text)}</p><strong>${html(e.conclusion)}</strong></div></div>`).join('');
+    return`<div class="turn-card"><h4>Turn ${t.turn}</h4>${evs.length?`<div class="evidence-list">${evHTML}</div>`:'<p class="muted">No key evidence</p>'}</div>`;
+  }).join('');
+  $('replayResults').className='replay-results';
+  $('replayResults').innerHTML=`<div class="timeline">${turnHTML}</div><div class="replay-summary"><h4>Summary</h4><p>${parser.evidence.length} evidence points across ${turns.length} turns</p>${replayStrongestHtml(parser.replayRead.strongest)}</div>`;
+}
+function loadReplayDetective(){
+  const strongest=lastReplayRead?.strongest;
+  const input=strongest?.detectiveInput;
+  if(!strongest||!input)return;
+  const opp=$('oppSpecies'), move=$('obsMove');
+  if(opp?._items){
+    const idx=opp._items.findIndex(x=>x.species===input.species);
+    if(idx>=0)opp.value=String(idx);
+  }
+  if(move?._items&&input.move){
+    const idx=move._items.findIndex(x=>x.species===input.move);
+    if(idx>=0)move.value=String(idx);
+  }
+  if($('obsPct'))$('obsPct').value=String(input.observedDamage||$('obsPct').value||43);
+  if($('evidence'))$('evidence').value=input.evidence||'they_hit_me';
+  if($('statusMove'))$('statusMove').checked=!!input.usedStatusMove;
+  if($('hazardTell'))$('hazardTell').checked=!!input.tookHazardDamage;
+  if($('repeatTell'))$('repeatTell').checked=!!input.repeatedDamagingMove;
+  if($('speedTell'))$('speedTell').checked=!!input.movedFirst;
+  detect({...input,choiceContradiction:input.choiceContradiction,revealedItem:input.revealedItem});
+}
+function copyReplaySummary(){let text=$('replayResults').innerText;if(text)navigator.clipboard?.writeText(text)}
+const LocalAgents={
+  surgeon:facts=>{const worst=facts.weaknesses?.[0];if(!worst)return'No weakness data available. Run team analysis first.';return`[TYPE SURGEON REPORT]\n\nCritical Finding: ${worst.weak} Pokemon vulnerable to ${worst.tp}.\nSeverity: ${worst.sev.toUpperCase()}.\n\nIdentity context: ${facts.identity||'unknown'}. Patch this before trusting the matchup spread.`},
+  actuary:facts=>{if(!facts.move)return'No KO calculation data. Run damage calculator first.';let ko=+facts.koChance||0,rev=+facts.reverseKo||0;return`[KO ACTUARY REPORT]\n\n${facts.attacker} -> ${facts.defender} using ${facts.move}:\nOHKO ${facts.koChance}% / reverse ${facts.reverseKo}%${facts.reverseMove?` (${facts.reverseMove})`:''}.\n\n${ko>85&&rev<40?'Safe click.':ko>60?'Playable risk.':'Not lethal enough. Seek chip or pivot.'}`},
+  detective:facts=>{
+    if(!facts.species)return'No detective data. Run hidden info detection first.';
+    const notes=(facts.notes||[]).slice(0,3).join(', ')||'Need more structured clues.';
+    return `[SET DETECTIVE REPORT]\n\nSubject: ${facts.species}\nPrimary Hypothesis: ${facts.topItem} + ${facts.topNature}\nConfidence: ${facts.confidence||`${(facts.prob*100).toFixed(1)}%`}\nVerdict: ${facts.verdict||'Best current line loaded.'}\nNotes: ${notes}`;
+  },
+  goblin:facts=>facts.status?`[LADDER GOBLIN REPORT]\n\n${facts.status==='Critical'?'This build needs adult supervision.':'The patient is breathing.'}\nIdentity: ${facts.identity||'unknown'}\nMissing: ${facts.missing?.join(', ')||'None'}\nRedundant: ${facts.redundancies?.join(', ')||'None'}`:'No team data. Analyze first.',
+  summary:facts=>facts.status?`[NURSE JOYLESS PRESCRIPTION]\n\nStatus: ${facts.status}\nIdentity: ${facts.identity||'unknown'}\nWorst weakness: ${facts.worstType||'none'}\nBest suggestion: ${facts.topSuggestion||'none'}\n\nRun Sparring Lab before trusting your feelings.`:'Analyze a team and run Sparring Lab first.'
+};
+let currentAgentMode='local',currentAgent='surgeon';
+function getAgentFacts(agent){
+  const facts={};
+  if(analysis){
+    runReasoner();
+    facts.status=analysis.status;
+    facts.weaknesses=analysis.rows?.slice(0,3);
+    facts.typeCounts=analysis.typeCounts;
+    facts.missing=analysis.missing;
+    facts.redundancies=analysis.red;
+    facts.worstType=analysis.rows?.[0]?.tp;
+    facts.identity=reasoner?.identity?.primary?.name;
+    facts.topSuggestion=reasoner?.suggestions?.[0]?.pokemon;
+  }
+  if(agent==='actuary'){
+    const atk=$('attacker')?.value,def=$('defender')?.value,move=$('move')?.value;
+    if(atk&&def&&move){
+      const a=$('attacker')._items?.[atk],d=$('defender')._items?.[def];
+      if(a&&d){
+        const r=dmg(a,d,move,{hpPct:+$('hp')?.value||100,hazards:$('hazards')?.value||'none',field:$('field')?.value||'none',attackerTera:$('attTera')?.checked,defenderTera:$('defTera')?.checked,attackerTeraType:$('attTeraType')?.value,defenderTeraType:$('defTeraType')?.value});
+        facts.attacker=a.species;
+        facts.defender=d.species;
+        facts.move=move;
+        facts.koChance=(r.ko*100).toFixed(1);
+        try{
+          const rm=d.moves.find(m=>moveData(m)&&moveCategory(m)!=='Status')||'Earthquake';
+          const rev=dmg(d,a,rm,{hpPct:100});
+          facts.reverseKo=(rev.ko*100).toFixed(1);
+          facts.reverseMove=rm;
+        }catch(e){
+          facts.reverseKo='?';
+        }
+      }
+    }
+  }
+  if(agent==='detective'){
+    const read=lastDetectiveRead||null;
+    const replay=lastReplayRead?.strongest||null;
+    if(read?.top?.length){
+      const top=read.top[0];
+      facts.species=read.input.species;
+      facts.topItem=top.item;
+      facts.topNature=top.nature;
+      facts.prob=top.prob;
+      facts.confidence=read.summary?.confidence?.label||`${(top.prob*100).toFixed(1)}%`;
+      facts.verdict=read.summary?.verdict;
+      facts.notes=read.summary?.notes||[];
+    }else if(replay){
+      facts.species=replay.species;
+      facts.topItem=replay.revealedItem||'Unconfirmed item';
+      facts.topNature=replay.movedFirst?'fast line favored':'nature still open';
+      facts.prob=0.5;
+      facts.confidence='Replay-only';
+      facts.verdict=`Replay Observer has ${replay.evidenceCount} structured clue(s) on ${replay.species}.`;
+      facts.notes=replay.notes||[];
+    }
+  }
+  return facts;
+}
 async function streamKimi(prompt,onChunk,onDone,onError){const apiKey=localStorage.getItem('nursejoyless_kimiKey');if(!apiKey){onError('No Kimi API key. Add key in settings.');return}try{const res=await fetch('https://api.moonshot.ai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},body:JSON.stringify({model:'kimi-k2-0711-preview',messages:[{role:'system',content:'You are a competitive Pokemon analyst. ONLY explain provided facts. Never invent mechanics.'},{role:'user',content:prompt}],stream:true,temperature:.7,max_tokens:300})});if(!res.ok){onError(`Kimi error: ${res.status}`);return}const reader=res.body?.getReader?.();if(!reader){onError('Kimi response body is not streamable.');return}const decoder=new TextDecoder();let buffer='';while(true){const {done,value}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});let lines=buffer.split('\n');buffer=lines.pop()||'';for(const line of lines){if(!line.startsWith('data: '))continue;let data=line.slice(6).trim();if(data==='[DONE]'){onDone();return}try{let json=JSON.parse(data),chunk=json.choices?.[0]?.delta?.content||'';if(chunk)onChunk(chunk)}catch(e){}}}onDone()}catch(err){onError(err.message||String(err))}}async function streamOllama(prompt,onChunk,onDone,onError){const baseUrl=localStorage.getItem('nursejoyless_ollamaUrl')||'http://localhost:11434';try{const res=await fetch(`${baseUrl}/api/generate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'llama3',prompt,stream:true})});if(!res.ok){onError(`Ollama error: ${res.status}`);return}const reader=res.body.getReader(),decoder=new TextDecoder();while(true){const{done,value}=await reader.read();if(done)break;decoder.decode(value).split('\n').filter(Boolean).forEach(line=>{try{let j=JSON.parse(line);onChunk(j.response||'')}catch(e){}})}onDone()}catch(err){onError(err.message)}}function buildAgentPrompt(agent,facts){return`Agent: ${agent}\nRules: only explain facts, never invent mechanics.\nFACTS:\n${JSON.stringify(facts,null,2)}\nRespond in 2-3 sharp sentences.`}async function runAgent(agent){currentAgent=agent;document.querySelectorAll('.agent-tab').forEach(t=>t.classList.toggle('active',t.dataset.agent===agent));const facts=getAgentFacts(agent),output=$('agentOutput');if(currentAgentMode==='local'){output.innerHTML='<div class="agent-loading">Analyzing...</div>';setTimeout(()=>{output.innerHTML=`<pre class="agent-response">${html(LocalAgents[agent](facts))}</pre>`},120);return}const prompt=buildAgentPrompt(agent,facts);output.innerHTML='<pre class="agent-response"></pre>';const pre=output.querySelector('pre');let full='';const onChunk=c=>{full+=c;pre.textContent=full;output.scrollTop=output.scrollHeight};const onDone=()=>pre.classList.add('done');const onError=e=>output.innerHTML=`<div class="agent-error">${html(e)}</div>`;if(currentAgentMode==='kimi')await streamKimi(prompt,onChunk,onDone,onError);else await streamOllama(prompt,onChunk,onDone,onError)}function initAgentConsole(){$('openAgent').onclick=()=>$('agentConsole').classList.add('open');$('closeAgent').onclick=()=>$('agentConsole').classList.remove('open');document.querySelectorAll('.agent-tab').forEach(t=>t.onclick=()=>runAgent(t.dataset.agent));document.querySelectorAll('.mode-btn').forEach(b=>b.onclick=()=>{document.querySelectorAll('.mode-btn').forEach(x=>x.classList.remove('active'));b.classList.add('active');currentAgentMode=b.dataset.mode;$('apiSettings').classList.toggle('hidden',currentAgentMode==='local')});$('saveApi').onclick=()=>{localStorage.setItem('nursejoyless_kimiKey',$('kimiKey').value);localStorage.setItem('nursejoyless_ollamaUrl',$('ollamaUrl').value);alert('Settings saved')}}
-function runAnalyze(){team=parseTeam($('teamInput').value);renderTeam();if(!team.length){$('diagnosis').className='empty';$('diagnosis').textContent='No valid team blocks found.';return}analysis=analyze(team);renderAnalysis();populate();scoreArchetypes()}function setDemo(){let ai=[...$('attacker').options].find(o=>o.textContent.includes('Great Tusk'));if(ai)$('attacker').value=ai.value;updateMoves();let mi=[...$('move').options].find(o=>o.textContent==='Close Combat');if(mi)$('move').value='Close Combat';let di=[...$('defender').options].find(o=>o.textContent.includes('Kingambit'));if(di)$('defender').value=di.value;$('hp').value=71;renderKo();let oi=[...$('oppSpecies').options].find(o=>o.textContent==='Dragapult');if(oi)$('oppSpecies').value=oi.value;let sm=[...$('obsMove').options].find(o=>o.textContent==='Shadow Ball');if(sm)$('obsMove').value=sm.value;detect()}function init(){$('teamInput').value=SAMPLE;$('loadDemo').onclick=()=>{$('teamInput').value=SAMPLE;runAnalyze();setDemo()};$('reset').onclick=()=>{team=[];analysis=null;reasoner=null;$('teamInput').value='';['teamCards','diagnosis','archetypeResults','identityResults','synergyResults','assistantResults','validationResults','exportsResults'].forEach(id=>{let e=$(id);if(e){e.className='empty';e.textContent='Analyze a team first.'}});$('status').textContent='No patient loaded';$('statusText').textContent='Paste a team before I start judging you.'};$('analyze').onclick=runAnalyze;$('attacker').onchange=updateMoves;$('calcKo').onclick=renderKo;$('detect').onclick=detect;$('rebuild').onclick=rebuild;$('calcArchetypes').onclick=scoreArchetypes;if($('suggestPokemon'))$('suggestPokemon').onclick=()=>{runReasoner();renderAssistant()};if($('validateMoves'))$('validateMoves').onclick=validateTeamSets;if($('copyMarkdown'))$('copyMarkdown').onclick=copyMarkdown;if($('exportJson'))$('exportJson').onclick=exportJson;$('analyzeReplay').onclick=analyzeReplay;
+function runAnalyze(){team=parseTeam($('teamInput').value);lastDetectiveRead=null;renderTeam();if(!team.length){$('diagnosis').className='empty';$('diagnosis').textContent='No valid team blocks found.';return}analysis=analyze(team);renderAnalysis();populate();scoreArchetypes()}function setDemo(){let ai=[...$('attacker').options].find(o=>o.textContent.includes('Great Tusk'));if(ai)$('attacker').value=ai.value;updateMoves();let mi=[...$('move').options].find(o=>o.textContent==='Close Combat');if(mi)$('move').value='Close Combat';let di=[...$('defender').options].find(o=>o.textContent.includes('Kingambit'));if(di)$('defender').value=di.value;$('hp').value=71;renderKo();let oi=[...$('oppSpecies').options].find(o=>o.textContent==='Dragapult');if(oi)$('oppSpecies').value=oi.value;let sm=[...$('obsMove').options].find(o=>o.textContent==='Shadow Ball');if(sm)$('obsMove').value=sm.value;detect()}function init(){$('teamInput').value=SAMPLE;$('loadDemo').onclick=()=>{$('teamInput').value=SAMPLE;runAnalyze();setDemo()};$('reset').onclick=()=>{team=[];analysis=null;reasoner=null;lastReplayRead=null;lastDetectiveRead=null;$('teamInput').value='';['teamCards','diagnosis','archetypeResults','identityResults','synergyResults','assistantResults','validationResults','exportsResults'].forEach(id=>{let e=$(id);if(e){e.className='empty';e.textContent='Analyze a team first.'}});$('status').textContent='No patient loaded';$('statusText').textContent='Paste a team before I start judging you.'};$('analyze').onclick=runAnalyze;$('attacker').onchange=updateMoves;$('calcKo').onclick=renderKo;$('detect').onclick=detect;$('rebuild').onclick=rebuild;$('calcArchetypes').onclick=scoreArchetypes;if($('suggestPokemon'))$('suggestPokemon').onclick=()=>{runReasoner();renderAssistant()};if($('validateMoves'))$('validateMoves').onclick=validateTeamSets;if($('copyMarkdown'))$('copyMarkdown').onclick=copyMarkdown;if($('exportJson'))$('exportJson').onclick=exportJson;$('analyzeReplay').onclick=analyzeReplay;
   // Regression test team buttons
   if($('testDragonSpam'))$('testDragonSpam').onclick=()=>{$('teamInput').value=REGRESSION_TEAMS.dragonSpam;runAnalyze();setDemo()};
   if($('testHazardStack'))$('testHazardStack').onclick=()=>{$('teamInput').value=REGRESSION_TEAMS.hazardStack;runAnalyze();setDemo()};
@@ -816,6 +1169,8 @@ function detectiveEvidenceNotes(input){
   const notes=[], hardBlocks=[];
   if(input.usedStatusMove){notes.push('Used a status move, so Assault Vest lines are dead.'); hardBlocks.push('Assault Vest impossible')}
   if(input.tookHazardDamage){notes.push('Took hazard chip, so Heavy-Duty Boots is ruled out.'); hardBlocks.push('Heavy-Duty Boots impossible')}
+  if(input.choiceContradiction){notes.push('Changed damaging moves without switching, so Choice item lines are dead.'); hardBlocks.push('Choice items impossible')}
+  if(input.revealedItem){notes.push(`${input.revealedItem} is already revealed, so non-${input.revealedItem} lines are dead.`); hardBlocks.push(`${input.revealedItem} confirmed`)}
   if(input.repeatedDamagingMove)notes.push('Repeated damage leans toward Choice locking, but does not prove it.');
   if(input.movedFirst)notes.push('Moving first boosts fast natures and Scarf lines, but only as a soft speed clue.');
   return {notes,hardBlocks};
@@ -849,6 +1204,9 @@ function buildDetectiveRead(input){
   cs.forEach(c=>{
     if(input.usedStatusMove&&c.item==='Assault Vest'){c.prob=0;c.eliminated=true;c.reasons.push('hard rule-out: used a status move')}
     if(input.tookHazardDamage&&c.item==='Heavy-Duty Boots'){c.prob=0;c.eliminated=true;c.reasons.push('hard rule-out: took hazard damage')}
+    if(input.choiceContradiction&&['Choice Band','Choice Specs','Choice Scarf'].includes(c.item)&&(!input.revealedItem||c.item!==input.revealedItem)){c.prob=0;c.eliminated=true;c.reasons.push('hard rule-out: changed damaging moves without switching')}
+    if(input.revealedItem&&c.item!==input.revealedItem){c.prob=0;c.eliminated=true;c.reasons.push(`hard rule-out: replay revealed ${input.revealedItem}`)}
+    if(input.revealedItem&&c.item===input.revealedItem){c.prob*=1.8;c.reasons.push(`hard anchor: revealed item is ${input.revealedItem}`)}
     if(input.repeatedDamagingMove&&['Choice Band','Choice Specs','Choice Scarf'].includes(c.item)){c.prob*=1.35;c.reasons.push('soft boost: repeated damage points toward a Choice item')}
     if(input.movedFirst&&(['Timid','Jolly'].includes(c.nature)||c.item==='Choice Scarf')){c.prob*=1.22;c.reasons.push('soft boost: speed clue supports fast lines')}
     try{
@@ -864,7 +1222,8 @@ function buildDetectiveRead(input){
   });
   normC(cs);
   cs.sort((a,b)=>b.prob-a.prob);
-  const top=cs.slice(0,8), eliminated=cs.filter(c=>c.eliminated), summary=detectiveSummary(top,input,notes);
+  const live=cs.filter(c=>c.prob>0);
+  const top=(live.length?live:cs).slice(0,8), eliminated=cs.filter(c=>c.eliminated), summary=detectiveSummary(top,input,notes);
   return {
     input,
     summary,
@@ -880,7 +1239,7 @@ function renderDetectiveRead(read){
   $('detective').className='diag';
   $('detective').innerHTML=`<div class="box"><h3>Read on ${html(read.input.species)}</h3><p>Observed ${read.input.observedDamage}% from ${html(read.input.move)}. <strong>${html(read.summary.confidence.label)} confidence.</strong> ${html(read.summary.verdict)}</p><div class="badges">${noteBadges||reasonBadge(read.summary.confidence.reason,'good')}</div></div><div class="threecol"><div class="box"><h3>Likely items</h3>${bars(read.itemRows)}</div><div class="box"><h3>Likely natures</h3>${bars(read.natureRows)}</div><div class="box"><h3>Likely spreads</h3>${bars(read.profileRows)}</div></div><div class="box"><h3>Top candidates</h3><table><thead><tr><th>Set</th><th>Item</th><th>Nature</th><th>Prob</th><th>Evidence</th></tr></thead><tbody>${top.map(c=>`<tr><td>${html(c.profile)}</td><td>${html(c.item)}</td><td>${html(c.nature)}</td><td>${(c.prob*100).toFixed(1)}%</td><td>${html(c.reasons.slice(0,3).join('; '))}</td></tr>`).join('')}</tbody></table></div>${read.eliminated.length?`<div class="box"><h3>Hard eliminations</h3><div class="badges">${read.eliminated.slice(0,6).map(c=>reasonBadge(`${c.item} ${c.nature} ${c.profile}`,'bad')).join('')}</div><p class="muted">These lines conflict with hard evidence and were removed from the live pool.</p></div>`:''}`
 }
-function detect(){let sp=$('oppSpecies')._items[$('oppSpecies').value].species,e=$('evidence').value,mv=$('obsMove')._items[$('obsMove').value].species,obs=+$('obsPct').value,used=$('statusMove').checked,haz=$('hazardTell').checked,rep=$('repeatTell').checked,spd=$('speedTell').checked,user=team[0]||preset('Great Tusk','Heavy-Duty Boots','Impish',{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},['Close Combat','Headlong Rush','Rapid Spin','Knock Off']);const read=buildDetectiveRead({species:sp,evidence:e,move:mv,observedDamage:obs,usedStatusMove:used,tookHazardDamage:haz,repeatedDamagingMove:rep,movedFirst:spd,user});renderDetectiveRead(read);return read}
+function detect(overrides={}){const oppItems=$('oppSpecies')?._items||[],moveItems=$('obsMove')?._items||[],oppHit=oppItems[$('oppSpecies')?.value],moveHit=moveItems[$('obsMove')?.value],sp=overrides.species||oppHit?.species||oppItems[0]?.species,e=overrides.evidence||$('evidence')?.value||'they_hit_me',mv=overrides.move||moveHit?.species||moveItems[0]?.species,obs=overrides.observedDamage??(+$('obsPct')?.value||43),used=overrides.usedStatusMove??!!$('statusMove')?.checked,haz=overrides.tookHazardDamage??!!$('hazardTell')?.checked,rep=overrides.repeatedDamagingMove??!!$('repeatTell')?.checked,spd=overrides.movedFirst??!!$('speedTell')?.checked,user=overrides.user||team[0]||preset('Great Tusk','Heavy-Duty Boots','Impish',{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},['Close Combat','Headlong Rush','Rapid Spin','Knock Off']);if(!sp||!mv)return null;const read=buildDetectiveRead({...overrides,species:sp,evidence:e,move:mv,observedDamage:obs,usedStatusMove:used,tookHazardDamage:haz,repeatedDamagingMove:rep,movedFirst:spd,user});lastDetectiveRead=read;renderDetectiveRead(read);return read}
 function renderFavs(){if(!$('favorites'))return;$('favorites').className='';$('favorites').innerHTML=`<div class="favlist">${team.map((p,i)=>`<label class="fav"><input class="favBox" value="${html(p.species)}" type="checkbox" ${i<3?'checked':''}/> Keep ${html(p.species)}</label>`).join('')}</div>`}
 function evText(e){let lab={hp:'HP',atk:'Atk',def:'Def',spa:'SpA',spd:'SpD',spe:'Spe'};return Object.entries(e||{}).filter(([k,v])=>v).map(([k,v])=>`${v} ${lab[k]}`).join(' / ')||'4 HP / 252 Atk / 252 Spe'}
 function exportSet(p){return`${p.species} @ ${p.item||'Leftovers'}\nAbility: ${p.ability||'Pressure'}\n${p.tera?`Tera Type: ${p.tera}\n`:''}EVs: ${evText(p.evs)}\n${p.nature||'Hardy'} Nature\n${p.moves.slice(0,4).map(m=>`- ${m}`).join('\n')}`}

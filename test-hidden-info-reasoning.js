@@ -103,6 +103,29 @@ const softRead = vm.runInContext(
 assert(softRead.summary.confidence.label !== 'High', 'soft clues alone should not produce overconfident detective reads');
 assert(softRead.summary.verdict.length > 20, 'detective verdict should explain the read, not just rank candidates');
 
+const revealedRead = vm.runInContext(
+  `buildDetectiveRead({
+    species:'Dragapult',
+    evidence:'they_hit_me',
+    move:'Shadow Ball',
+    observedDamage:43,
+    usedStatusMove:false,
+    tookHazardDamage:false,
+    repeatedDamagingMove:false,
+    movedFirst:false,
+    choiceContradiction:true,
+    revealedItem:'Choice Specs',
+    user:${JSON.stringify(userMon)}
+  })`,
+  context,
+  { timeout: 10000 }
+);
+
+assert(revealedRead.itemRows[0][0] === 'Choice Specs', 'revealed item should anchor the live item ranking');
+assert(!revealedRead.itemRows.some(([name]) => /^Choice (Band|Scarf)$/.test(name)), 'choice contradiction should remove incompatible Choice items');
+assert(revealedRead.summary.notes.some(x => /Choice items impossible/.test(x)), 'choice contradiction should be surfaced in detective notes');
+assert(revealedRead.summary.notes.some(x => /Choice Specs confirmed/.test(x)), 'revealed item should be surfaced in detective notes');
+
 const oppSpeciesEl = context.document.getElementById('oppSpecies');
 const evidenceEl = context.document.getElementById('evidence');
 const obsMoveEl = context.document.getElementById('obsMove');

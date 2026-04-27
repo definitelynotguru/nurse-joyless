@@ -106,13 +106,22 @@ const tests = String.raw`
   assert(/Sun Room|Trick Room/.test(lastReasoning.identity.primary.name), 'Sparring Lab failed to detect Sun Room / Trick Room');
   assert(lastReasoning.synergy.scores.speedControl >= 60, 'Trick Room should count as speed control');
 
-  const log = '|turn|3\n|move|p2a: Dragapult|Thunder Wave|p1a: Blastoise\n|-damage|p2a: Dragapult|88/100|[from] Stealth Rock\n|move|p2a: Dragapult|Shadow Ball|p1a: Blastoise\n|-damage|p1a: Blastoise|57/100\n';
+  const log = '|turn|3\n|switch|p2a: Dragapult|Dragapult, L80\n|move|p2a: Dragapult|Thunder Wave|p1a: Blastoise\n|-damage|p2a: Dragapult|88/100|[from] Stealth Rock\n|move|p2a: Dragapult|Shadow Ball|p1a: Blastoise\n|-damage|p1a: Blastoise|57/100\n|turn|4\n|move|p2a: Dragapult|Draco Meteor|p1a: Blastoise\n|-damage|p1a: Blastoise|12/100\n|-item|p2a: Dragapult|Choice Specs\n';
   const parser = new ReplayParser(); const turns = parser.parse(log);
-  assert(turns.length === 1, 'ReplayParser did not parse turn');
+  assert(turns.length === 2, 'ReplayParser did not parse turns');
   assert(parser.evidence.some(e => e.conclusion.includes('Heavy-Duty Boots')), 'ReplayParser did not detect Boots impossible');
   assert(parser.evidence.some(e => e.conclusion.includes('Assault Vest')), 'ReplayParser did not detect AV impossible');
+  assert(parser.evidence.some(e => e.conclusion.includes('Choice items contradicted')), 'ReplayParser did not detect a same-stay Choice contradiction');
+  assert(parser.replayRead.strongest?.species === 'Dragapult', 'ReplayParser did not select the strongest detective target');
+  assert(parser.replayRead.strongest?.revealedItem === 'Choice Specs', 'ReplayParser did not keep revealed item context');
   document.getElementById('replayInput').value = log; analyzeReplay();
   assert(document.getElementById('replayResults').innerHTML.includes('Heavy-Duty Boots'), 'Replay Observer did not render evidence');
+  assert(document.getElementById('replayResults').innerHTML.includes('Load strongest read into detective'), 'Replay Observer did not offer a detective handoff');
+  loadReplayDetective();
+  assert(document.getElementById('detective').innerHTML.includes('Choice Specs'), 'Replay handoff did not anchor the detective read');
+  const detectiveFacts = getAgentFacts('detective');
+  assert(detectiveFacts.species === 'Dragapult', 'Detective agent facts did not use the live detective read');
+  assert(/Choice Specs/.test(detectiveFacts.verdict || '') || detectiveFacts.topItem === 'Choice Specs', 'Detective agent facts did not carry the anchored item read');
 
   document.getElementById('attacker').value = '0'; document.getElementById('attacker')._items = [mt];
   document.getElementById('defender').value = '0'; document.getElementById('defender')._items = [bl];
