@@ -200,4 +200,26 @@ const replayLoadedRead = vm.runInContext('lastDetectiveRead', context, { timeout
 assert(replayLoadedRead.input.user.species === 'Dragonite', 'replay detective handoff should use the actual replay target as the reference mon');
 assert(replayLoadedRead.top[0].profile === 'speed physical', 'replay detective handoff should preserve structured speed context');
 
+vm.runInContext(
+  `team=[
+    preset("Great Tusk","Heavy-Duty Boots","Impish",{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},["Close Combat","Headlong Rush","Rapid Spin","Knock Off"]),
+    preset("Dragonite","Heavy-Duty Boots","Jolly",{hp:0,atk:252,def:4,spa:0,spd:0,spe:252},["Dragon Dance","Extreme Speed","Earthquake","Fire Punch"])
+  ];
+  lastReplayRead={strongest:{detectiveInput:{
+    species:"Gholdengo",
+    move:"Headlong Rush",
+    observedDamage:65,
+    evidence:"i_hit_them",
+    userSpecies:"Great Tusk",
+    revealedItem:"Leftovers"
+  }}};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const defenderLoadedRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(defenderLoadedRead.input.user.species === 'Great Tusk', 'replay defender-side handoff should use the attacking teammate as the reference mon');
+assert(defenderLoadedRead.input.evidence === 'i_hit_them', 'replay defender-side handoff should preserve the defensive evidence direction');
+
 console.log('[OK] hidden info detective reasoning passed');

@@ -119,6 +119,13 @@ const tests = String.raw`
   const speedParser = new ReplayParser(); speedParser.parse(speedLog);
   const gholdengoSpeedTarget = speedParser.replayRead.targets.find(t => t.species === 'Gholdengo');
   assert(gholdengoSpeedTarget?.detectiveInput?.speedContext?.opponentSpecies === 'Dragonite', 'ReplayParser did not keep neutral-priority speed context');
+  assert(gholdengoSpeedTarget?.detectiveInput?.evidence === 'i_hit_them', 'ReplayParser did not preserve defender-side damage evidence direction');
+  assert(gholdengoSpeedTarget?.detectiveInput?.userSpecies === 'Dragonite', 'ReplayParser did not keep the attacking teammate for defender-side detective math');
+  const defenseLog = '|turn|1\n|switch|p1a: Great Tusk|Great Tusk, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|move|p1a: Great Tusk|Headlong Rush|p2a: Gholdengo\n|-damage|p2a: Gholdengo|35/100\n|-item|p2a: Gholdengo|Leftovers';
+  const defenseParser = new ReplayParser(); defenseParser.parse(defenseLog);
+  assert(defenseParser.replayRead.strongest?.species === 'Gholdengo', 'ReplayParser did not elevate defender-side evidence when it had the richest clue stack');
+  assert(defenseParser.replayRead.strongest?.detectiveInput?.evidence === 'i_hit_them', 'ReplayParser strongest read did not hand defender-side evidence to the detective');
+  assert(defenseParser.replayRead.strongest?.detectiveInput?.userSpecies === 'Great Tusk', 'ReplayParser strongest read lost the attacking teammate on defender-side evidence');
   document.getElementById('replayInput').value = log; analyzeReplay();
   assert(document.getElementById('replayResults').innerHTML.includes('Heavy-Duty Boots'), 'Replay Observer did not render evidence');
   assert(document.getElementById('replayResults').innerHTML.includes('Load strongest read into detective'), 'Replay Observer did not offer a detective handoff');

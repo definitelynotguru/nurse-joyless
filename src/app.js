@@ -320,13 +320,27 @@ class ReplayParser{
         movedSecond:false,
         revealedItem:'',
         abilityHints:[],
-        damageObservation:null,
+        damageObservations:[],
         speedContext:null,
         lastDamagingMove:'',
         lastMoveTurn:0
       };
     }
     return this.slotState[slot];
+  }
+  addDamageObservation(state, observation){
+    if(!state||!observation?.move||observation.observedDamage==null)return;
+    state.damageObservations.push({...observation, turn:observation.turn||0});
+    if(state.damageObservations.length>6)state.damageObservations=state.damageObservations.slice(-6);
+  }
+  bestDamageObservation(state){
+    const observations=(state?.damageObservations||[]).map((obs,index)=>({...obs,_index:index}));
+    if(!observations.length)return null;
+    observations.sort((a,b)=>{
+      const anchorA=(a.targetSpecies?1:0)+(a.userSpecies?1:0), anchorB=(b.targetSpecies?1:0)+(b.userSpecies?1:0);
+      return (anchorB-anchorA)||((b.turn||0)-(a.turn||0))||(b._index-a._index);
+    });
+    return observations[0];
   }
   pctFromFraction(value){
     const match=String(value||'').match(/(\d+)\/(\d+)/);
@@ -393,7 +407,9 @@ class ReplayParser{
       if(pct!==null&&moveEvent){
         this.addEvidence(this.ensureState(moveEvent.slot),turn,'damage',`${moveEvent.species} dealt ${pct}% with ${moveEvent.move}`,'Damage-roll evidence available',1,{move:moveEvent.move,observedDamage:pct,evidenceType:'they_hit_me',targetSpecies:state.species});
         const attackerState=this.ensureState(moveEvent.slot);
-        attackerState.damageObservation={move:moveEvent.move,observedDamage:pct,evidence:'they_hit_me',targetSpecies:state.species};
+        this.addDamageObservation(attackerState,{turn,move:moveEvent.move,observedDamage:pct,evidence:'they_hit_me',targetSpecies:state.species});
+        this.addEvidence(state,turn,'damage',`${state.species} took ${pct}% from ${moveEvent.species}'s ${moveEvent.move}`,'Defensive damage-roll evidence available',1.25,{move:moveEvent.move,observedDamage:pct,evidenceType:'i_hit_them',userSpecies:moveEvent.species});
+        this.addDamageObservation(state,{turn,move:moveEvent.move,observedDamage:pct,evidence:'i_hit_them',userSpecies:moveEvent.species});
       }else if(pct!==null){
         this.addEvidence(state,turn,'damage',`${state.species} changed to ${pct}% HP`,'Damage-roll evidence available',0.5,{observedDamage:pct});
       }
@@ -424,6 +440,7 @@ class ReplayParser{
     const targets=Object.values(this.slotState)
       .filter(state=>state.species&&state.evidence.length)
       .map(state=>{
+        const bestObservation=this.bestDamageObservation(state);
         const uniqueNotes=unique([
           state.revealedItem?`${state.revealedItem} confirmed`:null,
           ...state.abilityHints.map(a=>`${a} revealed`),
@@ -436,12 +453,13 @@ class ReplayParser{
           state.movedFirst&&!state.speedContext?.opponentSpecies?'Moved first in a neutral-priority exchange':null,
           state.movedSecond&&!state.speedContext?.opponentSpecies?'Moved after a neutral-priority exchange':null
         ]);
-        const detectiveInput=state.damageObservation?{
+        const detectiveInput=bestObservation?{
           species:state.species,
-          move:state.damageObservation.move,
-          observedDamage:state.damageObservation.observedDamage,
-          evidence:state.damageObservation.evidence,
-          targetSpecies:state.damageObservation.targetSpecies,
+          move:bestObservation.move,
+          observedDamage:bestObservation.observedDamage,
+          evidence:bestObservation.evidence,
+          targetSpecies:bestObservation.targetSpecies,
+          userSpecies:bestObservation.userSpecies,
           usedStatusMove:state.usedStatusMove,
           tookHazardDamage:state.tookHazardDamage,
           repeatedDamagingMove:state.repeatedDamagingMove,
