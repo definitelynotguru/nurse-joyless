@@ -529,15 +529,26 @@ class ReplayParser{
 function replayEvidenceIcon(source){
   return source==='hazard'?'!':source==='status'?'X':source==='damage'?'*':'+';
 }
-function replayStrongestHtml(strongest){
-  if(!strongest)return '<p class="muted">No single target had enough structured evidence to preload the detective.</p>';
-  const noteBadges=(strongest.notes||[]).map(note=>reasonBadge(note,/confirmed|revealed/i.test(note)?'good':'warn')).join('');
-  const detectiveInputs=strongest.detectiveInputs||[];
+function replayTargetHtml(target,targetIndex,{headline='Replay target',strongest=false,includeCopy=false}={}){
+  if(!target)return '';
+  const noteBadges=(target.notes||[]).map(note=>reasonBadge(note,/confirmed|revealed/i.test(note)?'good':'warn')).join('');
+  const detectiveInputs=target.detectiveInputs||[];
   const detectiveButtons=detectiveInputs.length
-    ? detectiveInputs.map((input,index)=>`<button class="${index===0?'primary':'ghost'} small" onclick="loadReplayDetective(${index})">${html(index===0?`Load primary read: ${input.label}`:`Load alternate read: ${input.label}`)}</button>`).join('')
+    ? detectiveInputs.map((input,index)=>`<button class="${index===0?'primary':'ghost'} small" onclick="loadReplayDetective(${targetIndex},${index})">${html(index===0?(strongest?`Load primary read: ${input.label}`:`Load read: ${input.label}`):`Load alternate read: ${input.label}`)}</button>`).join('')
     : '';
   const branchText=detectiveInputs.length>1?` It has ${detectiveInputs.length} detective-ready branches instead of a single collapsed clue.`:'';
-  return `<div class="box"><h4>Strongest target</h4><p><strong>${html(strongest.species)}</strong> is the best detective handoff right now with ${strongest.evidenceCount} clue(s).${branchText}</p><div class="badges">${noteBadges||reasonBadge('Damage-only clue pool','warn')}</div><div class="actions"><button class="ghost small" onclick="copyReplaySummary()">Copy read</button>${detectiveButtons}</div></div>`;
+  const evidenceText=target.evidenceCount===1?'1 clue':`${target.evidenceCount} clue(s)`;
+  return `<div class="box replay-target-card"><h4>${html(headline)}</h4><p><strong>${html(target.species)}</strong> carries ${evidenceText}.${strongest?' It is the best detective handoff right now.':' It is still replay-loadable even though it is not the top score.'}${branchText}</p><div class="badges">${noteBadges||reasonBadge('Damage-only clue pool','warn')}</div><div class="actions">${includeCopy?'<button class="ghost small" onclick="copyReplaySummary()">Copy read</button>':''}${detectiveButtons}</div></div>`;
+}
+function replaySummaryHtml(read){
+  const targets=read?.targets||[];
+  const strongest=read?.strongest||targets[0]||null;
+  if(!strongest)return '<p class="muted">No single target had enough structured evidence to preload the detective.</p>';
+  const secondaryTargets=targets.slice(1,4);
+  const secondaryHtml=secondaryTargets.length
+    ? `<div class="replay-secondary"><h4>Other live targets</h4><p>${secondaryTargets.length} more replay-backed target${secondaryTargets.length===1?' is':'s are'} still worth loading into the detective.</p><div class="replay-target-grid">${secondaryTargets.map((target,index)=>replayTargetHtml(target,index+1,{headline:`#${index+2} target`})).join('')}</div></div>`
+    : '';
+  return `${replayTargetHtml(strongest,0,{headline:'Strongest target',strongest:true,includeCopy:true})}${secondaryHtml}`;
 }
 function analyzeReplay(){
   const log=$('replayInput').value;
@@ -562,13 +573,23 @@ function analyzeReplay(){
     return`<div class="turn-card"><h4>Turn ${t.turn}</h4>${evs.length?`<div class="evidence-list">${evHTML}</div>`:'<p class="muted">No key evidence</p>'}</div>`;
   }).join('');
   $('replayResults').className='replay-results';
-  $('replayResults').innerHTML=`<div class="timeline">${turnHTML}</div><div class="replay-summary"><h4>Summary</h4><p>${parser.evidence.length} evidence points across ${turns.length} turns</p>${replayStrongestHtml(parser.replayRead.strongest)}</div>`;
+  $('replayResults').innerHTML=`<div class="timeline">${turnHTML}</div><div class="replay-summary"><h4>Summary</h4><p>${parser.evidence.length} evidence points across ${turns.length} turns and ${parser.replayRead.targets.length} replay-backed target${parser.replayRead.targets.length===1?'':'s'}.</p>${replaySummaryHtml(parser.replayRead)}</div>`;
 }
-function loadReplayDetective(index=0){
-  const strongest=lastReplayRead?.strongest;
-  const inputs=strongest?.detectiveInputs||[];
-  const input=inputs[index]||strongest?.detectiveInput;
-  if(!strongest||!input)return;
+function loadReplayDetective(targetIndex=0,branchIndex){
+  const targets=lastReplayRead?.targets||[];
+  if(branchIndex==null){
+    const strongestBranches=lastReplayRead?.strongest?.detectiveInputs||[];
+    if(targetIndex>0&&strongestBranches[targetIndex]){
+      branchIndex=targetIndex;
+      targetIndex=0;
+    }else{
+      branchIndex=0;
+    }
+  }
+  const target=targets[targetIndex]||lastReplayRead?.strongest;
+  const inputs=target?.detectiveInputs||[];
+  const input=inputs[branchIndex]||target?.detectiveInput;
+  if(!target||!input)return;
   const opp=$('oppSpecies'), move=$('obsMove');
   if(opp?._items){
     const idx=opp._items.findIndex(x=>x.species===input.species);
@@ -651,7 +672,8 @@ function getAgentFacts(agent){
       facts.topNature=replay.movedFirst?'fast line favored':'nature still open';
       facts.prob=0.5;
       facts.confidence='Replay-only';
-      facts.verdict=`Replay Observer has ${replay.evidenceCount} structured clue(s) on ${replay.species}${replay.detectiveBranchCount>1?`, including ${replay.detectiveBranchCount} detective-ready branches`:''}.`;
+      const trackedTargets=lastReplayRead?.targets?.length||1;
+      facts.verdict=`Replay Observer has ${replay.evidenceCount} structured clue(s) on ${replay.species}${replay.detectiveBranchCount>1?`, including ${replay.detectiveBranchCount} detective-ready branches`:''}${trackedTargets>1?`, while keeping ${trackedTargets-1} other replay-backed target${trackedTargets-1===1?'':'s'} live`:''}.`;
       facts.notes=replay.notes||[];
     }
   }

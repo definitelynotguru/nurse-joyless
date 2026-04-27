@@ -139,6 +139,14 @@ const tests = String.raw`
   assert(document.getElementById('replayResults').innerHTML.includes('Load alternate read:'), 'Replay Observer did not surface alternate detective branches');
   loadReplayDetective(1);
   assert(lastDetectiveRead?.input?.move === 'Make It Rain', 'alternate replay detective branch did not stay loadable');
+  const multiTargetLog = '|turn|1\n|switch|p1a: Great Tusk|Great Tusk, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|move|p2a: Gholdengo|Make It Rain|p1a: Great Tusk\n|-damage|p1a: Great Tusk|58/100\n|-item|p2a: Gholdengo|Leftovers\n|turn|2\n|switch|p1a: Dragonite|Dragonite, L80\n|switch|p2a: Dragapult|Dragapult, L80\n|move|p2a: Dragapult|Shadow Ball|p1a: Dragonite\n|-damage|p1a: Dragonite|55/100\n|-damage|p2a: Dragapult|88/100|[from] Stealth Rock';
+  document.getElementById('replayInput').value = multiTargetLog; analyzeReplay();
+  assert(lastReplayRead?.targets?.length >= 2, 'Replay Observer did not keep multiple replay-backed targets');
+  assert(document.getElementById('replayResults').innerHTML.includes('Other live targets'), 'Replay Observer did not render secondary replay targets');
+  const secondaryReplayTarget = lastReplayRead.targets[1];
+  assert(document.getElementById('replayResults').innerHTML.includes(secondaryReplayTarget.species), 'Replay Observer did not name the secondary replay target');
+  loadReplayDetective(1, 0);
+  assert(lastDetectiveRead?.input?.species === secondaryReplayTarget.species, 'Replay Observer did not load the secondary replay target into the detective');
 
   document.getElementById('attacker').value = '0'; document.getElementById('attacker')._items = [mt];
   document.getElementById('defender').value = '0'; document.getElementById('defender')._items = [bl];
