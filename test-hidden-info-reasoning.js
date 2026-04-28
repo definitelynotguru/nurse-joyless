@@ -858,4 +858,52 @@ const slowReplayRead = vm.runInContext('lastDetectiveRead', context, { timeout: 
 assert(slowReplayRead.input.speedContext?.relation === 'slowerThan', 'Replay detective handoff should preserve the slower-than speed context on the loaded branch');
 assert(slowReplayRead.input.speedContext?.opponentSpecies === 'Dragapult', 'Replay detective handoff should preserve the original slower-than opponent');
 
+const postLossBootsRecoveryLog = '|turn|1\n|-sidestart|p2: foe|move: Stealth Rock\n|switch|p2a: Dragapult|Dragapult, L80\n|-damage|p2a: Dragapult|88/100|[from] Stealth Rock\n|-item|p2a: Dragapult|Leftovers\n|turn|2\n|-enditem|p2a: Dragapult|Leftovers|[from] move: Knock Off\n|turn|3\n|switch|p2a: Dragapult|Dragapult, L80';
+const postLossBootsRecoveryParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(postLossBootsRecoveryLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const postLossBootsRecoveryTarget = postLossBootsRecoveryParser.targets.find(t => t.species === 'Dragapult');
+assert(postLossBootsRecoveryTarget?.historicalHazardDamage, 'pre-loss hazard chip should stay visible as historical context after item loss');
+assert(!postLossBootsRecoveryTarget?.tookHazardDamage, 'pre-loss hazard chip alone should not rule out Boots for the current post-loss state');
+assert(postLossBootsRecoveryTarget?.detectiveInputs?.[0]?.postItemLossProtectionItems?.includes('Heavy-Duty Boots'), 'post-loss missing hazards should keep Boots live as a current-state explanation');
+
+vm.runInContext(
+  `team=[
+    preset("Great Tusk","Heavy-Duty Boots","Impish",{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},["Close Combat","Headlong Rush","Rapid Spin","Knock Off"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: postLossBootsRecoveryTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+const postLossBootsRecoveryRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(postLossBootsRecoveryRead.summary.notes.some(x => /Earlier hazard chip only ruled out Boots before the old item left/i.test(x)), 'post-loss current-state reads should explain that old hazard chip does not freeze the new item story');
+assert(postLossBootsRecoveryRead.summary.notes.some(x => /Heavy-Duty Boots live/i.test(x)), 'post-loss current-state reads should explain that later protection keeps Boots live');
+assert(postLossBootsRecoveryRead.itemRows.some(([name]) => name === 'Heavy-Duty Boots'), 'post-loss current-state reads should keep Boots in the live item pool');
+assert(!postLossBootsRecoveryRead.itemRows.some(([name]) => name === 'No Item'), 'post-loss protection return should stop leaving an empty slot as the leading current-state explanation');
+
+const clefableMagicGuardRecoveryLog = '|turn|1\n|-sidestart|p2: foe|move: Stealth Rock\n|switch|p2a: Clefable|Clefable, L80\n|-damage|p2a: Clefable|88/100|[from] Stealth Rock\n|-item|p2a: Clefable|Leftovers\n|turn|2\n|-enditem|p2a: Clefable|Leftovers|[from] move: Knock Off\n|turn|3\n|switch|p2a: Clefable|Clefable, L80';
+const clefableMagicGuardRecoveryParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(clefableMagicGuardRecoveryLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const clefableMagicGuardRecoveryTarget = clefableMagicGuardRecoveryParser.targets.find(t => t.species === 'Clefable');
+assert(clefableMagicGuardRecoveryTarget?.detectiveInputs?.[0]?.postItemLossProtectionAbilities?.includes('Magic Guard'), 'offline replay reasoning should keep Magic Guard live when later Stealth Rock no-chip can explain the new state');
+
+vm.runInContext(
+  `team=[
+    preset("Great Tusk","Heavy-Duty Boots","Impish",{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},["Close Combat","Headlong Rush","Rapid Spin","Knock Off"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: clefableMagicGuardRecoveryTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+const clefableMagicGuardRecoveryRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(clefableMagicGuardRecoveryRead.summary.notes.some(x => /Magic Guard/i.test(x)), 'offline replay reads should explain that Magic Guard stays live after post-loss Stealth Rock immunity');
+assert(clefableMagicGuardRecoveryRead.abilityRows[0][0] === 'Magic Guard', 'offline replay reads should let Magic Guard lead the ability ranking when it fits the later hazard immunity');
+
 console.log('[OK] hidden info detective reasoning passed');

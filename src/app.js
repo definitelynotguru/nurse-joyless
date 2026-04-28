@@ -20,6 +20,34 @@ Pecharunt:[["Poison","Ghost"],[88,88,160,88,110,60]],
 "Ogerpon-Wellspring":[["Grass","Water"],[80,120,84,60,96,110]],
 "Ogerpon-Hearthflame":[["Grass","Fire"],[80,120,84,60,96,110]],
 "Ogerpon-Cornerstone":[["Grass","Rock"],[80,120,84,60,96,110]]};
+const FALLBACK_ABILITIES={
+  Dragonite:{0:'Inner Focus',1:'Multiscale'},
+  Hydreigon:{0:'Levitate'},
+  Dragapult:{0:'Clear Body',1:'Infiltrator',H:'Cursed Body'},
+  Corviknight:{0:'Pressure',1:'Unnerve',H:'Mirror Armor'},
+  Heatran:{0:'Flash Fire'},
+  'Rotom-Wash':{0:'Levitate'},
+  'Rotom-Heat':{0:'Levitate'},
+  'Rotom-Fan':{0:'Levitate'},
+  'Rotom-Mow':{0:'Levitate'},
+  'Rotom-Frost':{0:'Levitate'},
+  'Great Tusk':{0:'Protosynthesis'},
+  Gholdengo:{0:'Good as Gold'},
+  Toxapex:{0:'Merciless',1:'Limber',H:'Regenerator'},
+  Clefable:{0:'Cute Charm',1:'Magic Guard',H:'Unaware'},
+  Hatterene:{0:'Healer',1:'Anticipation',H:'Magic Bounce'},
+  Garganacl:{0:'Purifying Salt'},
+  Clodsire:{0:'Poison Point',1:'Water Absorb',H:'Unaware'},
+  Amoonguss:{0:'Effect Spore',H:'Regenerator'},
+  Alomomola:{0:'Hydration',H:'Regenerator'},
+  Zapdos:{0:'Pressure',H:'Static'},
+  Pecharunt:{0:'Poison Puppeteer'},
+  'Landorus-Therian':{0:'Intimidate'},
+  Primarina:{0:'Torrent',H:'Liquid Voice'},
+  Skeledirge:{0:'Blaze',H:'Unaware'},
+  Pelipper:{0:'Keen Eye',1:'Drizzle',H:'Rain Dish'},
+  Barraskewda:{0:'Swift Swim',H:'Propeller Tail'}
+};
 const MOVES={"Shadow Ball":["Ghost","Special",80,100],"Draco Meteor":["Dragon","Special",130,90],Flamethrower:["Fire","Special",90,100],"U-turn":["Bug","Physical",70,100],"Dragon Darts":["Dragon","Physical",100,100],"Will-O-Wisp":["Fire","Status",0,85],Thunderbolt:["Electric","Special",90,100],"Ice Beam":["Ice","Special",90,100],Moonblast:["Fairy","Special",95,100],"Close Combat":["Fighting","Physical",120,100],"Headlong Rush":["Ground","Physical",120,100],Earthquake:["Ground","Physical",100,100],"Ice Spinner":["Ice","Physical",80,100],"Rapid Spin":["Normal","Physical",50,100],"Knock Off":["Dark","Physical",65,100],"Sucker Punch":["Dark","Physical",70,100,1],"Kowtow Cleave":["Dark","Physical",85,100],"Iron Head":["Steel","Physical",80,100],"Swords Dance":["Normal","Status",0,100],Roost:["Flying","Status",0,100],Defog:["Flying","Status",0,100],"Body Press":["Fighting","Physical",80,100,0,"def"],"Stealth Rock":["Rock","Status",0,100],Spikes:["Ground","Status",0,100],"Toxic Spikes":["Poison","Status",0,100],"Sticky Web":["Bug","Status",0,100],"Volt Switch":["Electric","Special",70,100],"Flip Turn":["Water","Physical",60,100],Recover:["Normal","Status",0,100],"Slack Off":["Normal","Status",0,100],Wish:["Normal","Status",0,100],Protect:["Normal","Status",0,100],Toxic:["Poison","Status",0,90],"Thunder Wave":["Electric","Status",0,90],Spore:["Grass","Status",0,100],"Calm Mind":["Psychic","Status",0,100],"Dragon Dance":["Dragon","Status",0,100],"Nasty Plot":["Dark","Status",0,100],"Bulk Up":["Fighting","Status",0,100],"Quiver Dance":["Bug","Status",0,100],"Extreme Speed":["Normal","Physical",80,100,2],"Fire Punch":["Fire","Physical",75,100],Hurricane:["Flying","Special",110,70],"Brave Bird":["Flying","Physical",120,100],"Make It Rain":["Steel","Special",120,100],"Focus Blast":["Fighting","Special",120,70],Psychic:["Psychic","Special",90,100],"Psychic Noise":["Psychic","Special",75,100],Psyshock:["Psychic","Special",80,100,0,"targetDef"],"Giga Drain":["Grass","Special",75,100],"Energy Ball":["Grass","Special",90,100],"Earth Power":["Ground","Special",90,100],"Weather Ball":["Normal","Special",50,100],"Dazzling Gleam":["Fairy","Special",80,100],"Flower Trick":["Grass","Physical",70,100],"Play Rough":["Fairy","Physical",90,90],"Flash Cannon":["Steel","Special",80,100],"Stone Edge":["Rock","Physical",100,80],"Rock Slide":["Rock","Physical",75,90],"Fiery Dance":["Fire","Special",80,100],"Bug Buzz":["Bug","Special",90,100],"Torch Song":["Fire","Special",80,100],"Dark Pulse":["Dark","Special",80,100],Crunch:["Dark","Physical",80,100],"Icicle Crash":["Ice","Physical",85,90],Outrage:["Dragon","Physical",120,100],"Aqua Jet":["Water","Physical",40,100,1],Waterfall:["Water","Physical",80,100],"Air Slash":["Flying","Special",75,95],Thunder:["Electric","Special",110,70],"Magma Storm":["Fire","Special",100,75],"Lava Plume":["Fire","Special",80,100],Eruption:["Fire","Special",150,100],"Tera Blast":["Normal","Special",80,100],"Hyperspace Fury":["Dark","Physical",100,100],"Drain Punch":["Fighting","Physical",75,100],"Trick Room":["Psychic","Status",0,100],"Healing Wish":["Psychic","Status",0,100],"Lunar Dance":["Psychic","Status",0,100],Moonlight:["Fairy","Status",0,100],Facade:["Normal","Physical",70,100],Roar:["Normal","Status",0,100]};
 const REPLAY_MOVE_HINTS={
   "Surf":["Water","Special",0],
@@ -211,7 +239,7 @@ const DexAdapter={dex:null,useDex:false,learnsets:null,init(){if(typeof window!=
   'tauros-paldea':'Tauros-Paldea-Combat','tauros-paldea-combat':'Tauros-Paldea-Combat','tauros-paldea-blaze':'Tauros-Paldea-Blaze','tauros-paldea-aqua':'Tauros-Paldea-Aqua','taurospaldea':'Tauros-Paldea-Combat',
   // Common nicknames
   'pult':'Dragapult','tusk':'Great Tusk','gambit':'Kingambit','valiant':'Iron Valiant','hoopau':'Hoopa-Unbound','lando':'Landorus-Therian'
-};let alias=aliases[this.id(raw)]||raw;if(this.useDex){let direct=this.dex.species.get(alias);if(direct&&direct.exists!==false&&direct.name)return direct.name;let hit=this.speciesNames().find(k=>this.id(k)===this.id(alias));if(hit)return hit}return alias.replace(/\b\w/g,c=>c.toUpperCase())},resolveMoveName(name){let raw=String(name||'').trim();if(!raw)return'';let local=keys(MOVES).find(k=>this.id(k)===this.id(raw));if(local)return local;if(this.useDex){let direct=this.dex.moves.get(raw);if(direct&&direct.exists!==false&&direct.name)return direct.name;let hit=this.moveNames().find(k=>this.id(k)===this.id(raw));if(hit)return hit}return raw},getSpecies(name){let n=this.resolveSpeciesName(name);if(this.useDex){let s=this.dex.species.get(n);if(s&&s.exists!==false&&s.baseStats)return{name:s.name,types:s.types||['Normal'],baseStats:[s.baseStats.hp,s.baseStats.atk,s.baseStats.def,s.baseStats.spa,s.baseStats.spd,s.baseStats.spe],abilities:s.abilities||{}}}return P[n]?{name:n,types:P[n][0],baseStats:P[n][1]}:null},getMove(name){let n=this.resolveMoveName(name);if(this.useDex){let m=this.dex.moves.get(n);if(m&&m.exists!==false&&m.name){let acc=m.accuracy===true?100:(m.accuracy||100),extra=null,id=this.id(m.name);if(id==='bodypress')extra='def';if(['psyshock','psystrike','secretsword'].includes(id))extra='targetDef';return[m.type||'Normal',m.category||'Status',m.basePower||0,acc,m.priority||0,extra]}}return MOVES[n]||null},async loadLearnsets(){if(this.learnsets)return this.learnsets;if(!this.useDex||typeof this.dex.getLearnsets!=='function')return null;try{this.learnsets=await this.dex.getLearnsets();return this.learnsets}catch(e){return null}},async canLearn(species,move){let s=this.useDex?this.dex.species.get(species):null,m=this.useDex?this.dex.moves.get(move):null;if(!this.useDex||!s||!m||s.exists===false||m.exists===false){return {known:false,can:null,reason:'learnset data unavailable in fallback mode'}}let all=await this.loadLearnsets();let data=all?.learnsets?.[s.id]||all?.[s.id]||this.dex.data?.Learnsets?.[s.id];let learnset=data?.learnset||data;if(!learnset)return {known:false,can:null,reason:'learnset not loaded for this species'};return {known:true,can:!!learnset[m.id],reason:learnset[m.id]?'move present in learnset':'move not found in learnset'}}};
+};let alias=aliases[this.id(raw)]||raw;if(this.useDex){let direct=this.dex.species.get(alias);if(direct&&direct.exists!==false&&direct.name)return direct.name;let hit=this.speciesNames().find(k=>this.id(k)===this.id(alias));if(hit)return hit}return alias.replace(/\b\w/g,c=>c.toUpperCase())},resolveMoveName(name){let raw=String(name||'').trim();if(!raw)return'';let local=keys(MOVES).find(k=>this.id(k)===this.id(raw));if(local)return local;if(this.useDex){let direct=this.dex.moves.get(raw);if(direct&&direct.exists!==false&&direct.name)return direct.name;let hit=this.moveNames().find(k=>this.id(k)===this.id(raw));if(hit)return hit}return raw},getSpecies(name){let n=this.resolveSpeciesName(name);if(this.useDex){let s=this.dex.species.get(n);if(s&&s.exists!==false&&s.baseStats)return{name:s.name,types:s.types||['Normal'],baseStats:[s.baseStats.hp,s.baseStats.atk,s.baseStats.def,s.baseStats.spa,s.baseStats.spd,s.baseStats.spe],abilities:s.abilities||{}}}return P[n]?{name:n,types:P[n][0],baseStats:P[n][1],abilities:FALLBACK_ABILITIES[n]||{}}:null},getMove(name){let n=this.resolveMoveName(name);if(this.useDex){let m=this.dex.moves.get(n);if(m&&m.exists!==false&&m.name){let acc=m.accuracy===true?100:(m.accuracy||100),extra=null,id=this.id(m.name);if(id==='bodypress')extra='def';if(['psyshock','psystrike','secretsword'].includes(id))extra='targetDef';return[m.type||'Normal',m.category||'Status',m.basePower||0,acc,m.priority||0,extra]}}return MOVES[n]||null},async loadLearnsets(){if(this.learnsets)return this.learnsets;if(!this.useDex||typeof this.dex.getLearnsets!=='function')return null;try{this.learnsets=await this.dex.getLearnsets();return this.learnsets}catch(e){return null}},async canLearn(species,move){let s=this.useDex?this.dex.species.get(species):null,m=this.useDex?this.dex.moves.get(move):null;if(!this.useDex||!s||!m||s.exists===false||m.exists===false){return {known:false,can:null,reason:'learnset data unavailable in fallback mode'}}let all=await this.loadLearnsets();let data=all?.learnsets?.[s.id]||all?.[s.id]||this.dex.data?.Learnsets?.[s.id];let learnset=data?.learnset||data;if(!learnset)return {known:false,can:null,reason:'learnset not loaded for this species'};return {known:true,can:!!learnset[m.id],reason:learnset[m.id]?'move present in learnset':'move not found in learnset'}}};
 DexAdapter.init();
 function moveData(n){return DexAdapter.getMove(n)}function moveMeta(n){let data=moveData(n);if(data)return data;let hint=REPLAY_MOVE_HINTS[DexAdapter.resolveMoveName(n)]||REPLAY_MOVE_HINTS[String(n||'').trim()];return hint?[hint[0],hint[1],0,100,hint[2]||0]:null}function moveCategory(n){return moveMeta(n)?.[1]||'Status'}function movePriority(n){return moveMeta(n)?.[4]||0}function speciesNames(){return DexAdapter.speciesNames()}function moveNames(){return moveNamesWithHints()}function moveNamesWithHints(){return unique([...DexAdapter.moveNames(),...keys(REPLAY_MOVE_HINTS)])}function norm(s){if(!s)return'';let m=String(s).match(/\(([^)]+)\)/);return DexAdapter.resolveSpeciesName(m?m[1]:s)}function moveName(s){return DexAdapter.resolveMoveName(s)}
 function parseEV(line,def=0){let e={hp:def,atk:def,def:def,spa:def,spd:def,spe:def},map={HP:'hp',Atk:'atk',Def:'def',SpA:'spa',SpD:'spd',Spe:'spe'};(line||'').replace(/^EVs:|^IVs:/i,'').split('/').forEach(x=>{let m=x.trim().match(/(\d+)\s+(HP|Atk|Def|SpA|SpD|Spe)/i);if(m)e[map[m[2]]]=+m[1]});return e}
@@ -400,6 +428,8 @@ class ReplayParser{
         hazardEvents:[],
         postItemLossNotes:[],
         postItemLossProtectionRecovered:false,
+        postItemLossProtectionItems:[],
+        postItemLossProtectionAbilities:[],
         abilityHints:[],
         damageObservations:[],
         clueObservations:[],
@@ -437,6 +467,55 @@ class ReplayParser{
     if(!state.postItemLossNotes.includes(text)){
       state.postItemLossNotes=[...state.postItemLossNotes,text].slice(-4);
     }
+  }
+  joinWithOr(list=[]){
+    const values=unique((list||[]).map(x=>String(x||'').trim()));
+    if(!values.length)return '';
+    if(values.length===1)return values[0];
+    if(values.length===2)return `${values[0]} or ${values[1]}`;
+    return `${values.slice(0,-1).join(', ')}, or ${values[values.length-1]}`;
+  }
+  currentStateHazardEvents(state){
+    const events=[...(state?.hazardEvents||[])];
+    if(state?.itemGone&&state.itemLossTurn)return events.filter(event=>(event.turn||0)>=state.itemLossTurn);
+    return events;
+  }
+  historicalHazardEvents(state){
+    if(!state?.itemGone||!state.itemLossTurn)return [];
+    return [...(state?.hazardEvents||[])].filter(event=>(event.turn||0)<state.itemLossTurn);
+  }
+  currentStateTookHazardDamage(state){
+    return this.currentStateHazardEvents(state).length>0;
+  }
+  protectionRecoveryItemsForHazard(hazard=''){
+    return this.normalizedHazardName(hazard)?['Heavy-Duty Boots']:[];
+  }
+  protectionRecoveryAbilitiesForHazard(state, hazard=''){
+    const label=this.normalizedHazardName(hazard);
+    if(!label)return [];
+    const abilities=detectiveAbilities(state?.species);
+    return abilities.filter(ability=>{
+      if(['Stealth Rock','Spikes'].includes(label)&&ability==='Magic Guard')return true;
+      if(['Spikes','Toxic Spikes','Sticky Web'].includes(label)&&ability==='Levitate')return true;
+      if(label==='Toxic Spikes'&&['Immunity','Pastel Veil'].includes(ability))return true;
+      if(label==='Sticky Web'&&['Clear Body','White Smoke','Full Metal Body'].includes(ability))return true;
+      return false;
+    });
+  }
+  addPostItemLossProtectionHints(state, hazard=''){
+    if(!state)return;
+    state.postItemLossProtectionItems=unique([...(state.postItemLossProtectionItems||[]),...this.protectionRecoveryItemsForHazard(hazard)]);
+    state.postItemLossProtectionAbilities=unique([...(state.postItemLossProtectionAbilities||[]),...this.protectionRecoveryAbilitiesForHazard(state,hazard)]);
+  }
+  postItemLossProtectionHintNote(state, hazard=''){
+    const label=this.normalizedHazardName(hazard);
+    if(!state||!label)return '';
+    const options=[
+      ...this.protectionRecoveryItemsForHazard(label),
+      ...this.protectionRecoveryAbilitiesForHazard(state,label)
+    ];
+    if(!options.length)return '';
+    return `Later missing ${label} after ${state?.removedItem||'the old item'} left the slot keeps ${this.joinWithOr(options)} live for the new current-state explanation.`;
   }
   turnSpeedContext(state, turn){
     if(!state||!turn)return null;
@@ -569,30 +648,20 @@ class ReplayParser{
   canMeaningfullyMissSpikes(state){
     const species=DexAdapter.getSpecies(state?.species);
     const types=species?.types||[];
-    if(types.includes('Flying'))return false;
-    if(detectiveAbilities(state?.species).includes('Levitate'))return false;
-    return true;
+    return !types.includes('Flying');
   }
   canMeaningfullyMissStealthRock(state){
-    return !detectiveAbilities(state?.species).includes('Magic Guard');
+    return !!state?.species;
   }
   canMeaningfullyMissToxicSpikes(state){
     const species=DexAdapter.getSpecies(state?.species);
     const types=species?.types||[];
-    if(types.includes('Flying')||types.includes('Poison')||types.includes('Steel'))return false;
-    const abilities=detectiveAbilities(state?.species);
-    if(abilities.includes('Levitate'))return false;
-    if(abilities.includes('Immunity')||abilities.includes('Pastel Veil'))return false;
-    return true;
+    return !types.includes('Flying')&&!types.includes('Poison')&&!types.includes('Steel');
   }
   canMeaningfullyMissStickyWeb(state){
     const species=DexAdapter.getSpecies(state?.species);
     const types=species?.types||[];
-    if(types.includes('Flying'))return false;
-    const abilities=detectiveAbilities(state?.species);
-    if(abilities.includes('Levitate'))return false;
-    if(abilities.includes('Clear Body')||abilities.includes('White Smoke')||abilities.includes('Full Metal Body'))return false;
-    return true;
+    return !types.includes('Flying');
   }
   pendingEntryHazards(state){
     if(!state?.itemGone||!state.side)return [];
@@ -633,7 +702,9 @@ class ReplayParser{
   markPostItemLossProtection(state, hazard=''){
     if(!state)return;
     state.postItemLossProtectionRecovered=true;
+    this.addPostItemLossProtectionHints(state,hazard);
     this.addPostItemLossNote(state,this.postItemLossProtectionNote(state,hazard));
+    this.addPostItemLossNote(state,this.postItemLossProtectionHintNote(state,hazard));
   }
   resolvePendingEntryChecksForEvent(turn, event){
     if(!this.pendingEntryChecks.length)return;
@@ -720,6 +791,8 @@ class ReplayParser{
     return this.detectiveInputsFromState(state)[0]||null;
   }
   detectiveInputsFromState(state){
+    const currentTookHazardDamage=this.currentStateTookHazardDamage(state);
+    const historicalHazardDamage=this.historicalHazardEvents(state).length>0;
     const baseInputs=(state?.damageObservations||[]).map((obs,index)=>({
       species:state.species,
       move:obs.move,
@@ -728,7 +801,8 @@ class ReplayParser{
       targetSpecies:obs.targetSpecies,
       userSpecies:obs.userSpecies,
       usedStatusMove:state.usedStatusMove,
-      tookHazardDamage:state.tookHazardDamage,
+      tookHazardDamage:currentTookHazardDamage,
+      historicalHazardDamage,
       repeatedDamagingMove:state.repeatedDamagingMove,
       revealedAbility:state.abilityHints.length===1?state.abilityHints[0]:undefined,
       abilityHints:state.abilityHints.slice(),
@@ -741,6 +815,8 @@ class ReplayParser{
       itemLossLabel:state.itemLossLabel||undefined,
       itemLossNote:state.itemLossNote||undefined,
       postItemLossProtectionRecovered:!!state.postItemLossProtectionRecovered,
+      postItemLossProtectionItems:(state.postItemLossProtectionItems||[]).slice(),
+      postItemLossProtectionAbilities:(state.postItemLossProtectionAbilities||[]).slice(),
       postItemLossNotes:(state.postItemLossNotes||[]).slice(),
       revealedItem:state.revealedItem||undefined,
       _index:index,
@@ -754,7 +830,8 @@ class ReplayParser{
           evidence:'clue_only',
           clueLabel:obs.label,
           usedStatusMove:state.usedStatusMove,
-          tookHazardDamage:state.tookHazardDamage,
+          tookHazardDamage:currentTookHazardDamage,
+          historicalHazardDamage,
           repeatedDamagingMove:state.repeatedDamagingMove,
           revealedAbility:state.abilityHints.length===1?state.abilityHints[0]:undefined,
           abilityHints:state.abilityHints.slice(),
@@ -767,6 +844,8 @@ class ReplayParser{
           itemLossLabel:state.itemLossLabel||undefined,
           itemLossNote:state.itemLossNote||undefined,
           postItemLossProtectionRecovered:!!state.postItemLossProtectionRecovered,
+          postItemLossProtectionItems:(state.postItemLossProtectionItems||[]).slice(),
+          postItemLossProtectionAbilities:(state.postItemLossProtectionAbilities||[]).slice(),
           postItemLossNotes:(state.postItemLossNotes||[]).slice(),
           revealedItem:state.revealedItem||undefined,
           _index:index,
@@ -917,6 +996,8 @@ class ReplayParser{
       state.itemLossTurn=0;
       state.postItemLossNotes=[];
       state.postItemLossProtectionRecovered=false;
+      state.postItemLossProtectionItems=[];
+      state.postItemLossProtectionAbilities=[];
       this.addEvidence(state,turn,'reveal',`${state.species} revealed ${event.item}`,'Item confirmed',5,{hard:true,revealedItem:event.item});
       this.addClueObservation(state,{turn,label:this.itemClueLabel(event.item)});
       return;
@@ -932,6 +1013,8 @@ class ReplayParser{
       if(state.revealedItem===event.item)state.revealedItem='';
       state.postItemLossNotes=[];
       state.postItemLossProtectionRecovered=false;
+      state.postItemLossProtectionItems=[];
+      state.postItemLossProtectionAbilities=[];
       this.addPostItemLossNote(state,this.hazardTimelineNote(state));
       const sourceText=String(event.from||'').trim();
       const sourceDetail=sourceText?` via ${sourceText.replace(/^move: /,'')}`:'';
@@ -993,6 +1076,8 @@ class ReplayParser{
       .map(state=>{
         const detectiveInputs=this.detectiveInputsFromState(state);
         const bestObservation=detectiveInputs[0]||null;
+        const currentTookHazardDamage=this.currentStateTookHazardDamage(state);
+        const historicalHazardDamage=this.historicalHazardEvents(state).length>0;
         const speedNotes=unique((state.speedContexts||[]).map(ctx=>{
           if(ctx.relation==='fasterThan'&&ctx.opponentSpecies)return `Moved before ${ctx.opponentSpecies} in a neutral-priority exchange`;
           if(ctx.relation==='slowerThan'&&ctx.opponentSpecies)return `Moved after ${ctx.opponentSpecies} in a neutral-priority exchange`;
@@ -1007,7 +1092,7 @@ class ReplayParser{
             const reward=this.abilityRewardText(a);
             return reward?`${a} revealed (${reward})`:`${a} revealed`;
           }),
-          state.tookHazardDamage?'Boots ruled out':null,
+          currentTookHazardDamage?'Boots ruled out for current item state':historicalHazardDamage?'Pre-loss hazard chip only ruled out Boots before the old item left':null,
           state.usedStatusMove?'Assault Vest ruled out':null,
           state.choiceContradiction?'Choice items contradicted':null,
           state.repeatedDamagingMove?'Repeated move hints at Choice locking':null,
@@ -1030,12 +1115,15 @@ class ReplayParser{
           postItemLossNotes:(state.postItemLossNotes||[]).slice(),
           abilityHints:state.abilityHints.slice(),
           usedStatusMove:state.usedStatusMove,
-          tookHazardDamage:state.tookHazardDamage,
+          tookHazardDamage:currentTookHazardDamage,
+          historicalHazardDamage,
           repeatedDamagingMove:state.repeatedDamagingMove,
           choiceContradiction:state.choiceContradiction,
           movedFirst:state.movedFirst,
           movedSecond:state.movedSecond,
           speedContext:state.speedContext?{...state.speedContext}:null,
+          postItemLossProtectionItems:(state.postItemLossProtectionItems||[]).slice(),
+          postItemLossProtectionAbilities:(state.postItemLossProtectionAbilities||[]).slice(),
           detectiveInput:bestObservation,
           detectiveInputs:detectiveInputs.map(input=>({
             ...input,
@@ -1790,10 +1878,12 @@ function normC(c){let s=c.reduce((a,b)=>a+Math.max(0,b.prob),0)||1;c.forEach(x=>
 function defaultMoves(sp,c){let pool={Dragapult:c.profile.includes('special')?['Shadow Ball','Draco Meteor','Flamethrower','U-turn']:['Dragon Darts','U-turn','Sucker Punch','Tera Blast'],Kingambit:['Kowtow Cleave','Sucker Punch','Iron Head','Swords Dance'],'Great Tusk':['Close Combat','Headlong Rush','Rapid Spin','Knock Off'],'Iron Valiant':['Moonblast','Close Combat','Thunderbolt','Calm Mind'],Gholdengo:['Make It Rain','Shadow Ball','Focus Blast','Recover'],Corviknight:['Roost','Defog','U-turn','Body Press'],Dragonite:['Dragon Dance','Extreme Speed','Earthquake','Fire Punch']};return pool[sp]||['Earthquake','Ice Beam','Moonblast','Thunderbolt']}
 function candSet(c){return {...preset(c.species,c.item,c.nature,c.evs,defaultMoves(c.species,c)),ability:c.ability||''}}
 function bars(rows){return rows.map(([n,p])=>`<p class="meta">${html(n)} · ${(p*100).toFixed(1)}%</p><div class="bar"><div style="width:${Math.max(2,p*100)}%"></div></div>`).join('')}
+function joinWithOr(list=[]){const values=unique((list||[]).map(x=>String(x||'').trim()));if(!values.length)return'';if(values.length===1)return values[0];if(values.length===2)return `${values[0]} or ${values[1]}`;return `${values.slice(0,-1).join(', ')}, or ${values[values.length-1]}`}
 function detectiveEvidenceNotes(input){
   const notes=[], hardBlocks=[];
   if(input.usedStatusMove){notes.push('Used a status move, so Assault Vest lines are dead.'); hardBlocks.push('Assault Vest impossible')}
   if(input.tookHazardDamage){notes.push('Took hazard chip, so Heavy-Duty Boots is ruled out.'); hardBlocks.push('Heavy-Duty Boots impossible')}
+  else if(input.historicalHazardDamage)notes.push('Earlier hazard chip only ruled out Boots before the old item left, so the current state can still reopen that protection line.');
   if(input.choiceContradiction){notes.push('Changed damaging moves without switching, so Choice item lines are dead.'); hardBlocks.push('Choice items impossible')}
   if(input.revealedItem){notes.push(`${input.revealedItem} is already revealed, so non-${input.revealedItem} lines are dead.`); hardBlocks.push(`${input.revealedItem} confirmed`)}
   if(input.revealedAbility){notes.push(`${input.revealedAbility} is already revealed, so non-${input.revealedAbility} lines are dead.`); hardBlocks.push(`${input.revealedAbility} confirmed`)}
@@ -1819,6 +1909,8 @@ function detectiveEvidenceNotes(input){
   if(input.postItemLossProtectionRecovered){
     notes.push('Later entry behavior shows the post-loss state regained protection, so an empty slot is no longer the only live current-item story.');
   }
+  const protectionOptions=unique([...(input.postItemLossProtectionItems||[]),...(input.postItemLossProtectionAbilities||[])]);
+  if(protectionOptions.length)notes.push(`Later entry protection keeps ${joinWithOr(protectionOptions)} live for the current state.`);
   (input.postItemLossNotes||[]).forEach(note=>notes.push(note));
   if(input.repeatedDamagingMove)notes.push('Repeated damage leans toward Choice locking, but does not prove it.');
   if(input.speedContext?.relation==='fasterThan'&&input.speedContext?.opponentSpecies)notes.push(`Moved before ${input.speedContext.opponentSpecies} in a neutral-priority exchange, so clearly slower lines are weak fits.`);
@@ -1885,6 +1977,8 @@ function buildDetectiveRead(input){
     if(input.itemGone&&input.removedItem&&c.item===input.removedItem){c.prob=0;c.eliminated=true;c.reasons.push(`hard rule-out: ${input.removedItem} is already gone`)}
     if(input.itemGone&&c.item==='No Item'){c.prob*=1.7;c.reasons.push('hard anchor: replay proved the old item left the slot')}
     if(input.postItemLossProtectionRecovered&&c.item==='No Item'){c.prob*=0.55;c.reasons.push('soft penalty: later entry protection means the slot may not still be empty')}
+    if((input.postItemLossProtectionItems||[]).includes(c.item)){c.prob*=1.6;c.reasons.push('soft boost: later entry protection fits this current item line')}
+    if((input.postItemLossProtectionAbilities||[]).includes(c.ability)){c.prob*=1.45;c.reasons.push('soft boost: later entry protection fits this ability line')}
     if(input.revealedItem&&c.item!==input.revealedItem){c.prob=0;c.eliminated=true;c.reasons.push(`hard rule-out: replay revealed ${input.revealedItem}`)}
     if(input.revealedItem&&c.item===input.revealedItem){c.prob*=1.8;c.reasons.push(`hard anchor: revealed item is ${input.revealedItem}`)}
     if(input.revealedAbility&&c.ability!==input.revealedAbility){c.prob=0;c.eliminated=true;c.reasons.push(`hard rule-out: replay revealed ${input.revealedAbility}`)}
