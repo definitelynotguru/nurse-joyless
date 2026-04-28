@@ -322,7 +322,9 @@ class ReplayParser{
         revealedItem:'',
         abilityHints:[],
         damageObservations:[],
+        clueObservations:[],
         speedContext:null,
+        lastMove:'',
         lastDamagingMove:'',
         lastMoveTurn:0
       };
@@ -333,6 +335,11 @@ class ReplayParser{
     if(!state||!observation?.move||observation.observedDamage==null)return;
     state.damageObservations.push({...observation, turn:observation.turn||0});
     if(state.damageObservations.length>6)state.damageObservations=state.damageObservations.slice(-6);
+  }
+  addClueObservation(state, observation){
+    if(!state||!observation?.label)return;
+    state.clueObservations.push({...observation, turn:observation.turn||0});
+    if(state.clueObservations.length>4)state.clueObservations=state.clueObservations.slice(-4);
   }
   bestDamageObservation(state){
     return this.detectiveInputsFromState(state)[0]||null;
@@ -358,10 +365,32 @@ class ReplayParser{
       _index:index,
       _turn:obs.turn||0
     }));
-    if(!baseInputs.length)return [];
+    const clueInputs=!baseInputs.length
+      ? (state?.clueObservations||[]).map((obs,index)=>({
+          species:state.species,
+          move:obs.move||'',
+          observedDamage:null,
+          evidence:'clue_only',
+          clueLabel:obs.label,
+          usedStatusMove:state.usedStatusMove,
+          tookHazardDamage:state.tookHazardDamage,
+          repeatedDamagingMove:state.repeatedDamagingMove,
+          revealedAbility:state.abilityHints.length===1?state.abilityHints[0]:undefined,
+          abilityHints:state.abilityHints.slice(),
+          movedFirst:state.movedFirst,
+          movedSecond:state.movedSecond,
+          speedContext:state.speedContext?{...state.speedContext}:null,
+          choiceContradiction:state.choiceContradiction,
+          revealedItem:state.revealedItem||undefined,
+          _index:index,
+          _turn:obs.turn||0
+        }))
+      : [];
+    const allInputs=baseInputs.length?baseInputs:clueInputs;
+    if(!allInputs.length)return [];
     const deduped=[];
     const seen=new Set();
-    baseInputs
+    allInputs
       .sort((a,b)=>{
         const anchorA=(a.targetSpecies?1:0)+(a.userSpecies?1:0), anchorB=(b.targetSpecies?1:0)+(b.userSpecies?1:0);
         return (anchorB-anchorA)||((b._turn||0)-(a._turn||0))||(b._index-a._index);
@@ -382,6 +411,12 @@ class ReplayParser{
   }
   detectiveInputLabel(input){
     if(!input)return 'Replay clue';
+    if(input.evidence==='clue_only'){
+      if(input.clueLabel)return input.clueLabel;
+      if(input.revealedAbility)return `${input.revealedAbility} clue`;
+      if(input.revealedItem)return `${input.revealedItem} clue`;
+      return `${input.species} replay clue`;
+    }
     if(input.evidence==='they_hit_me'){
       return input.targetSpecies?`${input.move} into ${input.targetSpecies}`:`${input.move} damage clue`;
     }
@@ -409,6 +444,7 @@ class ReplayParser{
     }
     if(event.type==='move'&&event.attacker){
       const state=this.ensureState(event.attacker);
+      state.lastMove=event.move;
       const md=moveData(event.move);
       if(md&&md[1]==='Status'){
         state.usedStatusMove=true;
@@ -480,7 +516,10 @@ class ReplayParser{
       if(ability&&ability!==event.from){
         const state=this.ensureState(event.target);
         if(!state.abilityHints.includes(ability))state.abilityHints.push(ability);
+        const moveEvent=[...this.turnMoves].reverse().find(x=>x.species&&state.slot!==x.slot);
+        const clueLabel=moveEvent?.move?`${ability} blocked ${moveEvent.move}`:`${ability} revealed`;
         this.addEvidence(state,turn,'reveal',`${state.species} was protected by ${ability}`,'Ability revealed',3.5,{hard:true,ability});
+        this.addClueObservation(state,{turn,move:moveEvent?.move||'',label:clueLabel});
       }
     }
   }
@@ -526,7 +565,7 @@ class ReplayParser{
           evidence:state.evidence.slice()
         };
       })
-      .sort((a,b)=>b.score-a.score||b.detectiveBranchCount-a.detectiveBranchCount||b.evidenceCount-a.evidenceCount);
+      .sort((a,b)=>(b.detectiveBranchCount>0?1:0)-(a.detectiveBranchCount>0?1:0)||b.score-a.score||b.detectiveBranchCount-a.detectiveBranchCount||b.evidenceCount-a.evidenceCount);
     return {targets,strongest:targets[0]||null};
   }
 }
@@ -1314,11 +1353,18 @@ function detectiveConfidence(top){
 function detectiveSummary(top,input,notes){
   const conf=detectiveConfidence(top);
   const lead=top[0], itemLead=lead?`${lead.item} ${lead.nature} ${lead.profile}`:'no clean line';
-  const verdict=conf.label==='High'
-    ? `Best current read: ${itemLead}. The evidence is pointing in one direction.`
-    : conf.label==='Medium'
-      ? `Best current read: ${itemLead}. There is a lead, but it is not airtight.`
-      : `The read is still wide open. ${lead?`${lead.item} ${lead.nature} ${lead.profile} is only the front-runner.`:'Need more evidence.'}`;
+  const isClueOnly=input.evidence==='clue_only'||input.observedDamage==null||!input.move;
+  const verdict=isClueOnly
+    ? (conf.label==='High'
+      ? `Best current read: ${itemLead}. The replay clues point strongly in one direction even without a damage roll.`
+      : conf.label==='Medium'
+        ? `Best current read: ${itemLead}. The replay clues narrow the field, but there is still meaningful competition.`
+        : `The replay clues are useful but still incomplete. ${lead?`${lead.item} ${lead.nature} ${lead.profile} is only the front-runner.`:'Need more evidence.'}`)
+    : (conf.label==='High'
+      ? `Best current read: ${itemLead}. The evidence is pointing in one direction.`
+      : conf.label==='Medium'
+        ? `Best current read: ${itemLead}. There is a lead, but it is not airtight.`
+        : `The read is still wide open. ${lead?`${lead.item} ${lead.nature} ${lead.profile} is only the front-runner.`:'Need more evidence.'}`);
   return {confidence:conf,verdict,notes:[...notes.hardBlocks,...notes.notes]};
 }
 function aggregateDetective(top,key){return Object.entries(top.reduce((o,c)=>(o[c[key]]=(o[c[key]]||0)+c.prob,o),{})).sort((a,b)=>b[1]-a[1])}
@@ -1337,15 +1383,19 @@ function buildDetectiveRead(input){
     if(input.movedFirst&&(['Timid','Jolly'].includes(c.nature)||c.item==='Choice Scarf')){c.prob*=1.22;c.reasons.push('soft boost: speed clue supports fast lines')}
     const speedFit=detectiveSpeedFit(c,input);
     if(speedFit){c.prob*=speedFit.mult;c.reasons.push(speedFit.tag)}
-    try{
-      const roll=input.evidence==='they_hit_me'?dmg(candSet(c),input.user,input.move,{hpPct:100}):dmg(input.user,candSet(c),input.move,{hpPct:100});
-      roll.mv=input.move;
-      const fit=scoreDetectiveDamageFit(input.observedDamage,roll);
-      c.prob*=fit.mult;
-      c.fitQuality=fit.quality;
-      c.reasons.push(fit.tag);
-    }catch(err){
-      c.reasons.push('damage math unavailable for this line');
+    if(input.move&&input.observedDamage!=null&&moveCategory(input.move)!=='Status'){
+      try{
+        const roll=input.evidence==='they_hit_me'?dmg(candSet(c),input.user,input.move,{hpPct:100}):dmg(input.user,candSet(c),input.move,{hpPct:100});
+        roll.mv=input.move;
+        const fit=scoreDetectiveDamageFit(input.observedDamage,roll);
+        c.prob*=fit.mult;
+        c.fitQuality=fit.quality;
+        c.reasons.push(fit.tag);
+      }catch(err){
+        c.reasons.push('damage math unavailable for this line');
+      }
+    }else if(input.clueLabel){
+      c.reasons.push(`replay clue: ${input.clueLabel}`);
     }
   });
   normC(cs);
@@ -1366,8 +1416,13 @@ function buildDetectiveRead(input){
 function renderDetectiveRead(read){
   const top=read.top||[], noteBadges=(read.summary.notes||[]).map(x=>reasonBadge(x,/impossible/i.test(x)?'bad':'warn')).join('');
   const abilityBox=read.abilityRows?.length?`<div class="box"><h3>Likely abilities</h3>${bars(read.abilityRows)}</div>`:'';
+  const clueText=read.input.observedDamage!=null&&read.input.move
+    ? `Observed ${read.input.observedDamage}% from ${html(read.input.move)}.`
+    : read.input.clueLabel
+      ? `Replay clue: ${html(read.input.clueLabel)}.`
+      : 'Replay-only structured clues loaded.';
   $('detective').className='diag';
-  $('detective').innerHTML=`<div class="box"><h3>Read on ${html(read.input.species)}</h3><p>Observed ${read.input.observedDamage}% from ${html(read.input.move)}. <strong>${html(read.summary.confidence.label)} confidence.</strong> ${html(read.summary.verdict)}</p><div class="badges">${noteBadges||reasonBadge(read.summary.confidence.reason,'good')}</div></div><div class="threecol"><div class="box"><h3>Likely items</h3>${bars(read.itemRows)}</div><div class="box"><h3>Likely natures</h3>${bars(read.natureRows)}</div><div class="box"><h3>Likely spreads</h3>${bars(read.profileRows)}</div></div>${abilityBox}<div class="box"><h3>Top candidates</h3><table><thead><tr><th>Set</th><th>Item</th><th>Ability</th><th>Nature</th><th>Prob</th><th>Evidence</th></tr></thead><tbody>${top.map(c=>`<tr><td>${html(c.profile)}</td><td>${html(c.item)}</td><td>${html(c.ability||'Unknown')}</td><td>${html(c.nature)}</td><td>${(c.prob*100).toFixed(1)}%</td><td>${html(c.reasons.slice(0,3).join('; '))}</td></tr>`).join('')}</tbody></table></div>${read.eliminated.length?`<div class="box"><h3>Hard eliminations</h3><div class="badges">${read.eliminated.slice(0,6).map(c=>reasonBadge(`${c.item} ${c.ability||'Unknown'} ${c.nature} ${c.profile}`,'bad')).join('')}</div><p class="muted">These lines conflict with hard evidence and were removed from the live pool.</p></div>`:''}`
+  $('detective').innerHTML=`<div class="box"><h3>Read on ${html(read.input.species)}</h3><p>${clueText} <strong>${html(read.summary.confidence.label)} confidence.</strong> ${html(read.summary.verdict)}</p><div class="badges">${noteBadges||reasonBadge(read.summary.confidence.reason,'good')}</div></div><div class="threecol"><div class="box"><h3>Likely items</h3>${bars(read.itemRows)}</div><div class="box"><h3>Likely natures</h3>${bars(read.natureRows)}</div><div class="box"><h3>Likely spreads</h3>${bars(read.profileRows)}</div></div>${abilityBox}<div class="box"><h3>Top candidates</h3><table><thead><tr><th>Set</th><th>Item</th><th>Ability</th><th>Nature</th><th>Prob</th><th>Evidence</th></tr></thead><tbody>${top.map(c=>`<tr><td>${html(c.profile)}</td><td>${html(c.item)}</td><td>${html(c.ability||'Unknown')}</td><td>${html(c.nature)}</td><td>${(c.prob*100).toFixed(1)}%</td><td>${html(c.reasons.slice(0,3).join('; '))}</td></tr>`).join('')}</tbody></table></div>${read.eliminated.length?`<div class="box"><h3>Hard eliminations</h3><div class="badges">${read.eliminated.slice(0,6).map(c=>reasonBadge(`${c.item} ${c.ability||'Unknown'} ${c.nature} ${c.profile}`,'bad')).join('')}</div><p class="muted">These lines conflict with hard evidence and were removed from the live pool.</p></div>`:''}`
 }
 function detectiveReferenceUser(overrides={}){
   if(overrides.user)return overrides.user;
@@ -1378,7 +1433,7 @@ function detectiveReferenceUser(overrides={}){
   }
   return team[0]||preset('Great Tusk','Heavy-Duty Boots','Impish',{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},['Close Combat','Headlong Rush','Rapid Spin','Knock Off']);
 }
-function detect(overrides={}){const oppItems=$('oppSpecies')?._items||[],moveItems=$('obsMove')?._items||[],oppHit=oppItems[$('oppSpecies')?.value],moveHit=moveItems[$('obsMove')?.value],sp=overrides.species||oppHit?.species||oppItems[0]?.species,e=overrides.evidence||$('evidence')?.value||'they_hit_me',mv=overrides.move||moveHit?.species||moveItems[0]?.species,obs=overrides.observedDamage??(+$('obsPct')?.value||43),used=overrides.usedStatusMove??!!$('statusMove')?.checked,haz=overrides.tookHazardDamage??!!$('hazardTell')?.checked,rep=overrides.repeatedDamagingMove??!!$('repeatTell')?.checked,spd=overrides.movedFirst??!!$('speedTell')?.checked,user=detectiveReferenceUser(overrides);if(!sp||!mv)return null;const read=buildDetectiveRead({...overrides,species:sp,evidence:e,move:mv,observedDamage:obs,usedStatusMove:used,tookHazardDamage:haz,repeatedDamagingMove:rep,movedFirst:spd,user});lastDetectiveRead=read;renderDetectiveRead(read);return read}
+function detect(overrides={}){const oppItems=$('oppSpecies')?._items||[],moveItems=$('obsMove')?._items||[],oppHit=oppItems[$('oppSpecies')?.value],moveHit=moveItems[$('obsMove')?.value],sp=overrides.species||oppHit?.species||oppItems[0]?.species,e=Object.prototype.hasOwnProperty.call(overrides,'evidence')?overrides.evidence:($('evidence')?.value||'they_hit_me'),mv=Object.prototype.hasOwnProperty.call(overrides,'move')?overrides.move:(moveHit?.species||moveItems[0]?.species),obs=Object.prototype.hasOwnProperty.call(overrides,'observedDamage')?overrides.observedDamage:(+$('obsPct')?.value||43),used=overrides.usedStatusMove??!!$('statusMove')?.checked,haz=overrides.tookHazardDamage??!!$('hazardTell')?.checked,rep=overrides.repeatedDamagingMove??!!$('repeatTell')?.checked,spd=overrides.movedFirst??!!$('speedTell')?.checked,user=detectiveReferenceUser(overrides);if(!sp)return null;const read=buildDetectiveRead({...overrides,species:sp,evidence:e,move:mv,observedDamage:obs,usedStatusMove:used,tookHazardDamage:haz,repeatedDamagingMove:rep,movedFirst:spd,user});lastDetectiveRead=read;renderDetectiveRead(read);return read}
 function renderFavs(){if(!$('favorites'))return;$('favorites').className='';$('favorites').innerHTML=`<div class="favlist">${team.map((p,i)=>`<label class="fav"><input class="favBox" value="${html(p.species)}" type="checkbox" ${i<3?'checked':''}/> Keep ${html(p.species)}</label>`).join('')}</div>`}
 function evText(e){let lab={hp:'HP',atk:'Atk',def:'Def',spa:'SpA',spd:'SpD',spe:'Spe'};return Object.entries(e||{}).filter(([k,v])=>v).map(([k,v])=>`${v} ${lab[k]}`).join(' / ')||'4 HP / 252 Atk / 252 Spe'}
 function exportSet(p){return`${p.species} @ ${p.item||'Leftovers'}\nAbility: ${p.ability||'Pressure'}\n${p.tera?`Tera Type: ${p.tera}\n`:''}EVs: ${evText(p.evs)}\n${p.nature||'Hardy'} Nature\n${p.moves.slice(0,4).map(m=>`- ${m}`).join('\n')}`}

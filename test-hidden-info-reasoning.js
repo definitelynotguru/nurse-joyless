@@ -147,6 +147,28 @@ assert(revealedAbilityRead.abilityRows[0][0] === 'Infiltrator', 'revealed abilit
 assert(revealedAbilityRead.summary.notes.some(x => /Infiltrator confirmed/.test(x)), 'revealed ability should be surfaced in detective notes');
 assert(revealedAbilityRead.top.every(x => x.ability === 'Infiltrator'), 'revealed ability should remove incompatible ability lines from the live pool');
 
+const clueOnlyAbilityRead = vm.runInContext(
+  `buildDetectiveRead({
+    species:'Gholdengo',
+    evidence:'clue_only',
+    move:'Thunder Wave',
+    observedDamage:null,
+    clueLabel:'Good as Gold blocked Thunder Wave',
+    usedStatusMove:false,
+    tookHazardDamage:false,
+    repeatedDamagingMove:false,
+    movedFirst:false,
+    revealedAbility:'Good as Gold',
+    user:${JSON.stringify(userMon)}
+  })`,
+  context,
+  { timeout: 10000 }
+);
+
+assert(clueOnlyAbilityRead.abilityRows[0][0] === 'Good as Gold', 'clue-only revealed ability should anchor ability ranking without damage evidence');
+assert(/replay clues/i.test(clueOnlyAbilityRead.summary.verdict), 'clue-only detective verdict should explain the replay-clue reasoning path');
+assert(clueOnlyAbilityRead.top.every(x => x.ability === 'Good as Gold'), 'clue-only revealed ability should still prune incompatible ability lines');
+
 const dragoniteUser = vm.runInContext(
   "preset('Dragonite','Heavy-Duty Boots','Jolly',{hp:0,atk:252,def:4,spa:0,spd:0,spe:252},['Dragon Dance','Extreme Speed','Earthquake','Fire Punch'])",
   context
