@@ -126,6 +126,27 @@ assert(!revealedRead.itemRows.some(([name]) => /^Choice (Band|Scarf)$/.test(name
 assert(revealedRead.summary.notes.some(x => /Choice items impossible/.test(x)), 'choice contradiction should be surfaced in detective notes');
 assert(revealedRead.summary.notes.some(x => /Choice Specs confirmed/.test(x)), 'revealed item should be surfaced in detective notes');
 
+const revealedAbilityRead = vm.runInContext(
+  `buildDetectiveRead({
+    species:'Dragapult',
+    evidence:'they_hit_me',
+    move:'Shadow Ball',
+    observedDamage:43,
+    usedStatusMove:false,
+    tookHazardDamage:false,
+    repeatedDamagingMove:false,
+    movedFirst:false,
+    revealedAbility:'Infiltrator',
+    user:${JSON.stringify(userMon)}
+  })`,
+  context,
+  { timeout: 10000 }
+);
+
+assert(revealedAbilityRead.abilityRows[0][0] === 'Infiltrator', 'revealed ability should anchor the live ability ranking');
+assert(revealedAbilityRead.summary.notes.some(x => /Infiltrator confirmed/.test(x)), 'revealed ability should be surfaced in detective notes');
+assert(revealedAbilityRead.top.every(x => x.ability === 'Infiltrator'), 'revealed ability should remove incompatible ability lines from the live pool');
+
 const dragoniteUser = vm.runInContext(
   "preset('Dragonite','Heavy-Duty Boots','Jolly',{hp:0,atk:252,def:4,spa:0,spd:0,spe:252},['Dragon Dance','Extreme Speed','Earthquake','Fire Punch'])",
   context

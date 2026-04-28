@@ -38,10 +38,11 @@ const fakeDex = {
         mewtwo: { name: 'Mewtwo', id:'mewtwo', exists: true, types: ['Psychic'], baseStats: { hp:106, atk:110, def:90, spa:154, spd:90, spe:130 }, abilities: {0:'Pressure', H:'Unnerve'} },
         blastoise: { name: 'Blastoise', id:'blastoise', exists: true, types: ['Water'], baseStats: { hp:79, atk:83, def:100, spa:85, spd:105, spe:78 }, abilities: {0:'Torrent', H:'Rain Dish'} },
         dragapult: { name: 'Dragapult', id:'dragapult', exists: true, types: ['Dragon','Ghost'], baseStats: { hp:88, atk:120, def:75, spa:100, spd:75, spe:142 }, abilities: {0:'Clear Body', 1:'Infiltrator'} },
+        heatran: { name: 'Heatran', id:'heatran', exists: true, types: ['Fire','Steel'], baseStats: { hp:91, atk:90, def:106, spa:130, spd:106, spe:77 }, abilities: {0:'Flash Fire'} },
       };
       return data[id] || { name, id, exists: false };
     },
-    all() { return [this.get('Mewtwo'), this.get('Blastoise'), this.get('Dragapult')]; }
+    all() { return [this.get('Mewtwo'), this.get('Blastoise'), this.get('Dragapult'), this.get('Heatran')]; }
   },
   moves: {
     get(name) {
@@ -49,12 +50,13 @@ const fakeDex = {
       const data = {
         aurasphere: { name: 'Aura Sphere', id:'aurasphere', exists: true, type: 'Fighting', category: 'Special', basePower: 80, accuracy: true, priority: 0 },
         shadowball: { name: 'Shadow Ball', id:'shadowball', exists: true, type: 'Ghost', category: 'Special', basePower: 80, accuracy: 100, priority: 0 },
+        flamethrower: { name: 'Flamethrower', id:'flamethrower', exists: true, type: 'Fire', category: 'Special', basePower: 90, accuracy: 100, priority: 0 },
         thunderwave: { name: 'Thunder Wave', id:'thunderwave', exists: true, type: 'Electric', category: 'Status', basePower: 0, accuracy: 90, priority: 0 },
         surf: { name: 'Surf', id:'surf', exists: true, type: 'Water', category: 'Special', basePower: 90, accuracy: 100, priority: 0 },
       };
       return data[id] || { name, id, exists: false };
     },
-    all() { return [this.get('Aura Sphere'), this.get('Shadow Ball'), this.get('Thunder Wave'), this.get('Surf')]; }
+    all() { return [this.get('Aura Sphere'), this.get('Shadow Ball'), this.get('Flamethrower'), this.get('Thunder Wave'), this.get('Surf')]; }
   },
   getLearnsets: async () => ({learnsets:{mewtwo:{learnset:{aurasphere:['9M'],shadowball:['9M']}},blastoise:{learnset:{surf:['9M']}}}}),
 };
@@ -79,13 +81,27 @@ const tests = String.raw`
   const bl = preset('Blastoise','Leftovers','Calm',{hp:252,atk:0,def:0,spa:0,spd:252,spe:4},['Surf']);
   assert(moveName('aura sphere') === 'Aura Sphere', 'moveName() is not using DexAdapter move resolver');
   const ko = dmg(mt, bl, 'Aura Sphere', { hpPct: 50 });
+  const abilityRead = buildDetectiveRead({
+    species:'Dragapult',
+    evidence:'they_hit_me',
+    move:'Shadow Ball',
+    observedDamage:43,
+    revealedAbility:'Infiltrator',
+    user:bl,
+  });
+  assert(abilityRead.abilityRows[0][0] === 'Infiltrator', 'detective ability ranking should honor a revealed ability');
+  assert(abilityRead.top.every(x => x.ability === 'Infiltrator'), 'revealed ability should prune incompatible ability lines');
 
   assert(html('\"x\" & <tag>') === '&quot;x&quot; &amp; &lt;tag&gt;', 'html() must escape quotes for attribute-safe rendering');
   const teraAtt = preset('Dragapult','Life Orb','Timid',{hp:0,atk:0,def:0,spa:252,spd:4,spe:252},['Flamethrower']);
   const teraDef = preset('Corviknight','Leftovers','Impish',{hp:248,atk:0,def:252,spa:0,spd:8,spe:0},['Roost']);
   const noTeraFire = dmg(teraAtt, teraDef, 'Flamethrower', { hpPct: 100 });
   const yesTeraFire = dmg(teraAtt, teraDef, 'Flamethrower', { hpPct: 100, attackerTera: true, attackerTeraType: 'Fire' });
+  const flashFireDef = preset('Heatran','Leftovers','Calm',{hp:252,atk:0,def:4,spa:0,spd:252,spe:0},['Flamethrower']);
+  flashFireDef.ability = 'Flash Fire';
+  const flashFireRoll = dmg(teraAtt, flashFireDef, 'Flamethrower', { hpPct: 100 });
   assert(yesTeraFire.maxd > noTeraFire.maxd * 1.2, 'attacker Tera type should increase STAB damage for matching Tera moves');
+  assert(flashFireRoll.maxd === 0 && flashFireRoll.blockedBy === 'Flash Fire', 'damage engine should respect Flash Fire immunity');
   assert(ko.rolls.length === 16 && Number.isFinite(ko.ko), 'dmg() failed with Dex-only move/species');
   assert(nHitChance(ko,2) >= ko.ko, '2HKO chance should not be below OHKO chance');
 
@@ -131,6 +147,9 @@ const tests = String.raw`
   assert(document.getElementById('replayResults').innerHTML.includes('Load primary read:'), 'Replay Observer did not offer a detective handoff');
   loadReplayDetective();
   assert(document.getElementById('detective').innerHTML.includes('Choice Specs'), 'Replay handoff did not anchor the detective read');
+  lastDetectiveRead = abilityRead; renderDetectiveRead(abilityRead);
+  assert(document.getElementById('detective').innerHTML.includes('Likely abilities'), 'detective panel should render ability rankings when ability evidence exists');
+  assert(document.getElementById('detective').innerHTML.includes('Infiltrator'), 'detective panel should show the revealed ability');
   const detectiveFacts = getAgentFacts('detective');
   assert(detectiveFacts.species === 'Dragapult', 'Detective agent facts did not use the live detective read');
   assert(/Choice Specs/.test(detectiveFacts.verdict || '') || detectiveFacts.topItem === 'Choice Specs', 'Detective agent facts did not carry the anchored item read');
