@@ -345,6 +345,7 @@ class ReplayParser{
         abilityHints:[],
         damageObservations:[],
         clueObservations:[],
+        speedContexts:[],
         speedContext:null,
         lastMove:'',
         lastDamagingMove:'',
@@ -365,6 +366,33 @@ class ReplayParser{
     if(!state||!observation?.label)return;
     state.clueObservations.push({...observation, turn:observation.turn||0});
     if(state.clueObservations.length>4)state.clueObservations=state.clueObservations.slice(-4);
+  }
+  turnSpeedContext(state, turn){
+    if(!state||!turn)return null;
+    return [...(state.speedContexts||[])].reverse().find(ctx=>ctx.turn===turn)||null;
+  }
+  applyTurnSpeedContext(state, turn, relation, opponentSpecies){
+    if(!state||!turn||!relation||!opponentSpecies)return;
+    const context={turn,relation,opponentSpecies};
+    state.speedContext={...context};
+    state.movedFirst=state.movedFirst||relation==='fasterThan';
+    state.movedSecond=state.movedSecond||relation==='slowerThan';
+    const existing=(state.speedContexts||[]).find(ctx=>ctx.turn===turn&&ctx.relation===relation&&ctx.opponentSpecies===opponentSpecies);
+    if(!existing){
+      state.speedContexts=[...(state.speedContexts||[]),context].slice(-6);
+    }
+    state.damageObservations.forEach(obs=>{
+      if((obs.turn||0)!==turn)return;
+      obs.speedContext={relation,opponentSpecies};
+      obs.movedFirst=relation==='fasterThan';
+      obs.movedSecond=relation==='slowerThan';
+    });
+    state.clueObservations.forEach(obs=>{
+      if((obs.turn||0)!==turn)return;
+      obs.speedContext={relation,opponentSpecies};
+      obs.movedFirst=relation==='fasterThan';
+      obs.movedSecond=relation==='slowerThan';
+    });
   }
   itemClueLabel(item){
     return item?`${item} confirmed`:'Item revealed';
@@ -416,9 +444,9 @@ class ReplayParser{
       repeatedDamagingMove:state.repeatedDamagingMove,
       revealedAbility:state.abilityHints.length===1?state.abilityHints[0]:undefined,
       abilityHints:state.abilityHints.slice(),
-      movedFirst:state.movedFirst,
-      movedSecond:state.movedSecond,
-      speedContext:state.speedContext?{...state.speedContext}:null,
+      movedFirst:obs.movedFirst??state.movedFirst,
+      movedSecond:obs.movedSecond??state.movedSecond,
+      speedContext:obs.speedContext?{...obs.speedContext}:(state.speedContext?{...state.speedContext}:null),
       choiceContradiction:state.choiceContradiction,
       revealedItem:state.revealedItem||undefined,
       _index:index,
@@ -436,9 +464,9 @@ class ReplayParser{
           repeatedDamagingMove:state.repeatedDamagingMove,
           revealedAbility:state.abilityHints.length===1?state.abilityHints[0]:undefined,
           abilityHints:state.abilityHints.slice(),
-          movedFirst:state.movedFirst,
-          movedSecond:state.movedSecond,
-          speedContext:state.speedContext?{...state.speedContext}:null,
+          movedFirst:obs.movedFirst??state.movedFirst,
+          movedSecond:obs.movedSecond??state.movedSecond,
+          speedContext:obs.speedContext?{...obs.speedContext}:(state.speedContext?{...state.speedContext}:null),
           choiceContradiction:state.choiceContradiction,
           revealedItem:state.revealedItem||undefined,
           _index:index,
@@ -533,11 +561,9 @@ class ReplayParser{
         if(first.species!==second.species&&first.priority===second.priority&&first.priority===0){
           const firstState=this.ensureState(first.slot);
           const secondState=this.ensureState(second.slot);
-          firstState.movedFirst=true;
-          firstState.speedContext={relation:'fasterThan',opponentSpecies:second.species};
+          this.applyTurnSpeedContext(firstState,turn,'fasterThan',second.species);
           this.addEvidence(firstState,turn,'damage',`${firstState.species} moved before ${second.species} in a neutral-priority exchange`,'Soft speed clue',1,{soft:true,opponentSpecies:second.species});
-          secondState.movedSecond=true;
-          secondState.speedContext={relation:'slowerThan',opponentSpecies:first.species};
+          this.applyTurnSpeedContext(secondState,turn,'slowerThan',first.species);
           this.addEvidence(secondState,turn,'damage',`${secondState.species} moved after ${first.species} in a neutral-priority exchange`,'Soft speed clue',1,{soft:true,opponentSpecies:first.species});
         }
       }
@@ -555,9 +581,11 @@ class ReplayParser{
       if(pct!==null&&moveEvent){
         this.addEvidence(this.ensureState(moveEvent.slot),turn,'damage',`${moveEvent.species} dealt ${pct}% with ${moveEvent.move}`,'Damage-roll evidence available',1,{move:moveEvent.move,observedDamage:pct,evidenceType:'they_hit_me',targetSpecies:state.species});
         const attackerState=this.ensureState(moveEvent.slot);
-        this.addDamageObservation(attackerState,{turn,move:moveEvent.move,observedDamage:pct,evidence:'they_hit_me',targetSpecies:state.species});
+        const attackerSpeedContext=this.turnSpeedContext(attackerState,turn);
+        this.addDamageObservation(attackerState,{turn,move:moveEvent.move,observedDamage:pct,evidence:'they_hit_me',targetSpecies:state.species,speedContext:attackerSpeedContext?{relation:attackerSpeedContext.relation,opponentSpecies:attackerSpeedContext.opponentSpecies}:null,movedFirst:attackerSpeedContext?.relation==='fasterThan',movedSecond:attackerSpeedContext?.relation==='slowerThan'});
         this.addEvidence(state,turn,'damage',`${state.species} took ${pct}% from ${moveEvent.species}'s ${moveEvent.move}`,'Defensive damage-roll evidence available',1.25,{move:moveEvent.move,observedDamage:pct,evidenceType:'i_hit_them',userSpecies:moveEvent.species});
-        this.addDamageObservation(state,{turn,move:moveEvent.move,observedDamage:pct,evidence:'i_hit_them',userSpecies:moveEvent.species});
+        const defenderSpeedContext=this.turnSpeedContext(state,turn);
+        this.addDamageObservation(state,{turn,move:moveEvent.move,observedDamage:pct,evidence:'i_hit_them',userSpecies:moveEvent.species,speedContext:defenderSpeedContext?{relation:defenderSpeedContext.relation,opponentSpecies:defenderSpeedContext.opponentSpecies}:null,movedFirst:defenderSpeedContext?.relation==='fasterThan',movedSecond:defenderSpeedContext?.relation==='slowerThan'});
       }else if(pct!==null){
         this.addEvidence(state,turn,'damage',`${state.species} changed to ${pct}% HP`,'Damage-roll evidence available',0.5,{observedDamage:pct});
       }
@@ -609,6 +637,11 @@ class ReplayParser{
       .map(state=>{
         const detectiveInputs=this.detectiveInputsFromState(state);
         const bestObservation=detectiveInputs[0]||null;
+        const speedNotes=unique((state.speedContexts||[]).map(ctx=>{
+          if(ctx.relation==='fasterThan'&&ctx.opponentSpecies)return `Moved before ${ctx.opponentSpecies} in a neutral-priority exchange`;
+          if(ctx.relation==='slowerThan'&&ctx.opponentSpecies)return `Moved after ${ctx.opponentSpecies} in a neutral-priority exchange`;
+          return null;
+        }));
         const uniqueNotes=unique([
           state.revealedItem?`${state.revealedItem} confirmed`:null,
           ...state.abilityHints.map(a=>`${a} revealed (${this.abilityRewardText(a)})`),
@@ -616,8 +649,7 @@ class ReplayParser{
           state.usedStatusMove?'Assault Vest ruled out':null,
           state.choiceContradiction?'Choice items contradicted':null,
           state.repeatedDamagingMove?'Repeated move hints at Choice locking':null,
-          state.speedContext?.relation==='fasterThan'&&state.speedContext?.opponentSpecies?`Moved before ${state.speedContext.opponentSpecies} in a neutral-priority exchange`:null,
-          state.speedContext?.relation==='slowerThan'&&state.speedContext?.opponentSpecies?`Moved after ${state.speedContext.opponentSpecies} in a neutral-priority exchange`:null,
+          ...speedNotes,
           state.movedFirst&&!state.speedContext?.opponentSpecies?'Moved first in a neutral-priority exchange':null,
           state.movedSecond&&!state.speedContext?.opponentSpecies?'Moved after a neutral-priority exchange':null
         ]);

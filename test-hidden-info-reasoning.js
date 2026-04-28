@@ -495,4 +495,48 @@ assert(opponentDragapult?.revealedItem === 'Choice Specs', 'ReplayParser should 
 assert(!opponentDragapult?.usedStatusMove, 'ReplayParser should not leak player status-move evidence onto the opponent same-species target');
 assert(opponentDragapult?.detectiveInputs?.some(input => input.move === 'Shadow Ball'), 'ReplayParser should preserve opponent-side damage branches for same-species mirror targets');
 
+const multiSpeedLog = '|turn|1\n|switch|p1a: Great Tusk|Great Tusk, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|move|p2a: Gholdengo|Make It Rain|p1a: Great Tusk\n|-damage|p1a: Great Tusk|55/100\n|move|p1a: Great Tusk|Headlong Rush|p2a: Gholdengo\n|-damage|p2a: Gholdengo|42/100\n|turn|2\n|switch|p1a: Dragapult|Dragapult, L80\n|move|p1a: Dragapult|Shadow Ball|p2a: Gholdengo\n|-damage|p2a: Gholdengo|15/100\n|move|p2a: Gholdengo|Shadow Ball|p1a: Dragapult\n|-damage|p1a: Dragapult|58/100';
+const multiSpeedParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(multiSpeedLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const multiSpeedTarget = multiSpeedParser.targets.find(t => t.species === 'Gholdengo');
+const makeItRainBranch = multiSpeedTarget?.detectiveInputs?.find(input => input.move === 'Make It Rain' && input.evidence === 'they_hit_me');
+const dragapultBranch = multiSpeedTarget?.detectiveInputs?.find(input => input.userSpecies === 'Dragapult' && input.evidence === 'i_hit_them');
+assert(makeItRainBranch?.speedContext?.relation === 'fasterThan', 'ReplayParser should keep the faster-than speed clue on the Great Tusk branch');
+assert(makeItRainBranch?.speedContext?.opponentSpecies === 'Great Tusk', 'ReplayParser should keep the Great Tusk opponent on the faster branch');
+assert(dragapultBranch?.speedContext?.relation === 'slowerThan', 'ReplayParser should keep the slower-than speed clue on the Dragapult branch');
+assert(dragapultBranch?.speedContext?.opponentSpecies === 'Dragapult', 'ReplayParser should keep the Dragapult opponent on the slower branch');
+
+vm.runInContext(
+  `team=[
+    preset("Great Tusk","Heavy-Duty Boots","Impish",{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},["Close Combat","Headlong Rush","Rapid Spin","Knock Off"]),
+    preset("Dragapult","Choice Specs","Timid",{hp:0,atk:0,def:4,spa:252,spd:0,spe:252},["Shadow Ball","Draco Meteor","Flamethrower","U-turn"])
+  ];
+  lastReplayRead=${JSON.stringify({ targets: [multiSpeedTarget], strongest: multiSpeedTarget })};
+  loadReplayDetective(0, ${multiSpeedTarget.detectiveInputs.findIndex(input => input.move === 'Make It Rain' && input.evidence === 'they_hit_me')});
+  `,
+  context,
+  { timeout: 10000 }
+);
+const fastReplayRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(fastReplayRead.input.speedContext?.relation === 'fasterThan', 'Replay detective handoff should preserve the faster-than speed context on the loaded branch');
+assert(fastReplayRead.input.speedContext?.opponentSpecies === 'Great Tusk', 'Replay detective handoff should preserve the original faster-than opponent');
+
+vm.runInContext(
+  `team=[
+    preset("Great Tusk","Heavy-Duty Boots","Impish",{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},["Close Combat","Headlong Rush","Rapid Spin","Knock Off"]),
+    preset("Dragapult","Choice Specs","Timid",{hp:0,atk:0,def:4,spa:252,spd:0,spe:252},["Shadow Ball","Draco Meteor","Flamethrower","U-turn"])
+  ];
+  lastReplayRead=${JSON.stringify({ targets: [multiSpeedTarget], strongest: multiSpeedTarget })};
+  loadReplayDetective(0, ${multiSpeedTarget.detectiveInputs.findIndex(input => input.userSpecies === 'Dragapult' && input.evidence === 'i_hit_them')});
+  `,
+  context,
+  { timeout: 10000 }
+);
+const slowReplayRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(slowReplayRead.input.speedContext?.relation === 'slowerThan', 'Replay detective handoff should preserve the slower-than speed context on the loaded branch');
+assert(slowReplayRead.input.speedContext?.opponentSpecies === 'Dragapult', 'Replay detective handoff should preserve the original slower-than opponent');
+
 console.log('[OK] hidden info detective reasoning passed');
