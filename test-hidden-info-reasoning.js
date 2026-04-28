@@ -539,6 +539,28 @@ assert(airBalloonRead.itemRows[0][0] === 'No Item', 'Air Balloon pop clues shoul
 assert(!airBalloonRead.itemRows.some(([name]) => name === 'Air Balloon'), 'Air Balloon pop clues should remove the popped Balloon from the live pool');
 assert(airBalloonRead.summary.notes.some(x => /Ground immunity is gone/i.test(x)), 'Air Balloon pop clues should carry the groundedness consequence into the detective notes');
 
+const airBalloonHazardLog = '|turn|1\n|switch|p1a: Great Tusk|Great Tusk, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|-item|p2a: Gholdengo|Air Balloon\n|move|p1a: Great Tusk|Knock Off|p2a: Gholdengo\n|-enditem|p2a: Gholdengo|Air Balloon\n|turn|2\n|switch|p2a: Gholdengo|Gholdengo, L80\n|-damage|p2a: Gholdengo|88/100|[from] Spikes';
+const airBalloonHazardParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(airBalloonHazardLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const airBalloonHazardTarget = airBalloonHazardParser.targets.find(t => t.species === 'Gholdengo');
+assert(airBalloonHazardTarget?.notes?.some(note => /Later took Spikes after Air Balloon popped/i.test(note)), 'post-pop Spikes clues should explain that grounded hazard chip happened after the Balloon was gone');
+
+vm.runInContext(
+  `team=[
+    preset("Great Tusk","Heavy-Duty Boots","Impish",{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},["Close Combat","Headlong Rush","Rapid Spin","Knock Off"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: airBalloonHazardTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const airBalloonHazardRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(airBalloonHazardRead.summary.notes.some(x => /Later took Spikes after Air Balloon popped/i.test(x)), 'post-pop Spikes clues should stay visible in detective notes');
+
 const boosterLog = '|turn|1\n|switch|p2a: Raging Bolt|Raging Bolt, L80\n|-item|p2a: Raging Bolt|Booster Energy\n|-enditem|p2a: Raging Bolt|Booster Energy|[from] ability: Protosynthesis';
 const boosterParser = vm.runInContext(`(() => {
   const parser = new ReplayParser();
@@ -548,6 +570,28 @@ const boosterParser = vm.runInContext(`(() => {
 const boosterTarget = boosterParser.targets.find(t => t.species === 'Raging Bolt');
 assert(boosterTarget?.detectiveInputs?.[0]?.clueLabel === 'Booster Energy activated Protosynthesis', 'Booster Energy replay clues should keep the activation cause instead of generic removal wording');
 assert(boosterTarget?.notes?.some(note => /one-shot item/i.test(note)), 'Booster Energy replay clues should explain that the item was consumed and cannot still be current');
+
+const bootsRemovalHazardLog = '|turn|1\n|switch|p1a: Great Tusk|Great Tusk, L80\n|switch|p2a: Dragapult|Dragapult, L80\n|-item|p2a: Dragapult|Heavy-Duty Boots\n|move|p1a: Great Tusk|Knock Off|p2a: Dragapult\n|-enditem|p2a: Dragapult|Heavy-Duty Boots|[from] move: Knock Off\n|turn|2\n|switch|p2a: Dragapult|Dragapult, L80\n|-damage|p2a: Dragapult|88/100|[from] Stealth Rock';
+const bootsRemovalHazardParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(bootsRemovalHazardLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const bootsRemovalHazardTarget = bootsRemovalHazardParser.targets.find(t => t.species === 'Dragapult');
+assert(bootsRemovalHazardTarget?.notes?.some(note => /Later took Stealth Rock after Heavy-Duty Boots were removed/i.test(note)), 'post-removal hazard clues should explain that the chip belongs to the new post-Boots item state');
+
+vm.runInContext(
+  `team=[
+    preset("Great Tusk","Heavy-Duty Boots","Impish",{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},["Close Combat","Headlong Rush","Rapid Spin","Knock Off"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: bootsRemovalHazardTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const bootsRemovalHazardRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(bootsRemovalHazardRead.summary.notes.some(x => /Later took Stealth Rock after Heavy-Duty Boots were removed/i.test(x)), 'post-removal hazard timing should stay visible in detective notes');
 
 const goodAsGoldEncoreLog = '|turn|1\n|switch|p1a: Grimmsnarl|Grimmsnarl, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|move|p1a: Grimmsnarl|Encore|p2a: Gholdengo\n|-immune|p2a: Gholdengo|[from] ability: Good as Gold';
 const goodAsGoldEncoreParser = vm.runInContext(`(() => {

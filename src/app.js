@@ -382,6 +382,9 @@ class ReplayParser{
         itemGone:false,
         itemLossLabel:'',
         itemLossNote:'',
+        itemLossTurn:0,
+        hazardEvents:[],
+        postItemLossHazardNote:'',
         abilityHints:[],
         damageObservations:[],
         clueObservations:[],
@@ -406,6 +409,11 @@ class ReplayParser{
     if(!state||!observation?.label)return;
     state.clueObservations.push({...observation, turn:observation.turn||0});
     if(state.clueObservations.length>4)state.clueObservations=state.clueObservations.slice(-4);
+  }
+  addHazardEvent(state, turn, source=''){
+    if(!state||!turn)return;
+    const label=String(source||'').trim()||'hazards';
+    state.hazardEvents=[...(state.hazardEvents||[]),{turn,source:label}].slice(-6);
   }
   turnSpeedContext(state, turn){
     if(!state||!turn)return null;
@@ -516,6 +524,19 @@ class ReplayParser{
     if(['Flash Fire','Good as Gold'].includes(ability))return `${ability} blocked ${move}`;
     return `${ability} revealed`;
   }
+  hazardTimelineNote(state){
+    if(!state?.itemGone||!state.itemLossTurn)return '';
+    const laterHazard=[...(state.hazardEvents||[])].find(event=>(event.turn||0)>=state.itemLossTurn);
+    if(!laterHazard)return '';
+    const source=laterHazard.source||'hazards';
+    if(state.removedItem==='Air Balloon'&&/Spikes|Toxic Spikes|Sticky Web/i.test(source)){
+      return `Later took ${source} after Air Balloon popped, confirming the old Ground immunity really ended.`;
+    }
+    if(state.removedItem==='Heavy-Duty Boots'){
+      return `Later took ${source} after Heavy-Duty Boots were removed, so the hazard chip belongs to the new post-Knock Off item state.`;
+    }
+    return `Later took ${source} after ${state.removedItem||'the old item'} left the slot, so the replay keeps the hazard timing aligned with the current item state.`;
+  }
   recordAbilityReveal(state, turn, ability, moveEvent, text, clueLabel=''){
     if(!state||!ability)return;
     if(!state.abilityHints.includes(ability))state.abilityHints.push(ability);
@@ -547,6 +568,7 @@ class ReplayParser{
       itemGone:!!state.itemGone,
       itemLossLabel:state.itemLossLabel||undefined,
       itemLossNote:state.itemLossNote||undefined,
+      postItemLossHazardNote:state.postItemLossHazardNote||undefined,
       revealedItem:state.revealedItem||undefined,
       _index:index,
       _turn:obs.turn||0
@@ -571,6 +593,7 @@ class ReplayParser{
           itemGone:!!state.itemGone,
           itemLossLabel:state.itemLossLabel||undefined,
           itemLossNote:state.itemLossNote||undefined,
+          postItemLossHazardNote:state.postItemLossHazardNote||undefined,
           revealedItem:state.revealedItem||undefined,
           _index:index,
           _turn:obs.turn||0
@@ -676,6 +699,8 @@ class ReplayParser{
       const state=this.ensureState(event.target);
       if(event.from&&/Stealth Rock|Spikes|Toxic Spikes/i.test(event.from)){
         state.tookHazardDamage=true;
+        this.addHazardEvent(state,turn,event.from);
+        if(state.itemGone)state.postItemLossHazardNote=this.hazardTimelineNote(state);
         this.addEvidence(state,turn,'hazard',`${state.species} took hazard damage`,'Heavy-Duty Boots: IMPOSSIBLE',4,{hard:true});
         return;
       }
@@ -701,6 +726,8 @@ class ReplayParser{
       state.itemGone=false;
       state.itemLossLabel='';
       state.itemLossNote='';
+      state.itemLossTurn=0;
+      state.postItemLossHazardNote='';
       this.addEvidence(state,turn,'reveal',`${state.species} revealed ${event.item}`,'Item confirmed',5,{hard:true,revealedItem:event.item});
       this.addClueObservation(state,{turn,label:this.itemClueLabel(event.item)});
       return;
@@ -712,7 +739,9 @@ class ReplayParser{
       state.itemGone=true;
       state.itemLossLabel=loss.clueLabel;
       state.itemLossNote=loss.note;
+      state.itemLossTurn=turn;
       if(state.revealedItem===event.item)state.revealedItem='';
+      state.postItemLossHazardNote=this.hazardTimelineNote(state);
       const sourceText=String(event.from||'').trim();
       const sourceDetail=sourceText?` via ${sourceText.replace(/^move: /,'')}`:'';
       this.addEvidence(state,turn,'reveal',`${state.species} lost ${event.item}${sourceDetail}`,'Current item no longer present',4.5,{hard:true,removedItem:event.item,itemGone:true});
@@ -767,6 +796,7 @@ class ReplayParser{
           state.revealedItem?`${state.revealedItem} confirmed`:null,
           state.itemGone?(state.itemLossLabel||`${state.removedItem} was removed`):null,
           state.itemGone&&state.itemLossNote?state.itemLossNote:null,
+          state.itemGone&&state.postItemLossHazardNote?state.postItemLossHazardNote:null,
           ...state.abilityHints.map(a=>{
             const reward=this.abilityRewardText(a);
             return reward?`${a} revealed (${reward})`:`${a} revealed`;
@@ -790,6 +820,7 @@ class ReplayParser{
           removedItem:state.removedItem||undefined,
           itemGone:state.itemGone,
           revealedAbility:state.abilityHints.length===1?state.abilityHints[0]:undefined,
+          postItemLossHazardNote:state.postItemLossHazardNote||undefined,
           abilityHints:state.abilityHints.slice(),
           usedStatusMove:state.usedStatusMove,
           tookHazardDamage:state.tookHazardDamage,
@@ -1578,6 +1609,7 @@ function detectiveEvidenceNotes(input){
     hardBlocks.push(`${input.removedItem} no longer current item`);
     notes.push(input.itemLossNote||`${input.removedItem} was removed, so the old item is dead and the slot may now be empty.`);
   }
+  if(input.postItemLossHazardNote)notes.push(input.postItemLossHazardNote);
   if(input.repeatedDamagingMove)notes.push('Repeated damage leans toward Choice locking, but does not prove it.');
   if(input.speedContext?.relation==='fasterThan'&&input.speedContext?.opponentSpecies)notes.push(`Moved before ${input.speedContext.opponentSpecies} in a neutral-priority exchange, so clearly slower lines are weak fits.`);
   else if(input.speedContext?.relation==='slowerThan'&&input.speedContext?.opponentSpecies)notes.push(`Moved after ${input.speedContext.opponentSpecies} in a neutral-priority exchange, so clearly faster lines are weak fits.`);
