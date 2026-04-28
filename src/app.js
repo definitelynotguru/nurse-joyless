@@ -502,9 +502,11 @@ class ReplayParser{
       return false;
     });
   }
-  addPostItemLossProtectionHints(state, hazard=''){
+  addPostItemLossProtectionHints(state, hazard='', options={}){
     if(!state)return;
-    state.postItemLossProtectionItems=unique([...(state.postItemLossProtectionItems||[]),...this.protectionRecoveryItemsForHazard(hazard)]);
+    if(options.includeItems!==false){
+      state.postItemLossProtectionItems=unique([...(state.postItemLossProtectionItems||[]),...this.protectionRecoveryItemsForHazard(hazard)]);
+    }
     state.postItemLossProtectionAbilities=unique([...(state.postItemLossProtectionAbilities||[]),...this.protectionRecoveryAbilitiesForHazard(state,hazard)]);
   }
   postItemLossProtectionHintNote(state, hazard=''){
@@ -699,8 +701,32 @@ class ReplayParser{
     }
     return `Later switched through ${label} after ${state?.removedItem||'the old item'} left the slot ${missedEffect}, so the current state picked up fresh entry protection after the item loss.`;
   }
+  postItemLossAbilityProtectionNote(state, hazard=''){
+    const label=this.normalizedHazardName(hazard)||String(hazard||'hazards').trim()||'hazards';
+    const abilities=this.protectionRecoveryAbilitiesForHazard(state,label);
+    if(!abilities.length)return '';
+    const missedEffect=label==='Toxic Spikes'
+      ? 'without getting poisoned'
+      : label==='Sticky Web'
+        ? 'without getting slowed'
+        : 'without taking chip';
+    const abilityText=this.joinWithOr(abilities);
+    if(state?.removedItem==='Air Balloon'){
+      return `Later switched through ${label} after Air Balloon popped ${missedEffect}, but ${abilityText} still explains that protection without needing a fresh item.`;
+    }
+    if(state?.removedItem==='Heavy-Duty Boots'){
+      return `Later switched through ${label} after Heavy-Duty Boots were removed ${missedEffect}, so ${abilityText} still cleanly explains the empty-slot current state.`;
+    }
+    return `Later switched through ${label} after ${state?.removedItem||'the old item'} left the slot ${missedEffect}, and ${abilityText} still explains that protection without needing a new item.`;
+  }
   markPostItemLossProtection(state, hazard=''){
     if(!state)return;
+    const abilityOptions=this.protectionRecoveryAbilitiesForHazard(state,hazard);
+    if(abilityOptions.length){
+      this.addPostItemLossProtectionHints(state,hazard,{includeItems:false});
+      this.addPostItemLossNote(state,this.postItemLossAbilityProtectionNote(state,hazard));
+      return;
+    }
     state.postItemLossProtectionRecovered=true;
     this.addPostItemLossProtectionHints(state,hazard);
     this.addPostItemLossNote(state,this.postItemLossProtectionNote(state,hazard));

@@ -663,6 +663,60 @@ const bootsProtectionReturnRead = vm.runInContext('lastDetectiveRead', context, 
 assert(bootsProtectionReturnRead.summary.notes.some(x => /empty slot is no longer the only live current-item story/i.test(x)), 'post-Boots protection return should reopen the current-item story instead of locking on No Item');
 assert(bootsProtectionReturnRead.itemRows[0][0] !== 'No Item', 'post-Boots protection return should stop anchoring the current item read to an empty slot');
 
+const bootsLevitateProtectionLog = '|turn|1\n|switch|p1a: Ting-Lu|Ting-Lu, L80\n|-sidestart|p2: Hydreigon|move: Spikes\n|switch|p2a: Hydreigon|Hydreigon, L80\n|-item|p2a: Hydreigon|Heavy-Duty Boots\n|move|p1a: Ting-Lu|Knock Off|p2a: Hydreigon\n|-enditem|p2a: Hydreigon|Heavy-Duty Boots|[from] move: Knock Off\n|turn|2\n|switch|p2a: Hydreigon|Hydreigon, L80';
+const bootsLevitateProtectionParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(bootsLevitateProtectionLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const bootsLevitateProtectionTarget = bootsLevitateProtectionParser.targets.find(t => t.species === 'Hydreigon');
+assert(!bootsLevitateProtectionTarget?.postItemLossProtectionRecovered, 'Levitate-based missing Spikes should not be mislabeled as fresh protection returning after Boots were removed');
+assert((bootsLevitateProtectionTarget?.postItemLossProtectionItems || []).length === 0, 'Levitate-based missing Spikes should not invent a fresh-item hint');
+assert(bootsLevitateProtectionTarget?.postItemLossProtectionAbilities?.includes('Levitate'), 'Levitate-based missing Spikes should keep the ability explanation live');
+assert(bootsLevitateProtectionTarget?.notes?.some(note => /Levitate still cleanly explains the empty-slot current state/i.test(note)), 'Levitate-based missing Spikes should explain that the empty-slot story still works');
+
+vm.runInContext(
+  `team=[
+    preset("Great Tusk","Heavy-Duty Boots","Impish",{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},["Close Combat","Headlong Rush","Rapid Spin","Knock Off"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: bootsLevitateProtectionTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const bootsLevitateProtectionRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(bootsLevitateProtectionRead.itemRows[0][0] === 'No Item', 'Levitate-based missing Spikes should keep the empty current item slot as the top item read');
+assert(bootsLevitateProtectionRead.abilityRows[0][0] === 'Levitate', 'Levitate-based missing Spikes should surface Levitate as the live protection explanation');
+assert(bootsLevitateProtectionRead.summary.notes.some(x => /Levitate still cleanly explains the empty-slot current state/i.test(x)), 'Levitate-based missing Spikes should carry the ability explanation into detective notes');
+
+const bootsMagicGuardProtectionLog = '|turn|1\n|switch|p1a: Ting-Lu|Ting-Lu, L80\n|-sidestart|p2: Clefable|move: Stealth Rock\n|switch|p2a: Clefable|Clefable, L80\n|-item|p2a: Clefable|Heavy-Duty Boots\n|move|p1a: Ting-Lu|Knock Off|p2a: Clefable\n|-enditem|p2a: Clefable|Heavy-Duty Boots|[from] move: Knock Off\n|turn|2\n|switch|p2a: Clefable|Clefable, L80';
+const bootsMagicGuardProtectionParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(bootsMagicGuardProtectionLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const bootsMagicGuardProtectionTarget = bootsMagicGuardProtectionParser.targets.find(t => t.species === 'Clefable');
+assert(!bootsMagicGuardProtectionTarget?.postItemLossProtectionRecovered, 'Magic Guard-based missing Stealth Rock should not be mislabeled as fresh protection returning after Boots were removed');
+assert((bootsMagicGuardProtectionTarget?.postItemLossProtectionItems || []).length === 0, 'Magic Guard-based missing Stealth Rock should not invent a fresh-item hint');
+assert(bootsMagicGuardProtectionTarget?.postItemLossProtectionAbilities?.includes('Magic Guard'), 'Magic Guard-based missing Stealth Rock should keep the ability explanation live');
+assert(bootsMagicGuardProtectionTarget?.notes?.some(note => /Magic Guard still cleanly explains the empty-slot current state/i.test(note)), 'Magic Guard-based missing Stealth Rock should explain that the empty-slot story still works');
+
+vm.runInContext(
+  `team=[
+    preset("Great Tusk","Heavy-Duty Boots","Impish",{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},["Close Combat","Headlong Rush","Rapid Spin","Knock Off"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: bootsMagicGuardProtectionTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const bootsMagicGuardProtectionRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(bootsMagicGuardProtectionRead.itemRows[0][0] === 'No Item', 'Magic Guard-based missing Stealth Rock should keep the empty current item slot as the top item read');
+assert(bootsMagicGuardProtectionRead.abilityRows[0][0] === 'Magic Guard', 'Magic Guard-based missing Stealth Rock should surface Magic Guard as the live protection explanation');
+assert(bootsMagicGuardProtectionRead.summary.notes.some(x => /Magic Guard still cleanly explains the empty-slot current state/i.test(x)), 'Magic Guard-based missing Stealth Rock should carry the ability explanation into detective notes');
+
 const airBalloonToxicSpikesLog = '|turn|1\n|switch|p1a: Gliscor|Gliscor, L80\n|-sidestart|p2: Great Tusk|move: Toxic Spikes\n|switch|p2a: Great Tusk|Great Tusk, L80\n|-item|p2a: Great Tusk|Air Balloon\n|move|p1a: Gliscor|Knock Off|p2a: Great Tusk\n|-enditem|p2a: Great Tusk|Air Balloon\n|turn|2\n|switch|p2a: Great Tusk|Great Tusk, L80\n|-status|p2a: Great Tusk|psn|[from] move: Toxic Spikes';
 const airBalloonToxicSpikesParser = vm.runInContext(`(() => {
   const parser = new ReplayParser();
