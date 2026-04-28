@@ -414,19 +414,34 @@ class ReplayParser{
       'Well-Baked Body':'a Defense boost and Fire immunity',
       'Flash Fire':'Fire immunity and a Fire-power boost',
       'Good as Gold':'status immunity against opposing moves'
-    })[ability]||'a revealed immunity interaction';
+    })[ability]||'';
+  }
+  abilityTriggeredByMove(ability, move=''){
+    const type=moveData(move)?.[0]||({
+      Surf:'Water'
+    })[move]||'';
+    const category=moveCategory(move);
+    if(['Water Absorb','Storm Drain','Dry Skin'].includes(ability))return type==='Water';
+    if(['Volt Absorb','Lightning Rod','Motor Drive'].includes(ability))return type==='Electric';
+    if(ability==='Sap Sipper')return type==='Grass';
+    if(ability==='Earth Eater')return type==='Ground';
+    if(['Well-Baked Body','Flash Fire'].includes(ability))return type==='Fire';
+    if(ability==='Good as Gold')return category==='Status';
+    return false;
   }
   abilityClueLabel(ability, move=''){
-    if(!move)return `${ability} revealed`;
+    if(!move||!this.abilityTriggeredByMove(ability, move))return `${ability} revealed`;
     if(['Water Absorb','Volt Absorb','Dry Skin','Earth Eater'].includes(ability))return `${ability} absorbed ${move}`;
     if(['Storm Drain','Lightning Rod','Motor Drive','Sap Sipper','Well-Baked Body'].includes(ability))return `${ability} activated on ${move}`;
-    return `${ability} revealed on ${move}`;
+    if(['Flash Fire','Good as Gold'].includes(ability))return `${ability} blocked ${move}`;
+    return `${ability} revealed`;
   }
   recordAbilityReveal(state, turn, ability, moveEvent, text, clueLabel=''){
     if(!state||!ability)return;
     if(!state.abilityHints.includes(ability))state.abilityHints.push(ability);
     this.addEvidence(state,turn,'reveal',text||`${state.species} revealed ${ability}`,'Ability revealed',3.5,{hard:true,ability});
-    this.addClueObservation(state,{turn,move:moveEvent?.move||'',label:clueLabel||this.abilityClueLabel(ability,moveEvent?.move)});
+    const reactiveMove=this.abilityTriggeredByMove(ability, moveEvent?.move)?moveEvent:null;
+    this.addClueObservation(state,{turn,move:reactiveMove?.move||'',label:clueLabel||this.abilityClueLabel(ability,reactiveMove?.move)});
   }
   bestDamageObservation(state){
     return this.detectiveInputsFromState(state)[0]||null;
@@ -644,7 +659,10 @@ class ReplayParser{
         }));
         const uniqueNotes=unique([
           state.revealedItem?`${state.revealedItem} confirmed`:null,
-          ...state.abilityHints.map(a=>`${a} revealed (${this.abilityRewardText(a)})`),
+          ...state.abilityHints.map(a=>{
+            const reward=this.abilityRewardText(a);
+            return reward?`${a} revealed (${reward})`:`${a} revealed`;
+          }),
           state.tookHazardDamage?'Boots ruled out':null,
           state.usedStatusMove?'Assault Vest ruled out':null,
           state.choiceContradiction?'Choice items contradicted':null,

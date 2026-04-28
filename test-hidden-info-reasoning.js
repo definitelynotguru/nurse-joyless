@@ -465,6 +465,18 @@ const wellBakedRead = vm.runInContext('lastDetectiveRead', context, { timeout: 1
 assert(wellBakedRead.top.every(x => x.ability === 'Well-Baked Body'), 'Well-Baked Body replay clues should collapse the detective ability pool');
 assert(wellBakedRead.summary.notes.some(x => /Defense boost/i.test(x)), 'Well-Baked Body replay clues should explain the boost consequence');
 
+const speedBoostLog = '|turn|1\n|switch|p1a: Great Tusk|Great Tusk, L80\n|switch|p2a: Blaziken|Blaziken, L80\n|move|p2a: Blaziken|Protect|p2a: Blaziken\n|-boost|p2a: Blaziken|spe|1|[from] ability: Speed Boost';
+const speedBoostParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(speedBoostLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const speedBoostTarget = speedBoostParser.strongest;
+assert(speedBoostTarget?.species === 'Blaziken', 'generic ability replay clues should stay attached to the revealed target');
+assert(speedBoostTarget?.detectiveInputs?.[0]?.label === 'Speed Boost revealed', 'generic ability reveals should not pretend they were caused by the last move');
+assert(speedBoostTarget?.notes?.includes('Speed Boost revealed'), 'generic ability reveals should stay descriptive without fake immunity text');
+assert(!speedBoostTarget?.notes?.some(note => /immunity interaction/i.test(note)), 'generic ability reveals should not be mislabeled as immunity interactions');
+
 const switchedTargetLog = '|turn|1\n|switch|p1a: Great Tusk|Great Tusk, L80\n|switch|p2a: Dragapult|Dragapult, L80\n|move|p2a: Dragapult|Shadow Ball|p1a: Great Tusk\n|-damage|p1a: Great Tusk|57/100\n|-item|p2a: Dragapult|Leftovers\n|turn|2\n|switch|p2a: Gholdengo|Gholdengo, L80\n|turn|3\n|switch|p2a: Dragapult|Dragapult, L80\n|move|p2a: Dragapult|Draco Meteor|p1a: Great Tusk\n|-damage|p1a: Great Tusk|12/100';
 const switchedTargetParser = vm.runInContext(`(() => {
   const parser = new ReplayParser();
