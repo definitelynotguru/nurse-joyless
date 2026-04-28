@@ -430,6 +430,10 @@ class ReplayParser{
         postItemLossProtectionRecovered:false,
         postItemLossProtectionItems:[],
         postItemLossProtectionAbilities:[],
+        postItemLossGroundNotes:[],
+        postItemLossGroundProtectionRecovered:false,
+        postItemLossGroundProtectionItems:[],
+        postItemLossGroundProtectionAbilities:[],
         abilityHints:[],
         damageObservations:[],
         clueObservations:[],
@@ -466,6 +470,14 @@ class ReplayParser{
     if(!state.postItemLossNotes)state.postItemLossNotes=[];
     if(!state.postItemLossNotes.includes(text)){
       state.postItemLossNotes=[...state.postItemLossNotes,text].slice(-4);
+    }
+  }
+  addPostItemLossGroundNote(state, note=''){
+    const text=String(note||'').trim();
+    if(!state||!text)return;
+    if(!state.postItemLossGroundNotes)state.postItemLossGroundNotes=[];
+    if(!state.postItemLossGroundNotes.includes(text)){
+      state.postItemLossGroundNotes=[...state.postItemLossGroundNotes,text].slice(-4);
     }
   }
   joinWithOr(list=[]){
@@ -509,6 +521,26 @@ class ReplayParser{
     }
     state.postItemLossProtectionAbilities=unique([...(state.postItemLossProtectionAbilities||[]),...this.protectionRecoveryAbilitiesForHazard(state,hazard)]);
   }
+  isGroundProtectionMove(move=''){
+    const meta=moveMeta(move);
+    return !!meta&&meta[0]==='Ground'&&meta[1]!=='Status';
+  }
+  groundProtectionRecoveryItemsForMove(state, move=''){
+    if(state?.removedItem!=='Air Balloon'||!this.isGroundProtectionMove(move))return [];
+    return ['Air Balloon'];
+  }
+  groundProtectionRecoveryAbilitiesForMove(state, move=''){
+    if(state?.removedItem!=='Air Balloon'||!this.isGroundProtectionMove(move))return [];
+    const abilities=detectiveAbilities(state?.species);
+    return abilities.filter(ability=>['Levitate','Earth Eater'].includes(ability));
+  }
+  addPostItemLossGroundProtectionHints(state, move='', options={}){
+    if(!state)return;
+    if(options.includeItems!==false){
+      state.postItemLossGroundProtectionItems=unique([...(state.postItemLossGroundProtectionItems||[]),...this.groundProtectionRecoveryItemsForMove(state,move)]);
+    }
+    state.postItemLossGroundProtectionAbilities=unique([...(state.postItemLossGroundProtectionAbilities||[]),...this.groundProtectionRecoveryAbilitiesForMove(state,move)]);
+  }
   postItemLossProtectionHintNote(state, hazard=''){
     const label=this.normalizedHazardName(hazard);
     if(!state||!label)return '';
@@ -548,6 +580,9 @@ class ReplayParser{
   }
   itemClueLabel(item){
     return item?`${item} confirmed`:'Item revealed';
+  }
+  blockedItemClueLabel(item, move=''){
+    return item&&move?`${item} blocked ${move}`:this.itemClueLabel(item);
   }
   itemLossClueLabel(item, source=''){
     const move=String(source||'').match(/^move: (.+)$/)?.[1]||'';
@@ -592,6 +627,10 @@ class ReplayParser{
   }
   abilitySource(source){
     const match=String(source||'').match(/^ability: (.+)$/);
+    return match?match[1]:'';
+  }
+  itemSource(source){
+    const match=String(source||'').match(/^item: (.+)$/);
     return match?match[1]:'';
   }
   abilityRewardText(ability){
@@ -806,6 +845,23 @@ class ReplayParser{
     if(!moveName||!meta||meta[0]!=='Ground'||meta[1]==='Status')return '';
     return `Later took ${moveName} after Air Balloon popped, confirming the old Ground immunity really ended.`;
   }
+  postItemLossGroundProtectionNote(state, move=''){
+    const moveName=String(move||'').trim()||'a Ground move';
+    if(state?.removedItem==='Air Balloon'){
+      return `Later ignored ${moveName} after Air Balloon popped, so the current state regained Ground protection after the old Balloon was lost.`;
+    }
+    return `Later ignored ${moveName} after ${state?.removedItem||'the old item'} left the slot, so the current state regained Ground protection.`;
+  }
+  postItemLossGroundAbilityProtectionNote(state, move=''){
+    const moveName=String(move||'').trim()||'a Ground move';
+    const abilities=this.groundProtectionRecoveryAbilitiesForMove(state,move);
+    if(!abilities.length)return '';
+    const abilityText=this.joinWithOr(abilities);
+    if(state?.removedItem==='Air Balloon'){
+      return `Later ignored ${moveName} after Air Balloon popped, but ${abilityText} still cleanly explains the empty-slot current state.`;
+    }
+    return `Later ignored ${moveName} after ${state?.removedItem||'the old item'} left the slot, and ${abilityText} still explains that protection without needing a new item.`;
+  }
   recordAbilityReveal(state, turn, ability, moveEvent, text, clueLabel=''){
     if(!state||!ability)return;
     if(!state.abilityHints.includes(ability))state.abilityHints.push(ability);
@@ -844,6 +900,10 @@ class ReplayParser{
       postItemLossProtectionItems:(state.postItemLossProtectionItems||[]).slice(),
       postItemLossProtectionAbilities:(state.postItemLossProtectionAbilities||[]).slice(),
       postItemLossNotes:(state.postItemLossNotes||[]).slice(),
+      postItemLossGroundProtectionRecovered:!!state.postItemLossGroundProtectionRecovered,
+      postItemLossGroundProtectionItems:(state.postItemLossGroundProtectionItems||[]).slice(),
+      postItemLossGroundProtectionAbilities:(state.postItemLossGroundProtectionAbilities||[]).slice(),
+      postItemLossGroundNotes:(state.postItemLossGroundNotes||[]).slice(),
       revealedItem:state.revealedItem||undefined,
       _index:index,
       _turn:obs.turn||0
@@ -873,6 +933,10 @@ class ReplayParser{
           postItemLossProtectionItems:(state.postItemLossProtectionItems||[]).slice(),
           postItemLossProtectionAbilities:(state.postItemLossProtectionAbilities||[]).slice(),
           postItemLossNotes:(state.postItemLossNotes||[]).slice(),
+          postItemLossGroundProtectionRecovered:!!state.postItemLossGroundProtectionRecovered,
+          postItemLossGroundProtectionItems:(state.postItemLossGroundProtectionItems||[]).slice(),
+          postItemLossGroundProtectionAbilities:(state.postItemLossGroundProtectionAbilities||[]).slice(),
+          postItemLossGroundNotes:(state.postItemLossGroundNotes||[]).slice(),
           revealedItem:state.revealedItem||undefined,
           _index:index,
           _turn:obs.turn||0
@@ -1024,6 +1088,10 @@ class ReplayParser{
       state.postItemLossProtectionRecovered=false;
       state.postItemLossProtectionItems=[];
       state.postItemLossProtectionAbilities=[];
+      state.postItemLossGroundNotes=[];
+      state.postItemLossGroundProtectionRecovered=false;
+      state.postItemLossGroundProtectionItems=[];
+      state.postItemLossGroundProtectionAbilities=[];
       this.addEvidence(state,turn,'reveal',`${state.species} revealed ${event.item}`,'Item confirmed',5,{hard:true,revealedItem:event.item});
       this.addClueObservation(state,{turn,label:this.itemClueLabel(event.item)});
       return;
@@ -1041,6 +1109,10 @@ class ReplayParser{
       state.postItemLossProtectionRecovered=false;
       state.postItemLossProtectionItems=[];
       state.postItemLossProtectionAbilities=[];
+      state.postItemLossGroundNotes=[];
+      state.postItemLossGroundProtectionRecovered=false;
+      state.postItemLossGroundProtectionItems=[];
+      state.postItemLossGroundProtectionAbilities=[];
       this.addPostItemLossNote(state,this.hazardTimelineNote(state));
       const sourceText=String(event.from||'').trim();
       const sourceDetail=sourceText?` via ${sourceText.replace(/^move: /,'')}`:'';
@@ -1073,6 +1145,10 @@ class ReplayParser{
       const ability=this.abilitySource(event.from);
       if(ability){
         const moveEvent=[...this.turnMoves].reverse().find(x=>x.species&&state.slot!==x.slot);
+        if(state.itemGone&&this.groundProtectionRecoveryAbilitiesForMove(state,moveEvent?.move).includes(ability)){
+          this.addPostItemLossGroundProtectionHints(state,moveEvent?.move,{includeItems:false});
+          this.addPostItemLossGroundNote(state,this.postItemLossGroundAbilityProtectionNote(state,moveEvent?.move));
+        }
         this.recordAbilityReveal(state,turn,ability,moveEvent,`${state.species} restored HP with ${ability}`);
       }
       return;
@@ -1082,15 +1158,34 @@ class ReplayParser{
       const ability=this.abilitySource(event.from);
       if(ability){
         const moveEvent=[...this.turnMoves].reverse().find(x=>x.species&&state.slot!==x.slot);
+        if(state.itemGone&&this.groundProtectionRecoveryAbilitiesForMove(state,moveEvent?.move).includes(ability)){
+          this.addPostItemLossGroundProtectionHints(state,moveEvent?.move,{includeItems:false});
+          this.addPostItemLossGroundNote(state,this.postItemLossGroundAbilityProtectionNote(state,moveEvent?.move));
+        }
         this.recordAbilityReveal(state,turn,ability,moveEvent,`${state.species} gained a boost from ${ability}`);
       }
       return;
     }
     if(event.type==='-immune'&&event.target&&event.from){
+      const state=this.ensureState(event.target);
+      const moveEvent=[...this.turnMoves].reverse().find(x=>x.species&&state.slot!==x.slot);
+      const item=this.itemSource(event.from);
+      if(item){
+        state.revealedItem=item;
+        this.addEvidence(state,turn,'reveal',`${state.species} was protected by ${item}`,'Item confirmed',4,{hard:true,revealedItem:item});
+        this.addClueObservation(state,{turn,move:moveEvent?.move||'',label:this.blockedItemClueLabel(item,moveEvent?.move)});
+        if(state.itemGone&&this.groundProtectionRecoveryItemsForMove(state,moveEvent?.move).includes(item)){
+          state.postItemLossGroundProtectionRecovered=true;
+          this.addPostItemLossGroundProtectionHints(state,moveEvent?.move);
+          this.addPostItemLossGroundNote(state,this.postItemLossGroundProtectionNote(state,moveEvent?.move));
+        }
+      }
       const ability=this.abilitySource(event.from);
       if(ability){
-        const state=this.ensureState(event.target);
-        const moveEvent=[...this.turnMoves].reverse().find(x=>x.species&&state.slot!==x.slot);
+        if(state.itemGone&&this.groundProtectionRecoveryAbilitiesForMove(state,moveEvent?.move).includes(ability)){
+          this.addPostItemLossGroundProtectionHints(state,moveEvent?.move,{includeItems:false});
+          this.addPostItemLossGroundNote(state,this.postItemLossGroundAbilityProtectionNote(state,moveEvent?.move));
+        }
         const clueLabel=moveEvent?.move?`${ability} blocked ${moveEvent.move}`:`${ability} revealed`;
         this.recordAbilityReveal(state,turn,ability,moveEvent,`${state.species} was protected by ${ability}`,clueLabel);
       }
@@ -1114,6 +1209,7 @@ class ReplayParser{
           state.itemGone?(state.itemLossLabel||`${state.removedItem} was removed`):null,
           state.itemGone&&state.itemLossNote?state.itemLossNote:null,
           ...(state.postItemLossNotes||[]),
+          ...(state.postItemLossGroundNotes||[]),
           ...state.abilityHints.map(a=>{
             const reward=this.abilityRewardText(a);
             return reward?`${a} revealed (${reward})`:`${a} revealed`;
@@ -1139,6 +1235,8 @@ class ReplayParser{
           revealedAbility:state.abilityHints.length===1?state.abilityHints[0]:undefined,
           postItemLossProtectionRecovered:!!state.postItemLossProtectionRecovered,
           postItemLossNotes:(state.postItemLossNotes||[]).slice(),
+          postItemLossGroundProtectionRecovered:!!state.postItemLossGroundProtectionRecovered,
+          postItemLossGroundNotes:(state.postItemLossGroundNotes||[]).slice(),
           abilityHints:state.abilityHints.slice(),
           usedStatusMove:state.usedStatusMove,
           tookHazardDamage:currentTookHazardDamage,
@@ -1150,6 +1248,8 @@ class ReplayParser{
           speedContext:state.speedContext?{...state.speedContext}:null,
           postItemLossProtectionItems:(state.postItemLossProtectionItems||[]).slice(),
           postItemLossProtectionAbilities:(state.postItemLossProtectionAbilities||[]).slice(),
+          postItemLossGroundProtectionItems:(state.postItemLossGroundProtectionItems||[]).slice(),
+          postItemLossGroundProtectionAbilities:(state.postItemLossGroundProtectionAbilities||[]).slice(),
           detectiveInput:bestObservation,
           detectiveInputs:detectiveInputs.map(input=>({
             ...input,
@@ -1899,7 +1999,7 @@ function advice(r,rev){let risk=rev[0]?.ko||0;if(r.ko>=.999)return`Click ${r.mv}
 
 // V3.5 cleanup restore: hidden-info detective and prescription helpers.
 function detectiveAbilities(sp){let vals=unique(Object.values(DexAdapter.getSpecies(sp)?.abilities||{}).filter(Boolean));return vals.length?vals:['Unknown']}
-function candidates(sp,observedAbility='',options={}){let prof=[['physical offense','Adamant',{hp:0,atk:252,def:0,spa:0,spd:4,spe:252},['Choice Band','Life Orb','Heavy-Duty Boots','Black Glasses']],['speed physical','Jolly',{hp:0,atk:252,def:0,spa:0,spd:4,spe:252},['Choice Scarf','Life Orb','Heavy-Duty Boots']],['special offense','Modest',{hp:0,atk:0,def:4,spa:252,spd:0,spe:252},['Choice Specs','Life Orb','Heavy-Duty Boots','Expert Belt']],['speed special','Timid',{hp:0,atk:0,def:4,spa:252,spd:0,spe:252},['Choice Scarf','Choice Specs','Heavy-Duty Boots']],['physical wall','Impish',{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},['Leftovers','Rocky Helmet','Heavy-Duty Boots']],['special wall','Calm',{hp:252,atk:0,def:4,spa:0,spd:252,spe:0},['Leftovers','Assault Vest','Heavy-Duty Boots']]],out=[],abilities=detectiveAbilities(sp);if(observedAbility&&!abilities.includes(observedAbility))abilities=abilities[0]==='Unknown'?[observedAbility]:unique([...abilities,observedAbility]);prof.forEach(p=>{const items=options.allowItemless?unique([...p[3],'No Item']):p[3];items.forEach(item=>abilities.forEach(ability=>out.push({species:sp,profile:p[0],nature:p[1],evs:p[2],item,ability,prob:1,reasons:[]})))});normC(out);return out}
+function candidates(sp,observedAbility='',options={}){let prof=[['physical offense','Adamant',{hp:0,atk:252,def:0,spa:0,spd:4,spe:252},['Choice Band','Life Orb','Heavy-Duty Boots','Black Glasses']],['speed physical','Jolly',{hp:0,atk:252,def:0,spa:0,spd:4,spe:252},['Choice Scarf','Life Orb','Heavy-Duty Boots']],['special offense','Modest',{hp:0,atk:0,def:4,spa:252,spd:0,spe:252},['Choice Specs','Life Orb','Heavy-Duty Boots','Expert Belt']],['speed special','Timid',{hp:0,atk:0,def:4,spa:252,spd:0,spe:252},['Choice Scarf','Choice Specs','Heavy-Duty Boots']],['physical wall','Impish',{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},['Leftovers','Rocky Helmet','Heavy-Duty Boots']],['special wall','Calm',{hp:252,atk:0,def:4,spa:0,spd:252,spe:0},['Leftovers','Assault Vest','Heavy-Duty Boots']]],out=[],abilities=detectiveAbilities(sp),forcedItems=unique((options.forceItems||[]).filter(Boolean));if(observedAbility&&!abilities.includes(observedAbility))abilities=abilities[0]==='Unknown'?[observedAbility]:unique([...abilities,observedAbility]);prof.forEach(p=>{const items=unique([...(options.allowItemless?[...p[3],'No Item']:p[3]),...forcedItems]);items.forEach(item=>abilities.forEach(ability=>out.push({species:sp,profile:p[0],nature:p[1],evs:p[2],item,ability,prob:1,reasons:[]})))});normC(out);return out}
 function normC(c){let s=c.reduce((a,b)=>a+Math.max(0,b.prob),0)||1;c.forEach(x=>x.prob=Math.max(0,x.prob)/s)}
 function defaultMoves(sp,c){let pool={Dragapult:c.profile.includes('special')?['Shadow Ball','Draco Meteor','Flamethrower','U-turn']:['Dragon Darts','U-turn','Sucker Punch','Tera Blast'],Kingambit:['Kowtow Cleave','Sucker Punch','Iron Head','Swords Dance'],'Great Tusk':['Close Combat','Headlong Rush','Rapid Spin','Knock Off'],'Iron Valiant':['Moonblast','Close Combat','Thunderbolt','Calm Mind'],Gholdengo:['Make It Rain','Shadow Ball','Focus Blast','Recover'],Corviknight:['Roost','Defog','U-turn','Body Press'],Dragonite:['Dragon Dance','Extreme Speed','Earthquake','Fire Punch']};return pool[sp]||['Earthquake','Ice Beam','Moonblast','Thunderbolt']}
 function candSet(c){return {...preset(c.species,c.item,c.nature,c.evs,defaultMoves(c.species,c)),ability:c.ability||''}}
@@ -1929,8 +2029,12 @@ function detectiveEvidenceNotes(input){
   })[input.revealedAbility];
   if(abilityReward)notes.push(abilityReward);
   if(input.itemGone&&input.removedItem){
-    hardBlocks.push(`${input.removedItem} no longer current item`);
-    notes.push(input.itemLossNote||`${input.removedItem} was removed, so the old item is dead and the slot may now be empty.`);
+    if(input.revealedItem&&input.revealedItem===input.removedItem){
+      notes.push(`${input.removedItem} left earlier, but replay later showed that same item is back in the current state.`);
+    }else{
+      hardBlocks.push(`${input.removedItem} no longer current item`);
+      notes.push(input.itemLossNote||`${input.removedItem} was removed, so the old item is dead and the slot may now be empty.`);
+    }
   }
   if(input.postItemLossProtectionRecovered){
     notes.push('Later entry behavior shows the post-loss state regained protection, so an empty slot is no longer the only live current-item story.');
@@ -1938,6 +2042,12 @@ function detectiveEvidenceNotes(input){
   const protectionOptions=unique([...(input.postItemLossProtectionItems||[]),...(input.postItemLossProtectionAbilities||[])]);
   if(protectionOptions.length)notes.push(`Later entry protection keeps ${joinWithOr(protectionOptions)} live for the current state.`);
   (input.postItemLossNotes||[]).forEach(note=>notes.push(note));
+  if(input.postItemLossGroundProtectionRecovered){
+    notes.push('Later Ground immunity shows the post-loss state regained protection, so an empty slot is no longer the only live current-item story.');
+  }
+  const groundProtectionOptions=unique([...(input.postItemLossGroundProtectionItems||[]),...(input.postItemLossGroundProtectionAbilities||[])]);
+  if(groundProtectionOptions.length)notes.push(`Later Ground immunity keeps ${joinWithOr(groundProtectionOptions)} live for the current state.`);
+  (input.postItemLossGroundNotes||[]).forEach(note=>notes.push(note));
   if(input.repeatedDamagingMove)notes.push('Repeated damage leans toward Choice locking, but does not prove it.');
   if(input.speedContext?.relation==='fasterThan'&&input.speedContext?.opponentSpecies)notes.push(`Moved before ${input.speedContext.opponentSpecies} in a neutral-priority exchange, so clearly slower lines are weak fits.`);
   else if(input.speedContext?.relation==='slowerThan'&&input.speedContext?.opponentSpecies)notes.push(`Moved after ${input.speedContext.opponentSpecies} in a neutral-priority exchange, so clearly faster lines are weak fits.`);
@@ -1994,17 +2104,21 @@ function detectiveSummary(top,input,notes){
 }
 function aggregateDetective(top,key){return Object.entries(top.reduce((o,c)=>(o[c[key]]=(o[c[key]]||0)+c.prob,o),{})).sort((a,b)=>b[1]-a[1])}
 function buildDetectiveRead(input){
-  const cs=candidates(input.species,input.revealedAbility,{allowItemless:!!input.itemGone}).map(c=>({...c,reasons:[],eliminated:false,fitQuality:'unknown'}));
+  const forcedItems=unique([input.revealedItem,...(input.postItemLossProtectionItems||[]),...(input.postItemLossGroundProtectionItems||[])].filter(Boolean));
+  const cs=candidates(input.species,input.revealedAbility,{allowItemless:!!input.itemGone,forceItems:forcedItems}).map(c=>({...c,reasons:[],eliminated:false,fitQuality:'unknown'}));
   const notes=detectiveEvidenceNotes(input);
   cs.forEach(c=>{
     if(input.usedStatusMove&&c.item==='Assault Vest'){c.prob=0;c.eliminated=true;c.reasons.push('hard rule-out: used a status move')}
     if(input.tookHazardDamage&&c.item==='Heavy-Duty Boots'){c.prob=0;c.eliminated=true;c.reasons.push('hard rule-out: took hazard damage')}
     if(input.choiceContradiction&&['Choice Band','Choice Specs','Choice Scarf'].includes(c.item)&&(!input.revealedItem||c.item!==input.revealedItem)){c.prob=0;c.eliminated=true;c.reasons.push('hard rule-out: changed damaging moves without switching')}
-    if(input.itemGone&&input.removedItem&&c.item===input.removedItem){c.prob=0;c.eliminated=true;c.reasons.push(`hard rule-out: ${input.removedItem} is already gone`)}
+    if(input.itemGone&&input.removedItem&&c.item===input.removedItem&&(!input.revealedItem||c.item!==input.revealedItem)){c.prob=0;c.eliminated=true;c.reasons.push(`hard rule-out: ${input.removedItem} is already gone`)}
     if(input.itemGone&&c.item==='No Item'){c.prob*=1.7;c.reasons.push('hard anchor: replay proved the old item left the slot')}
     if(input.postItemLossProtectionRecovered&&c.item==='No Item'){c.prob*=0.55;c.reasons.push('soft penalty: later entry protection means the slot may not still be empty')}
     if((input.postItemLossProtectionItems||[]).includes(c.item)){c.prob*=1.6;c.reasons.push('soft boost: later entry protection fits this current item line')}
     if((input.postItemLossProtectionAbilities||[]).includes(c.ability)){c.prob*=1.45;c.reasons.push('soft boost: later entry protection fits this ability line')}
+    if(input.postItemLossGroundProtectionRecovered&&c.item==='No Item'){c.prob*=0.55;c.reasons.push('soft penalty: later Ground immunity means the slot may not still be empty')}
+    if((input.postItemLossGroundProtectionItems||[]).includes(c.item)){c.prob*=1.6;c.reasons.push('soft boost: later Ground immunity fits this current item line')}
+    if((input.postItemLossGroundProtectionAbilities||[]).includes(c.ability)){c.prob*=1.45;c.reasons.push('soft boost: later Ground immunity fits this ability line')}
     if(input.revealedItem&&c.item!==input.revealedItem){c.prob=0;c.eliminated=true;c.reasons.push(`hard rule-out: replay revealed ${input.revealedItem}`)}
     if(input.revealedItem&&c.item===input.revealedItem){c.prob*=1.8;c.reasons.push(`hard anchor: revealed item is ${input.revealedItem}`)}
     if(input.revealedAbility&&c.ability!==input.revealedAbility){c.prob=0;c.eliminated=true;c.reasons.push(`hard rule-out: replay revealed ${input.revealedAbility}`)}

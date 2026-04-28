@@ -539,6 +539,26 @@ assert(airBalloonRead.itemRows[0][0] === 'No Item', 'Air Balloon pop clues shoul
 assert(!airBalloonRead.itemRows.some(([name]) => name === 'Air Balloon'), 'Air Balloon pop clues should remove the popped Balloon from the live pool');
 assert(airBalloonRead.summary.notes.some(x => /Ground immunity is gone/i.test(x)), 'Air Balloon pop clues should carry the groundedness consequence into the detective notes');
 
+const currentAirBalloonRead = vm.runInContext(
+  `buildDetectiveRead({
+    species:'Gholdengo',
+    evidence:'clue_only',
+    move:'',
+    observedDamage:null,
+    clueLabel:'Air Balloon confirmed',
+    usedStatusMove:false,
+    tookHazardDamage:false,
+    repeatedDamagingMove:false,
+    movedFirst:false,
+    revealedItem:'Air Balloon',
+    user:${JSON.stringify(userMon)}
+  })`,
+  context,
+  { timeout: 10000 }
+);
+assert(currentAirBalloonRead.itemRows[0][0] === 'Air Balloon', 'revealed Air Balloon should anchor the live item ranking');
+assert(currentAirBalloonRead.top.every(x => x.item === 'Air Balloon'), 'revealed Air Balloon should keep only Air Balloon lines live');
+
 const airBalloonHazardLog = '|turn|1\n|switch|p1a: Great Tusk|Great Tusk, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|-item|p2a: Gholdengo|Air Balloon\n|move|p1a: Great Tusk|Knock Off|p2a: Gholdengo\n|-enditem|p2a: Gholdengo|Air Balloon\n|turn|2\n|switch|p2a: Gholdengo|Gholdengo, L80\n|-damage|p2a: Gholdengo|88/100|[from] Spikes';
 const airBalloonHazardParser = vm.runInContext(`(() => {
   const parser = new ReplayParser();
@@ -606,6 +626,58 @@ vm.runInContext(
 
 const airBalloonGroundRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
 assert(airBalloonGroundRead.summary.notes.some(x => /Later took Headlong Rush after Air Balloon popped/i.test(x)), 'post-pop Ground-damage clues should stay visible in detective notes');
+
+const airBalloonLevitateRecoveryLog = '|turn|1\n|switch|p1a: Great Tusk|Great Tusk, L80\n|switch|p2a: Hydreigon|Hydreigon, L80\n|-item|p2a: Hydreigon|Air Balloon\n|move|p1a: Great Tusk|Knock Off|p2a: Hydreigon\n|-enditem|p2a: Hydreigon|Air Balloon\n|turn|2\n|move|p1a: Great Tusk|Headlong Rush|p2a: Hydreigon\n|-immune|p2a: Hydreigon|[from] ability: Levitate';
+const airBalloonLevitateRecoveryParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(airBalloonLevitateRecoveryLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const airBalloonLevitateRecoveryTarget = airBalloonLevitateRecoveryParser.targets.find(t => t.species === 'Hydreigon');
+assert(!airBalloonLevitateRecoveryTarget?.postItemLossGroundProtectionRecovered, 'post-pop Ground immunity from Levitate should not be treated as fresh item protection returning');
+assert((airBalloonLevitateRecoveryTarget?.postItemLossGroundProtectionItems || []).length === 0, 'post-pop Ground immunity from Levitate should not invent a new item hint');
+assert(airBalloonLevitateRecoveryTarget?.postItemLossGroundProtectionAbilities?.includes('Levitate'), 'post-pop Ground immunity from Levitate should keep the standing ability explanation live');
+assert(airBalloonLevitateRecoveryTarget?.notes?.some(note => /Levitate still cleanly explains the empty-slot current state/i.test(note)), 'post-pop Ground immunity from Levitate should explain that the empty-slot story still works');
+
+vm.runInContext(
+  `team=[
+    preset("Great Tusk","Heavy-Duty Boots","Impish",{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},["Close Combat","Headlong Rush","Rapid Spin","Knock Off"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: airBalloonLevitateRecoveryTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const airBalloonLevitateRecoveryRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(airBalloonLevitateRecoveryRead.itemRows[0][0] === 'No Item', 'post-pop Ground immunity from Levitate should keep the empty current item slot as the top item read');
+assert(airBalloonLevitateRecoveryRead.abilityRows[0][0] === 'Levitate', 'post-pop Ground immunity from Levitate should surface Levitate as the live explanation');
+assert(airBalloonLevitateRecoveryRead.summary.notes.some(x => /Levitate still cleanly explains the empty-slot current state/i.test(x)), 'post-pop Ground immunity from Levitate should stay visible in detective notes');
+
+const airBalloonGroundProtectionReturnLog = '|turn|1\n|switch|p1a: Great Tusk|Great Tusk, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|-item|p2a: Gholdengo|Air Balloon\n|move|p1a: Great Tusk|Knock Off|p2a: Gholdengo\n|-enditem|p2a: Gholdengo|Air Balloon\n|turn|2\n|move|p1a: Great Tusk|Headlong Rush|p2a: Gholdengo\n|-immune|p2a: Gholdengo|[from] item: Air Balloon';
+const airBalloonGroundProtectionReturnParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(airBalloonGroundProtectionReturnLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const airBalloonGroundProtectionReturnTarget = airBalloonGroundProtectionReturnParser.targets.find(t => t.species === 'Gholdengo');
+assert(airBalloonGroundProtectionReturnTarget?.postItemLossGroundProtectionRecovered, 'post-pop Ground immunity from item evidence should mark that protection returned');
+assert(airBalloonGroundProtectionReturnTarget?.postItemLossGroundProtectionItems?.includes('Air Balloon'), 'post-pop Ground immunity from item evidence should keep Air Balloon live as the current-state explanation');
+assert(airBalloonGroundProtectionReturnTarget?.notes?.some(note => /regained Ground protection/i.test(note)), 'post-pop Ground immunity from item evidence should explain that the later state regained protection');
+
+vm.runInContext(
+  `team=[
+    preset("Great Tusk","Heavy-Duty Boots","Impish",{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},["Close Combat","Headlong Rush","Rapid Spin","Knock Off"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: airBalloonGroundProtectionReturnTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const airBalloonGroundProtectionReturnRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(airBalloonGroundProtectionReturnRead.itemRows[0][0] === 'Air Balloon', 'post-pop Ground immunity from item evidence should reopen Air Balloon as the top item read');
+assert(airBalloonGroundProtectionReturnRead.summary.notes.some(x => /empty slot is no longer the only live current-item story/i.test(x)), 'post-pop Ground immunity from item evidence should reopen the current item story instead of locking on No Item');
 
 const boosterLog = '|turn|1\n|switch|p2a: Raging Bolt|Raging Bolt, L80\n|-item|p2a: Raging Bolt|Booster Energy\n|-enditem|p2a: Raging Bolt|Booster Energy|[from] ability: Protosynthesis';
 const boosterParser = vm.runInContext(`(() => {
