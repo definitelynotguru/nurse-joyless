@@ -479,4 +479,20 @@ assert(!switchedDragapult.choiceContradiction, 'ReplayParser should not fake a C
 assert(switchedDragapult.detectiveInputs.some(input => input.move === 'Shadow Ball'), 'ReplayParser should keep the pre-switch damage branch');
 assert(switchedDragapult.detectiveInputs.some(input => input.move === 'Draco Meteor'), 'ReplayParser should keep the post-switch damage branch');
 
+const mirrorDragapultLog = '|turn|1\n|switch|p1a: Dragapult|Dragapult, L80\n|switch|p2a: Dragapult|Dragapult, L80\n|move|p1a: Dragapult|Thunder Wave|p2a: Dragapult\n|move|p2a: Dragapult|Shadow Ball|p1a: Dragapult\n|-damage|p1a: Dragapult|57/100\n|-item|p2a: Dragapult|Choice Specs';
+const mirrorDragapultParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(mirrorDragapultLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const mirrorDragapults = mirrorDragapultParser.targets.filter(t => t.species === 'Dragapult');
+assert(mirrorDragapults.length === 2, 'ReplayParser should keep same-species targets from opposite sides separate');
+const playerDragapult = mirrorDragapults.find(t => t.side === 'p1');
+const opponentDragapult = mirrorDragapults.find(t => t.side === 'p2');
+assert(playerDragapult?.usedStatusMove, 'ReplayParser should keep player-side status-move evidence on the correct same-species target');
+assert(!playerDragapult?.revealedItem, 'ReplayParser should not leak opponent item reveals onto the player-side same-species target');
+assert(opponentDragapult?.revealedItem === 'Choice Specs', 'ReplayParser should keep opponent item reveals on the correct same-species target');
+assert(!opponentDragapult?.usedStatusMove, 'ReplayParser should not leak player status-move evidence onto the opponent same-species target');
+assert(opponentDragapult?.detectiveInputs?.some(input => input.move === 'Shadow Ball'), 'ReplayParser should preserve opponent-side damage branches for same-species mirror targets');
+
 console.log('[OK] hidden info detective reasoning passed');

@@ -188,6 +188,12 @@ const tests = String.raw`
   assert(document.getElementById('replayResults').innerHTML.includes(secondaryReplayTarget.species), 'Replay Observer did not name the secondary replay target');
   loadReplayDetective(1, 0);
   assert(lastDetectiveRead?.input?.species === secondaryReplayTarget.species, 'Replay Observer did not load the secondary replay target into the detective');
+  const mirrorLog = '|turn|1\n|switch|p1a: Dragapult|Dragapult, L80\n|switch|p2a: Dragapult|Dragapult, L80\n|move|p1a: Dragapult|Thunder Wave|p2a: Dragapult\n|move|p2a: Dragapult|Shadow Ball|p1a: Dragapult\n|-damage|p1a: Dragapult|57/100\n|-item|p2a: Dragapult|Choice Specs';
+  document.getElementById('replayInput').value = mirrorLog; analyzeReplay();
+  const mirrorTargets = lastReplayRead.targets.filter(t => t.species === 'Dragapult');
+  assert(mirrorTargets.length === 2, 'Replay Observer should keep mirror-match same-species targets separate');
+  assert(document.getElementById('replayResults').innerHTML.includes('Dragapult (p1)'), 'Replay Observer should label duplicate-species targets by side');
+  assert(document.getElementById('replayResults').innerHTML.includes('Dragapult (p2)'), 'Replay Observer should render the opponent-side duplicate-species label');
 
   document.getElementById('attacker').value = '0'; document.getElementById('attacker')._items = [mt];
   document.getElementById('defender').value = '0'; document.getElementById('defender')._items = [bl];

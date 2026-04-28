@@ -306,20 +306,32 @@ class ReplayParser{
   slotId(token){
     return String(token||'').split(':')[0].trim();
   }
+  slotSide(slot){
+    const match=String(slot||'').match(/^(p\d+)/);
+    return match?match[1]:'';
+  }
   tokenSpecies(token){
     return String(token||'').split(':').slice(1).join(':').trim()||'';
   }
   detailsSpecies(details){
     return String(details||'').split(',')[0].trim()||'';
   }
+  stateKey(slot,species){
+    const side=this.slotSide(slot);
+    if(side&&species)return `${side}:${species}`;
+    return species||`__slot_${slot}`;
+  }
   ensureState(token,details=''){
     const slot=this.slotId(token);
-    const species=this.detailsSpecies(details)||this.tokenSpecies(token)||this.slotState[slot]||'';
-    const key=species||`__slot_${slot}`;
-    if(slot&&species)this.slotState[slot]=species;
+    const knownKey=this.slotState[slot];
+    const knownState=knownKey?this.speciesState[knownKey]:null;
+    const species=this.detailsSpecies(details)||knownState?.species||this.tokenSpecies(token)||'';
+    const key=this.stateKey(slot,species);
+    if(slot&&species)this.slotState[slot]=key;
     if(!this.speciesState[key]){
       this.speciesState[key]={
         slot,
+        side:this.slotSide(slot),
         species,
         evidence:[],
         score:0,
@@ -340,6 +352,7 @@ class ReplayParser{
       };
     }
     if(slot)this.speciesState[key].slot=slot;
+    if(slot)this.speciesState[key].side=this.slotSide(slot);
     if(species)this.speciesState[key].species=species;
     return this.speciesState[key];
   }
@@ -610,6 +623,7 @@ class ReplayParser{
         ]);
         return {
           species:state.species,
+          side:state.side,
           score:state.score,
           evidenceCount:state.evidence.length,
           detectiveBranchCount:detectiveInputs.length,
@@ -633,6 +647,12 @@ class ReplayParser{
         };
       })
       .sort((a,b)=>(b.detectiveBranchCount>0?1:0)-(a.detectiveBranchCount>0?1:0)||b.score-a.score||b.detectiveBranchCount-a.detectiveBranchCount||b.evidenceCount-a.evidenceCount);
+    const speciesCounts=targets.reduce((acc,target)=>{acc[target.species]=(acc[target.species]||0)+1;return acc;},{});
+    targets.forEach(target=>{
+      target.displaySpecies=speciesCounts[target.species]>1&&target.side
+        ? `${target.species} (${target.side})`
+        : target.species;
+    });
     return {targets,strongest:targets[0]||null};
   }
 }
@@ -648,7 +668,7 @@ function replayTargetHtml(target,targetIndex,{headline='Replay target',strongest
     : '';
   const branchText=detectiveInputs.length>1?` It has ${detectiveInputs.length} detective-ready branches instead of a single collapsed clue.`:'';
   const evidenceText=target.evidenceCount===1?'1 clue':`${target.evidenceCount} clue(s)`;
-  return `<div class="box replay-target-card"><h4>${html(headline)}</h4><p><strong>${html(target.species)}</strong> carries ${evidenceText}.${strongest?' It is the best detective handoff right now.':' It is still replay-loadable even though it is not the top score.'}${branchText}</p><div class="badges">${noteBadges||reasonBadge('Damage-only clue pool','warn')}</div><div class="actions">${includeCopy?'<button class="ghost small" onclick="copyReplaySummary()">Copy read</button>':''}${detectiveButtons}</div></div>`;
+  return `<div class="box replay-target-card"><h4>${html(headline)}</h4><p><strong>${html(target.displaySpecies||target.species)}</strong> carries ${evidenceText}.${strongest?' It is the best detective handoff right now.':' It is still replay-loadable even though it is not the top score.'}${branchText}</p><div class="badges">${noteBadges||reasonBadge('Damage-only clue pool','warn')}</div><div class="actions">${includeCopy?'<button class="ghost small" onclick="copyReplaySummary()">Copy read</button>':''}${detectiveButtons}</div></div>`;
 }
 function replaySummaryHtml(read){
   const targets=read?.targets||[];
