@@ -143,6 +143,12 @@ const tests = String.raw`
   assert(gholdengoImmunityTarget?.revealedAbility === 'Good as Gold', 'ReplayParser did not keep the revealed immunity ability');
   assert(gholdengoImmunityTarget?.detectiveInput?.evidence === 'clue_only', 'ReplayParser did not create a clue-only detective path for immunity-only evidence');
   assert(gholdengoImmunityTarget?.detectiveInput?.clueLabel.includes('Good as Gold blocked Thunder Wave'), 'ReplayParser did not label the immunity-only detective clue');
+  const itemOnlyLog = '|turn|1\n|switch|p1a: Great Tusk|Great Tusk, L80\n|switch|p2a: Dragapult|Dragapult, L80\n|-item|p2a: Dragapult|Leftovers';
+  const itemOnlyParser = new ReplayParser(); itemOnlyParser.parse(itemOnlyLog);
+  const dragapultItemTarget = itemOnlyParser.replayRead.targets.find(t => t.species === 'Dragapult');
+  assert(dragapultItemTarget?.revealedItem === 'Leftovers', 'ReplayParser did not keep the revealed item on an item-only clue');
+  assert(dragapultItemTarget?.detectiveInput?.evidence === 'clue_only', 'ReplayParser did not create a clue-only detective path for item-only evidence');
+  assert(dragapultItemTarget?.detectiveInput?.clueLabel === 'Leftovers confirmed', 'ReplayParser did not label the item-only detective clue');
   const defenseLog = '|turn|1\n|switch|p1a: Great Tusk|Great Tusk, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|move|p1a: Great Tusk|Headlong Rush|p2a: Gholdengo\n|-damage|p2a: Gholdengo|35/100\n|-item|p2a: Gholdengo|Leftovers';
   const defenseParser = new ReplayParser(); defenseParser.parse(defenseLog);
   assert(defenseParser.replayRead.strongest?.species === 'Gholdengo', 'ReplayParser did not elevate defender-side evidence when it had the richest clue stack');
@@ -158,6 +164,11 @@ const tests = String.raw`
   loadReplayDetective();
   assert(lastDetectiveRead?.input?.evidence === 'clue_only', 'Replay immunity clue did not stay detective-loadable without damage');
   assert(document.getElementById('detective').innerHTML.includes('Replay clue: Good as Gold blocked Thunder Wave'), 'detective panel did not explain the no-damage replay clue path');
+  document.getElementById('replayInput').value = itemOnlyLog; analyzeReplay();
+  assert(document.getElementById('replayResults').innerHTML.includes('Leftovers confirmed'), 'Replay Observer did not surface the item-only detective clue');
+  loadReplayDetective();
+  assert(lastDetectiveRead?.input?.revealedItem === 'Leftovers', 'Replay item clue did not carry the revealed item into the detective');
+  assert(document.getElementById('detective').innerHTML.includes('Leftovers'), 'detective panel did not anchor the item-only replay clue');
   lastDetectiveRead = abilityRead; renderDetectiveRead(abilityRead);
   assert(document.getElementById('detective').innerHTML.includes('Likely abilities'), 'detective panel should render ability rankings when ability evidence exists');
   assert(document.getElementById('detective').innerHTML.includes('Infiltrator'), 'detective panel should show the revealed ability');

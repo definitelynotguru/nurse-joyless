@@ -347,6 +347,9 @@ class ReplayParser{
     state.clueObservations.push({...observation, turn:observation.turn||0});
     if(state.clueObservations.length>4)state.clueObservations=state.clueObservations.slice(-4);
   }
+  itemClueLabel(item){
+    return item?`${item} confirmed`:'Item revealed';
+  }
   abilitySource(source){
     const match=String(source||'').match(/^ability: (.+)$/);
     return match?match[1]:'';
@@ -540,6 +543,7 @@ class ReplayParser{
       const state=this.ensureState(event.target);
       state.revealedItem=event.item;
       this.addEvidence(state,turn,'reveal',`${state.species} revealed ${event.item}`,'Item confirmed',5,{hard:true,revealedItem:event.item});
+      this.addClueObservation(state,{turn,label:this.itemClueLabel(event.item)});
       return;
     }
     if((event.type==='-activate'||event.type==='-ability')&&event.target&&event.ability){

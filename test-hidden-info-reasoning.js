@@ -169,6 +169,28 @@ assert(clueOnlyAbilityRead.abilityRows[0][0] === 'Good as Gold', 'clue-only reve
 assert(/replay clues/i.test(clueOnlyAbilityRead.summary.verdict), 'clue-only detective verdict should explain the replay-clue reasoning path');
 assert(clueOnlyAbilityRead.top.every(x => x.ability === 'Good as Gold'), 'clue-only revealed ability should still prune incompatible ability lines');
 
+const clueOnlyItemRead = vm.runInContext(
+  `buildDetectiveRead({
+    species:'Dragapult',
+    evidence:'clue_only',
+    move:'',
+    observedDamage:null,
+    clueLabel:'Leftovers confirmed',
+    usedStatusMove:false,
+    tookHazardDamage:false,
+    repeatedDamagingMove:false,
+    movedFirst:false,
+    revealedItem:'Leftovers',
+    user:${JSON.stringify(userMon)}
+  })`,
+  context,
+  { timeout: 10000 }
+);
+
+assert(clueOnlyItemRead.itemRows[0][0] === 'Leftovers', 'clue-only revealed item should anchor item ranking without damage evidence');
+assert(/replay clues/i.test(clueOnlyItemRead.summary.verdict), 'clue-only item detective verdict should explain the replay-clue reasoning path');
+assert(clueOnlyItemRead.top.every(x => x.item === 'Leftovers'), 'clue-only revealed item should still prune incompatible item lines');
+
 const waterAbsorbRoll = vm.runInContext(
   `dmg(
     preset('Primarina','Leftovers','Modest',{hp:252,atk:0,def:0,spa:252,spd:4,spe:0},['Waterfall','Moonblast','Protect','Psychic Noise']),
@@ -278,6 +300,32 @@ vm.runInContext(
 const defenderLoadedRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
 assert(defenderLoadedRead.input.user.species === 'Great Tusk', 'replay defender-side handoff should use the attacking teammate as the reference mon');
 assert(defenderLoadedRead.input.evidence === 'i_hit_them', 'replay defender-side handoff should preserve the defensive evidence direction');
+
+const itemOnlyLog = '|turn|1\n|switch|p1a: Great Tusk|Great Tusk, L80\n|switch|p2a: Dragapult|Dragapult, L80\n|-item|p2a: Dragapult|Leftovers';
+const itemOnlyParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(itemOnlyLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const itemOnlyTarget = itemOnlyParser.strongest;
+assert(itemOnlyTarget?.species === 'Dragapult', 'item-only replay clues should stay attached to the revealed target');
+assert(itemOnlyTarget?.detectiveBranchCount === 1, 'item-only replay clues should still create a detective-ready branch');
+assert(itemOnlyTarget?.detectiveInputs?.[0]?.clueLabel === 'Leftovers confirmed', 'item-only replay clues should preserve the item-specific clue label');
+
+vm.runInContext(
+  `team=[
+    preset("Great Tusk","Heavy-Duty Boots","Impish",{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},["Close Combat","Headlong Rush","Rapid Spin","Knock Off"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: itemOnlyTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const itemOnlyRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(itemOnlyRead.top.every(x => x.item === 'Leftovers'), 'item-only replay clues should collapse the detective item pool');
+assert(/replay clues/i.test(itemOnlyRead.summary.verdict), 'item-only replay clues should stay in the clue-only detective path');
+assert(itemOnlyRead.summary.notes.some(x => /Leftovers confirmed/.test(x)), 'item-only replay clues should explain the revealed item consequence');
 
 const multiBranchLog = '|turn|1\n|switch|p1a: Great Tusk|Great Tusk, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|move|p2a: Gholdengo|Make It Rain|p1a: Great Tusk\n|-damage|p1a: Great Tusk|58/100\n|move|p1a: Great Tusk|Headlong Rush|p2a: Gholdengo\n|-damage|p2a: Gholdengo|29/100\n|-item|p2a: Gholdengo|Leftovers';
 const multiBranchParser = vm.runInContext(`(() => {
