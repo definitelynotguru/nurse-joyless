@@ -425,6 +425,7 @@ class ReplayParser{
         itemLossLabel:'',
         itemLossNote:'',
         itemLossTurn:0,
+        historicalItemNotes:[],
         hazardEvents:[],
         postItemLossNotes:[],
         postItemLossProtectionRecovered:false,
@@ -478,6 +479,14 @@ class ReplayParser{
     if(!state.postItemLossGroundNotes)state.postItemLossGroundNotes=[];
     if(!state.postItemLossGroundNotes.includes(text)){
       state.postItemLossGroundNotes=[...state.postItemLossGroundNotes,text].slice(-4);
+    }
+  }
+  addHistoricalItemNote(state, note=''){
+    const text=String(note||'').trim();
+    if(!state||!text)return;
+    if(!state.historicalItemNotes)state.historicalItemNotes=[];
+    if(!state.historicalItemNotes.includes(text)){
+      state.historicalItemNotes=[...state.historicalItemNotes,text].slice(-4);
     }
   }
   joinWithOr(list=[]){
@@ -633,6 +642,21 @@ class ReplayParser{
     const match=String(source||'').match(/^item: (.+)$/);
     return match?match[1]:'';
   }
+  itemTransferMove(source=''){
+    const move=String(source||'').match(/^move: (.+)$/)?.[1]||'';
+    return ['Trick','Switcheroo','Bestow'].includes(move)?move:'';
+  }
+  itemTransferNote(oldItem='', newItem='', move=''){
+    if(!oldItem||!newItem)return '';
+    if(move)return `${oldItem} was traded away by ${move}, so it no longer anchors the current item state now that ${newItem} is revealed.`;
+    return `${oldItem} is no longer the live item once ${newItem} shows up in the current state.`;
+  }
+  reacquiredItemNote(oldItem='', newItem='', source=''){
+    if(!oldItem||!newItem)return '';
+    const move=this.itemTransferMove(source);
+    if(move)return `${newItem} later appeared via ${move}, so the earlier ${oldItem}-loss empty-slot read no longer describes the current item state.`;
+    return `${newItem} later appeared, so the earlier ${oldItem}-loss empty-slot read no longer describes the current item state.`;
+  }
   abilityRewardText(ability){
     return ({
       'Water Absorb':'healing and Water immunity',
@@ -645,7 +669,9 @@ class ReplayParser{
       'Earth Eater':'healing and Ground immunity',
       'Well-Baked Body':'a Defense boost and Fire immunity',
       'Flash Fire':'Fire immunity and a Fire-power boost',
-      'Good as Gold':'status immunity against opposing moves'
+      'Good as Gold':'status immunity against opposing moves',
+      'Protosynthesis':'a Paradox stat boost when sun or Booster Energy is active',
+      'Quark Drive':'a Paradox stat boost when Electric Terrain or Booster Energy is active'
     })[ability]||'';
   }
   abilityTriggeredByMove(ability, move=''){
@@ -896,6 +922,7 @@ class ReplayParser{
       itemGone:!!state.itemGone,
       itemLossLabel:state.itemLossLabel||undefined,
       itemLossNote:state.itemLossNote||undefined,
+      historicalItemNotes:(state.historicalItemNotes||[]).slice(),
       postItemLossProtectionRecovered:!!state.postItemLossProtectionRecovered,
       postItemLossProtectionItems:(state.postItemLossProtectionItems||[]).slice(),
       postItemLossProtectionAbilities:(state.postItemLossProtectionAbilities||[]).slice(),
@@ -929,6 +956,7 @@ class ReplayParser{
           itemGone:!!state.itemGone,
           itemLossLabel:state.itemLossLabel||undefined,
           itemLossNote:state.itemLossNote||undefined,
+          historicalItemNotes:(state.historicalItemNotes||[]).slice(),
           postItemLossProtectionRecovered:!!state.postItemLossProtectionRecovered,
           postItemLossProtectionItems:(state.postItemLossProtectionItems||[]).slice(),
           postItemLossProtectionAbilities:(state.postItemLossProtectionAbilities||[]).slice(),
@@ -1078,6 +1106,16 @@ class ReplayParser{
     }
     if(event.type==='-item'&&event.target&&event.item){
       const state=this.ensureState(event.target);
+      const previousItem=state.revealedItem;
+      const previousRemovedItem=state.removedItem;
+      const wasItemGone=!!state.itemGone;
+      const transferMove=this.itemTransferMove(event.from);
+      const transitionNote=wasItemGone&&previousRemovedItem
+        ? this.reacquiredItemNote(previousRemovedItem,event.item,event.from)
+        : transferMove&&previousItem&&previousItem!==event.item
+          ? this.itemTransferNote(previousItem,event.item,transferMove)
+          : '';
+      if(transitionNote)this.addHistoricalItemNote(state,transitionNote);
       state.revealedItem=event.item;
       state.removedItem='';
       state.itemGone=false;
@@ -1118,6 +1156,10 @@ class ReplayParser{
       const sourceDetail=sourceText?` via ${sourceText.replace(/^move: /,'')}`:'';
       this.addEvidence(state,turn,'reveal',`${state.species} lost ${event.item}${sourceDetail}`,'Current item no longer present',4.5,{hard:true,removedItem:event.item,itemGone:true});
       this.addClueObservation(state,{turn,label:loss.clueLabel});
+      const ability=this.abilitySource(event.from);
+      if(ability){
+        this.recordAbilityReveal(state,turn,ability,null,`${state.species} revealed ${ability}`,`${ability} confirmed`);
+      }
       return;
     }
     if(event.type==='-activate'&&event.target&&event.effect){
@@ -1208,6 +1250,7 @@ class ReplayParser{
           state.revealedItem?`${state.revealedItem} confirmed`:null,
           state.itemGone?(state.itemLossLabel||`${state.removedItem} was removed`):null,
           state.itemGone&&state.itemLossNote?state.itemLossNote:null,
+          ...(state.historicalItemNotes||[]),
           ...(state.postItemLossNotes||[]),
           ...(state.postItemLossGroundNotes||[]),
           ...state.abilityHints.map(a=>{
@@ -2025,7 +2068,9 @@ function detectiveEvidenceNotes(input){
     'Earth Eater':'That also means Ground attacks heal instead of damaging.',
     'Well-Baked Body':'That also means Fire attacks are dead lines and the reveal implies a Defense boost.',
     'Flash Fire':'That also means Fire attacks are dead lines and the reveal implies boosted Fire damage later.',
-    'Good as Gold':'That also means opposing status moves stay dead lines unless the log says otherwise.'
+    'Good as Gold':'That also means opposing status moves stay dead lines unless the log says otherwise.',
+    'Protosynthesis':'That also means sun or Booster Energy can turn on a Paradox stat boost.',
+    'Quark Drive':'That also means Electric Terrain or Booster Energy can turn on a Paradox stat boost.'
   })[input.revealedAbility];
   if(abilityReward)notes.push(abilityReward);
   if(input.itemGone&&input.removedItem){
@@ -2036,6 +2081,7 @@ function detectiveEvidenceNotes(input){
       notes.push(input.itemLossNote||`${input.removedItem} was removed, so the old item is dead and the slot may now be empty.`);
     }
   }
+  (input.historicalItemNotes||[]).forEach(note=>notes.push(note));
   if(input.postItemLossProtectionRecovered){
     notes.push('Later entry behavior shows the post-loss state regained protection, so an empty slot is no longer the only live current-item story.');
   }

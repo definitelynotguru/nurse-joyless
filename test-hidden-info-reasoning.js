@@ -686,8 +686,47 @@ const boosterParser = vm.runInContext(`(() => {
   return parser.replayRead;
 })()`, context, { timeout: 10000 });
 const boosterTarget = boosterParser.targets.find(t => t.species === 'Raging Bolt');
-assert(boosterTarget?.detectiveInputs?.[0]?.clueLabel === 'Booster Energy activated Protosynthesis', 'Booster Energy replay clues should keep the activation cause instead of generic removal wording');
+assert(boosterTarget?.detectiveInputs?.[0]?.itemLossLabel === 'Booster Energy activated Protosynthesis', 'Booster Energy replay clues should keep the activation cause instead of generic removal wording');
 assert(boosterTarget?.notes?.some(note => /one-shot item/i.test(note)), 'Booster Energy replay clues should explain that the item was consumed and cannot still be current');
+assert(boosterTarget?.revealedAbility === 'Protosynthesis', 'Booster Energy activation should preserve the revealed ability instead of dropping that hard clue');
+
+vm.runInContext(
+  `team=[
+    preset("Great Tusk","Heavy-Duty Boots","Impish",{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},["Close Combat","Headlong Rush","Rapid Spin","Knock Off"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: boosterTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const boosterRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(boosterRead.abilityRows[0][0] === 'Protosynthesis', 'Booster Energy activation should let replay-loaded detective reads keep Protosynthesis as the live ability explanation');
+assert(boosterRead.summary.notes.some(x => /Protosynthesis is already revealed/i.test(x)), 'Booster Energy activation should carry the revealed ability into detective notes');
+
+const trickTransferLog = '|turn|1\n|switch|p1a: Rotom-Wash|Rotom-Wash, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|-item|p2a: Gholdengo|Air Balloon\n|move|p1a: Rotom-Wash|Trick|p2a: Gholdengo\n|-item|p1a: Rotom-Wash|Air Balloon|[from] move: Trick\n|-item|p2a: Gholdengo|Choice Scarf|[from] move: Trick';
+const trickTransferParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(trickTransferLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const trickTransferTarget = trickTransferParser.targets.find(t => t.species === 'Gholdengo');
+assert(trickTransferTarget?.revealedItem === 'Choice Scarf', 'Trick item transfers should keep the newly revealed current item live');
+assert(trickTransferTarget?.notes?.some(note => /Air Balloon was traded away by Trick/i.test(note)), 'Trick item transfers should explain that the old item no longer anchors the current-state read');
+
+vm.runInContext(
+  `team=[
+    preset("Great Tusk","Heavy-Duty Boots","Impish",{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},["Close Combat","Headlong Rush","Rapid Spin","Knock Off"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: trickTransferTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const trickTransferRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(trickTransferRead.itemRows[0][0] === 'Choice Scarf', 'Trick item transfers should keep the newly revealed current item at the top of the detective read');
+assert(trickTransferRead.summary.notes.some(x => /Air Balloon was traded away by Trick/i.test(x)), 'Trick item transfers should carry the old-item timeline note into detective output');
 
 const bootsRemovalHazardLog = '|turn|1\n|switch|p1a: Great Tusk|Great Tusk, L80\n|switch|p2a: Dragapult|Dragapult, L80\n|-item|p2a: Dragapult|Heavy-Duty Boots\n|move|p1a: Great Tusk|Knock Off|p2a: Dragapult\n|-enditem|p2a: Dragapult|Heavy-Duty Boots|[from] move: Knock Off\n|turn|2\n|switch|p2a: Dragapult|Dragapult, L80\n|-damage|p2a: Dragapult|88/100|[from] Stealth Rock';
 const bootsRemovalHazardParser = vm.runInContext(`(() => {
