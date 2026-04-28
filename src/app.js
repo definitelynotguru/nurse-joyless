@@ -317,6 +317,7 @@ class ReplayParser{
       }else if(event.type==='-item'||event.type==='-enditem'){
         event.target=parts[1];
         event.item=parts[2];
+        event.from=parts.find(p=>p.startsWith('[from]'))?.replace('[from] ','')||'';
       }else if(event.type==='-immune'){
         event.target=parts[1];
         event.from=parts.find(p=>p.startsWith('[from]'))?.replace('[from] ','')||'';
@@ -376,6 +377,8 @@ class ReplayParser{
         movedFirst:false,
         movedSecond:false,
         revealedItem:'',
+        removedItem:'',
+        itemGone:false,
         abilityHints:[],
         damageObservations:[],
         clueObservations:[],
@@ -430,6 +433,11 @@ class ReplayParser{
   }
   itemClueLabel(item){
     return item?`${item} confirmed`:'Item revealed';
+  }
+  itemLossClueLabel(item, source=''){
+    const move=String(source||'').match(/^move: (.+)$/)?.[1]||'';
+    if(item&&move)return `${item} was removed by ${move}`;
+    return item?`${item} was removed`:'Item was removed';
   }
   abilitySource(source){
     const match=String(source||'').match(/^ability: (.+)$/);
@@ -496,6 +504,8 @@ class ReplayParser{
       movedSecond:obs.movedSecond??state.movedSecond,
       speedContext:obs.speedContext?{...obs.speedContext}:(state.speedContext?{...state.speedContext}:null),
       choiceContradiction:state.choiceContradiction,
+      removedItem:state.removedItem||undefined,
+      itemGone:!!state.itemGone,
       revealedItem:state.revealedItem||undefined,
       _index:index,
       _turn:obs.turn||0
@@ -516,6 +526,8 @@ class ReplayParser{
           movedSecond:obs.movedSecond??state.movedSecond,
           speedContext:obs.speedContext?{...obs.speedContext}:(state.speedContext?{...state.speedContext}:null),
           choiceContradiction:state.choiceContradiction,
+          removedItem:state.removedItem||undefined,
+          itemGone:!!state.itemGone,
           revealedItem:state.revealedItem||undefined,
           _index:index,
           _turn:obs.turn||0
@@ -639,11 +651,24 @@ class ReplayParser{
       }
       return;
     }
-    if((event.type==='-item'||event.type==='-enditem')&&event.target&&event.item){
+    if(event.type==='-item'&&event.target&&event.item){
       const state=this.ensureState(event.target);
       state.revealedItem=event.item;
+      state.removedItem='';
+      state.itemGone=false;
       this.addEvidence(state,turn,'reveal',`${state.species} revealed ${event.item}`,'Item confirmed',5,{hard:true,revealedItem:event.item});
       this.addClueObservation(state,{turn,label:this.itemClueLabel(event.item)});
+      return;
+    }
+    if(event.type==='-enditem'&&event.target&&event.item){
+      const state=this.ensureState(event.target);
+      state.removedItem=event.item;
+      state.itemGone=true;
+      if(state.revealedItem===event.item)state.revealedItem='';
+      const sourceText=String(event.from||'').trim();
+      const sourceDetail=sourceText?` via ${sourceText.replace(/^move: /,'')}`:'';
+      this.addEvidence(state,turn,'reveal',`${state.species} lost ${event.item}${sourceDetail}`,'Current item no longer present',4.5,{hard:true,removedItem:event.item,itemGone:true});
+      this.addClueObservation(state,{turn,label:this.itemLossClueLabel(event.item,event.from)});
       return;
     }
     if((event.type==='-activate'||event.type==='-ability')&&event.target&&event.ability){
@@ -692,6 +717,7 @@ class ReplayParser{
         }));
         const uniqueNotes=unique([
           state.revealedItem?`${state.revealedItem} confirmed`:null,
+          state.itemGone&&state.removedItem?`${state.removedItem} was removed`:null,
           ...state.abilityHints.map(a=>{
             const reward=this.abilityRewardText(a);
             return reward?`${a} revealed (${reward})`:`${a} revealed`;
@@ -712,6 +738,8 @@ class ReplayParser{
           detectiveBranchCount:detectiveInputs.length,
           notes:uniqueNotes,
           revealedItem:state.revealedItem,
+          removedItem:state.removedItem||undefined,
+          itemGone:state.itemGone,
           revealedAbility:state.abilityHints.length===1?state.abilityHints[0]:undefined,
           abilityHints:state.abilityHints.slice(),
           usedStatusMove:state.usedStatusMove,
@@ -1497,6 +1525,7 @@ function detectiveEvidenceNotes(input){
     'Good as Gold':'That also means opposing status moves stay dead lines unless the log says otherwise.'
   })[input.revealedAbility];
   if(abilityReward)notes.push(abilityReward);
+  if(input.itemGone&&input.removedItem)notes.push(`${input.removedItem} was removed, so current item inference should stay open.`);
   if(input.repeatedDamagingMove)notes.push('Repeated damage leans toward Choice locking, but does not prove it.');
   if(input.speedContext?.relation==='fasterThan'&&input.speedContext?.opponentSpecies)notes.push(`Moved before ${input.speedContext.opponentSpecies} in a neutral-priority exchange, so clearly slower lines are weak fits.`);
   else if(input.speedContext?.relation==='slowerThan'&&input.speedContext?.opponentSpecies)notes.push(`Moved after ${input.speedContext.opponentSpecies} in a neutral-priority exchange, so clearly faster lines are weak fits.`);

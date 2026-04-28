@@ -327,6 +327,33 @@ assert(itemOnlyRead.top.every(x => x.item === 'Leftovers'), 'item-only replay cl
 assert(/replay clues/i.test(itemOnlyRead.summary.verdict), 'item-only replay clues should stay in the clue-only detective path');
 assert(itemOnlyRead.summary.notes.some(x => /Leftovers confirmed/.test(x)), 'item-only replay clues should explain the revealed item consequence');
 
+const removedItemLog = '|turn|1\n|switch|p1a: Great Tusk|Great Tusk, L80\n|switch|p2a: Dragapult|Dragapult, L80\n|-item|p2a: Dragapult|Leftovers\n|turn|2\n|move|p1a: Great Tusk|Knock Off|p2a: Dragapult\n|-enditem|p2a: Dragapult|Leftovers|[from] move: Knock Off';
+const removedItemParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(removedItemLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const removedItemTarget = removedItemParser.targets.find(t => t.species === 'Dragapult');
+assert(removedItemTarget?.removedItem === 'Leftovers', 'replay item-loss clues should keep the former item as historical context');
+assert(removedItemTarget?.itemGone, 'replay item-loss clues should mark the item as no longer present');
+assert(!removedItemTarget?.revealedItem, 'replay item-loss clues should stop treating the removed item as a live confirmation');
+assert(removedItemTarget?.detectiveInputs?.[0]?.clueLabel === 'Leftovers was removed by Knock Off', 'replay item-loss clues should preserve the removal cause');
+assert(removedItemTarget?.notes?.includes('Leftovers was removed'), 'replay item-loss clues should surface the loss in summary notes');
+
+vm.runInContext(
+  `team=[
+    preset("Great Tusk","Heavy-Duty Boots","Impish",{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},["Close Combat","Headlong Rush","Rapid Spin","Knock Off"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: removedItemTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const removedItemRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(removedItemRead.summary.notes.some(x => /current item inference should stay open/i.test(x)), 'removed-item replay clues should explain that the old item no longer anchors the live read');
+assert(new Set(removedItemRead.top.map(x => x.item)).size > 1, 'removed-item replay clues should not collapse the detective to the lost item');
+
 const multiBranchLog = '|turn|1\n|switch|p1a: Great Tusk|Great Tusk, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|move|p2a: Gholdengo|Make It Rain|p1a: Great Tusk\n|-damage|p1a: Great Tusk|58/100\n|move|p1a: Great Tusk|Headlong Rush|p2a: Gholdengo\n|-damage|p2a: Gholdengo|29/100\n|-item|p2a: Gholdengo|Leftovers';
 const multiBranchParser = vm.runInContext(`(() => {
   const parser = new ReplayParser();
