@@ -1,75 +1,193 @@
 # Nurse Joyless
 
-![JavaScript](https://img.shields.io/badge/language-JavaScript-yellow)
-![HTML5](https://img.shields.io/badge/language-HTML5-orange)
-![Status](https://img.shields.io/badge/status-MVP-green)
+<p align="center">
+  <img alt="Project status" src="https://img.shields.io/badge/status-hackathon%20prototype-111827?style=flat-square">
+  <img alt="Version" src="https://img.shields.io/badge/version-v3.5-6d28d9?style=flat-square">
+  <img alt="Runtime" src="https://img.shields.io/badge/runtime-static%20web%20app-0f766e?style=flat-square">
+  <img alt="JavaScript" src="https://img.shields.io/badge/javascript-vanilla-f7df1e?style=flat-square&logo=javascript&logoColor=111827">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-reasoning%20gauntlet-2563eb?style=flat-square">
+</p>
 
-**Nurse Joyless** is a fan-made, retro pixel-art Pokémon Showdown team clinic. Paste a Showdown import and it diagnoses team structure, calculates KO odds, parses replay evidence, detects hidden-info clues, suggests additions, validates sets, and exports a shareable report.
+<p align="center">
+  <strong>A competitive Pokémon Showdown team clinic for structure analysis, matchup diagnosis, KO risk, replay evidence, and hidden-information reasoning.</strong>
+</p>
 
-> Nurse Joy heals Pokémon. Nurse Joyless heals bad decisions.
+<p align="center">
+  Nurse Joy heals Pokémon. Nurse Joyless heals bad decisions.
+</p>
 
-## 🚀 Features
+---
 
-### 🧪 Sparring Lab v2
-The core analytical engine that transforms imports into structured reports:
-- **Team Identity Detection**: Automatically identifies archetypes like Dragon Spam, Sun Room, Trick Room, Hyper Offense, Balance, Stall, Hazard Stack, and more.
-- **Evidence-Based Classification**: Uses a scoring system based on type stacking, speed tiers, weather setters, and offensive items.
-- **Structural Diagnosis**: Detects repeated weaknesses, missing roles, and dependency risks.
-- **Matchup Matrix**: Evaluates performance against common meta-archetypes.
-- **Synergy Scoring**: Rates type synergy, role balance, and win conditions.
-- **Precision Prescriptions**: Suggests Pokémon to patch structural gaps based on data, not just meta trends.
+## Hackathon pitch
 
-### 🛠️ Team Builder Assistant
-Ranks suggested additions based on:
-- Gap coverage & archetype fit.
-- Matchup improvement & role compression.
-- Synergy with existing team members.
-- *Includes exportable Showdown sets.*
+Nurse Joyless is a fan-made, retro-styled battle intelligence dashboard for Pokémon Showdown teams. Paste a team import, run the clinic, and the app turns raw sets into a structured strategic report: what the team is trying to be, where the structure breaks, how matchups look, what the reliable win paths are, which Pokémon could patch the problem, and what hidden information can be inferred from replay evidence.
 
-### ✅ Move & Set Validation
-Ensures your team is viable by checking:
-- EV totals and per-stat caps.
-- Species, moves, abilities, and Tera types.
-- Item conflicts (e.g., Assault Vest + status moves).
-- Learnset confidence using full Dex data.
+The project is designed to feel less like a type-chart toy and more like an agentic competitive assistant. It combines deterministic battle mechanics, metagame-inspired heuristics, Smogon-aware suggestions, replay parsing, and hidden-info detective logic into one demoable workflow.
 
-### 💥 KO Calculator
-A simplified modern singles damage engine featuring:
-- OHKO, 2HKO, and 3HKO probabilities.
-- Hazard chip and defensive Tera toggles.
-- Reverse KO risk tables.
+## What makes it interesting
 
-## 📦 Export Formats
-Reports can be exported as:
-- **Markdown summary**: For quick sharing and documentation.
-- **JSON report**: For debugging or integration into other tools/agents.
+Most team analyzers stop at weaknesses. Nurse Joyless goes deeper by connecting several layers of reasoning:
 
-## 💻 Getting Started
+| Layer | What it does | Why it matters |
+|---|---|---|
+| Team structure | Detects archetype intent, execution risk, role compression, and overloaded slots | A team can have good Pokémon and still be strategically incoherent |
+| Field control | Separates hazard setting, removal, removal denial, chip abuse, pivot abuse, and overload risk | Hazard stack is not just having Stealth Rock |
+| Matchup matrix | Scores common structures like Rain, Sun, Hyper Offense, Stall, Hazard Stack, Bulky Balance, Trick Room, and Dragon mirrors | The app explains dependency risk instead of giving blind confidence |
+| KO Actuary | Estimates OHKO, 2HKO, and 3HKO lines with hazard chip, Tera toggles, and reverse-KO risk | Decisions become risk-managed instead of vibes-based |
+| Replay Observer | Parses replay logs into structured evidence | Battle history becomes usable data |
+| Hidden Info Detective | Separates hard eliminations from soft clues for items, abilities, natures, spreads, and damage ranges | The assistant can say what is impossible, what is likely, and what is still ambiguous |
+| Team Builder Assistant | Suggests additions by strategic lane and supports quick swaps into the team import | Recommendations become actionable instead of generic glue spam |
 
-### Running Locally
-Since this is a frontend-driven application, no build step is required.
+## Demo flow for judges
+
+1. Paste a Pokémon Showdown team import.
+2. Click the main analysis action and review the identity card.
+3. Open Sparring Lab to inspect structural quality, battle reliability, field control, and matchup dependencies.
+4. Use KO Actuary to test a real attacking line and the reverse-KO risk.
+5. Paste a short replay log into Replay Observer and send evidence into Hidden Info Detective.
+6. Use Suggested Additions to compare patch lanes, open the three-dot action menu, and swap a suggested set into the team.
+7. Export the final Markdown report for a shareable scouting sheet.
+
+## Core features
+
+### Sparring Lab
+
+Sparring Lab is the main reasoning engine. It classifies the team by intent and execution instead of only counting surface traits. It is tuned to avoid common bad reads such as calling every Dondozo team stall, every fast team hyper offense, or every Stealth Rock team hazard stack.
+
+It reports three different score families:
+
+| Score family | Meaning |
+|---|---|
+| Identity Confidence | How strongly the team resembles an archetype |
+| Structural Quality | How well the roles, defensive glue, field control, and win paths fit together |
+| Battle Reliability | How likely the structure is to hold up across common matchup families |
+
+### Team Builder Assistant
+
+The suggestion system is organized by strategic lanes instead of a single repetitive ranked list. It can recommend candidates for matchup patching, field control, win condition improvement, defensive glue, speed control, and identity preservation.
+
+Suggestion cards include suggested Showdown sets, reasoning notes, copy actions, and quick swap actions. The three-dot action menu lets you switch a suggested Pokémon with a specific current team member directly inside the import.
+
+### KO Actuary
+
+The KO calculator is a simplified singles damage engine for decision support. It supports hazard chip, offensive and defensive Tera context, item modifiers, weather, screens, OHKO odds, 2HKO odds, 3HKO odds, and reverse-KO tables.
+
+It is built for hackathon-grade tactical reasoning, not as a full replacement for Pokémon Showdown's official simulator.
+
+### Replay Observer
+
+Replay Observer parses battle logs into evidence targets. Recent improvements preserve evidence across switches, keep same-species mirror targets separate by side, carry item-only and ability-only clues into the detective, and preserve multiple detective-ready branches when a target has several relevant observations.
+
+### Hidden Info Detective
+
+Hidden Info Detective turns battle clues into an uncertainty-aware read. It distinguishes hard eliminations from soft clues.
+
+Examples:
+
+| Evidence | Detective interpretation |
+|---|---|
+| Took hazard chip | Heavy-Duty Boots is ruled out for the current item state |
+| Used a status move | Assault Vest is ruled out |
+| Revealed item | Non-matching item lines are eliminated |
+| Revealed ability | Non-matching ability lines are eliminated |
+| Repeated one damaging move | Choice item is suggested, not proven |
+| Moved first | Fast nature or Choice Scarf lines are boosted, not guaranteed |
+| Damage range fits | Candidate spread/item/nature gains weight |
+| Damage range misses | Candidate line is heavily penalized |
+
+The output shows likely items, natures, spreads, abilities, top candidates, hard eliminations, and a confidence-graded verdict.
+
+### Export system
+
+Nurse Joyless can export both Markdown and JSON. The Markdown report is intended to read like a scouting document, including the team import, executive verdict, identity analysis, score explanations, field-control breakdown, type triage, matchup matrix, Pokémon-by-Pokémon notes, suggested additions, and validation notes.
+
+## Architecture
+
+Nurse Joyless is intentionally simple to run: it is a static frontend app with no build system required.
+
+```text
+nurse-joyless/
+├── index.html
+├── src/
+│   ├── app.js
+│   └── styles.css
+├── assets/
+├── docs/
+├── test-smoke.js
+├── test-dom-smoke.js
+├── test-v33-reasoner.js
+├── test-v35-gauntlet.js
+├── test-v35-legacy-and-suggestions.js
+└── test-hidden-info-reasoning.js
+```
+
+The app is dependency-light by design. Most of the hackathon logic lives in the browser so the demo remains easy to run, inspect, and share.
+
+## Run locally
 
 ```bash
-# Start a simple python server
 python3 -m http.server 8000
 ```
-Then open: `http://localhost:8000`
 
-*Note: For online Pokédex enrichment in the Team Builder Assistant, running a local server is required.*
+Then open:
 
-### Testing
+```text
+http://localhost:8000
+```
+
+A local server is recommended for online enrichment and browser-origin consistency. Opening `index.html` directly can work for offline features, but browser security rules may block some fetch-based flows.
+
+## Test suite
+
+Run the complete suite:
+
 ```bash
 npm test
 ```
+
 Individual checks:
-- `npm run check`: JS syntax & basic lookups.
-- `npm run smoke`: Core engine smoke tests.
-- `npm run dom-smoke`: UI rendering checks.
 
-## 📊 Data & Scope
-The app leverages `@pkmn/dex` for comprehensive data. 
+```bash
+npm run check
+npm run smoke
+npm run dom-smoke
+npm run v33-audit
+npm run v35-gauntlet
+npm run v35-legacy
+npm run hidden-info
+```
 
-**Key Disclaimer:** This is a modern singles-focused MVP. It uses simplified battle math and is not intended to be a perfect all-generation simulator or a legality validator.
+The tests cover syntax, DOM smoke behavior, team reasoning, gauntlet-style adversarial teams, legacy entrypoints, suggestion behavior, replay parsing, and hidden-info detective reasoning.
 
-## ⚖️ Fan-Project Disclaimer
-Fan-made prototype. Not affiliated with Nintendo, Game Freak, Creatures, The Pokémon Company, Pokémon Showdown, Foul Play, Nous Research, or Kimi. Inspired by battle-state inference concepts; no Foul Play code copied.
+## Current scope
+
+Nurse Joyless is strongest as a modern singles-focused hackathon prototype. It is built to demonstrate reasoning quality and product vision, not to perfectly replace battle simulators, official legality checkers, or ladder statistics tools.
+
+Known simplifications include:
+
+| Area | Current limitation |
+|---|---|
+| Damage engine | Simplified compared with the official simulator |
+| Legality validation | Conservative confidence model; unknown data should be treated as warnings |
+| Replay parsing | Supports common Showdown log patterns, not every possible edge case |
+| Ability interactions | Handles selected important inference cases; not a complete mechanics engine |
+| Metagame suggestions | Uses local and online-enriched reasoning, but still benefits from human review |
+
+## Project status
+
+V3.5 is the current line. Future improvements should stay on V3.5 unless there is a major architecture rewrite.
+
+High-value next steps:
+
+| Priority | Improvement |
+|---|---|
+| High | Feed more Replay Observer evidence directly into Hidden Info Detective |
+| High | Add richer Choice-lock contradictions and item-loss timeline tracking |
+| Medium | Extract Replay Parser, Hidden Info Detective, and damage logic into separate modules |
+| Medium | Improve Smogon-backed set selection and replacement-target scoring |
+| Medium | Add more replay fixtures for weather, terrain, ability suppression, and item removal |
+| Low | Add a hosted demo link and screenshots once deployment is stable |
+
+## Disclaimer
+
+This is a fan-made prototype. It is not affiliated with Nintendo, Game Freak, Creatures, The Pokémon Company, Pokémon Showdown, Foul Play, Nous Research, Kimi, or Smogon. Pokémon names and mechanics belong to their respective owners. The project is inspired by competitive battle-state inference concepts, but no Foul Play code is copied.
