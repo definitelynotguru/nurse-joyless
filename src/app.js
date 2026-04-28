@@ -182,7 +182,7 @@ DexAdapter.init();
 function moveData(n){return DexAdapter.getMove(n)}function moveCategory(n){return moveData(n)?.[1]||'Status'}function movePriority(n){return moveData(n)?.[4]||0}function speciesNames(){return DexAdapter.speciesNames()}function moveNames(){return DexAdapter.moveNames()}function norm(s){if(!s)return'';let m=String(s).match(/\(([^)]+)\)/);return DexAdapter.resolveSpeciesName(m?m[1]:s)}function moveName(s){return DexAdapter.resolveMoveName(s)}
 function parseEV(line,def=0){let e={hp:def,atk:def,def:def,spa:def,spd:def,spe:def},map={HP:'hp',Atk:'atk',Def:'def',SpA:'spa',SpD:'spd',Spe:'spe'};(line||'').replace(/^EVs:|^IVs:/i,'').split('/').forEach(x=>{let m=x.trim().match(/(\d+)\s+(HP|Atk|Def|SpA|SpD|Spe)/i);if(m)e[map[m[2]]]=+m[1]});return e}
 function parseTeam(t){return t.split(/\n\s*\n/).map((b,i)=>{let l=b.split(/\n/).map(x=>x.trim()).filter(Boolean);if(!l.length)return null;let first=l[0],sp=first,item='None';if(first.includes(' @ ')){let parts=first.split(' @ ');sp=parts[0];item=parts.slice(1).join(' @ ').trim()}let mon={id:i,species:norm(sp),item,ability:'',tera:'',nature:'Hardy',evs:{hp:0,atk:0,def:0,spa:0,spd:0,spe:0},ivs:{hp:31,atk:31,def:31,spa:31,spd:31,spe:31},moves:[],level:100,shiny:false};l.slice(1).forEach(x=>{if(/^Ability:/i.test(x))mon.ability=x.replace(/^Ability:\s*/i,'');else if(/^Tera Type:/i.test(x))mon.tera=norm(x.replace(/^Tera Type:\s*/i,''));else if(/^EVs:/i.test(x))mon.evs=parseEV(x,0);else if(/^IVs:/i.test(x))mon.ivs=parseEV(x,31);else if(/^Shiny:/i.test(x))mon.shiny=/yes/i.test(x);else if(/^Level:/i.test(x))mon.level=+x.replace(/^Level:\s*/i,'')||100;else if(/Nature$/i.test(x))mon.nature=x.replace(/\s*Nature$/i,'');else if(/^-/.test(x))mon.moves.push(moveName(x.replace(/^[- ]+/,'')))});return mon}).filter(Boolean).slice(0,6)}
-function moveBlockingAbility(moveType,category,ability){let name=String(ability||'');if(!name)return'';if(name==='Levitate'&&moveType==='Ground')return'Levitate';if(name==='Flash Fire'&&moveType==='Fire')return'Flash Fire';if(name==='Good as Gold'&&category==='Status')return'Good as Gold';if(['Water Absorb','Dry Skin','Storm Drain'].includes(name)&&moveType==='Water')return name;if(['Volt Absorb','Motor Drive','Lightning Rod'].includes(name)&&moveType==='Electric')return name;if(name==='Sap Sipper'&&moveType==='Grass')return'Sap Sipper';return''}
+function moveBlockingAbility(moveType,category,ability){let name=String(ability||'');if(!name)return'';if(name==='Levitate'&&moveType==='Ground')return'Levitate';if(name==='Flash Fire'&&moveType==='Fire')return'Flash Fire';if(name==='Well-Baked Body'&&moveType==='Fire')return'Well-Baked Body';if(name==='Good as Gold'&&category==='Status')return'Good as Gold';if(['Water Absorb','Dry Skin','Storm Drain'].includes(name)&&moveType==='Water')return name;if(['Volt Absorb','Motor Drive','Lightning Rod'].includes(name)&&moveType==='Electric')return name;if(['Sap Sipper'].includes(name)&&moveType==='Grass')return name;if(name==='Earth Eater'&&moveType==='Ground')return'Earth Eater';return''}
 function mult(atk,defs){return defs.reduce((a,t)=>a*((CHART[atk]&&CHART[atk][t]!==undefined)?CHART[atk][t]:1),1)}function nmod(n,s){let o=NATURE[n]||{};return o.up===s?1.1:o.down===s?.9:1}function stats(m,over={}){let base=DexAdapter.getSpecies(m?.species)?.baseStats||[80,80,80,80,80,80],e=over.evs||m.evs||{},iv=m.ivs||parseEV('',31),n=over.nature||m.nature||'Hardy',L=m.level||100,out={};out.hp=Math.floor(((2*base[0]+(iv.hp||31)+Math.floor((e.hp||0)/4))*L)/100)+L+10;['atk','def','spa','spd','spe'].forEach((s,i)=>{out[s]=Math.floor((Math.floor(((2*base[i+1]+(iv[s]??31)+Math.floor((e[s]||0)/4))*L)/100)+5)*nmod(n,s))});return out}function grounded(m){return !types(m).includes('Flying')&&m.ability!=='Levitate'&&m.item!=='Air Balloon'}function hazardPct(m,h){if(h==='none'||m.item==='Heavy-Duty Boots')return 0;if(h==='rocks')return 12.5*mult('Rock',types(m));if(!grounded(m))return 0;return h==='spikes1'?12.5:h==='spikes2'?16.67:h==='spikes3'?25:0}
 function effectiveSet(m,opts={}){let copy={...m};if(opts.attackerTera||opts.defenderTera){copy.tera=opts.teraType||m.tera}return copy}
 function dmg(att,def,mv,opt={}){let m=moveData(mv);if(!m)throw Error('Unknown move: '+mv);if(m[1]==='Status')throw Error(mv+' is a status move.');let aa=effectiveSet(att,{attackerTera:opt.attackerTera,teraType:opt.attackerTeraType}),dd=effectiveSet(def,{defenderTera:opt.defenderTera,teraType:opt.defenderTeraType});let sa=stats(aa,opt.attOver||{}),sd=stats(dd,opt.defOver||{}),cat=m[1],A=cat==='Physical'?sa.atk:sa.spa,D=cat==='Physical'?sd.def:sd.spd;if(m[5]==='def')A=sa.def;if(m[5]==='targetDef')D=sd.def;let ai=opt.attOver?.item||aa.item,di=opt.defOver?.item||dd.item;if(cat==='Physical'&&ai==='Choice Band')A*=1.5;if(cat==='Special'&&ai==='Choice Specs')A*=1.5;if(cat==='Special'&&di==='Assault Vest')D*=1.5;let bp=m[2];if(DexAdapter.id(mv)==='weatherball'&&(opt.field==='sun'||opt.field==='rain'))bp=100;let base=Math.floor(Math.floor(Math.floor((2*(aa.level||100)/5+2)*bp*A/D)/50)+2),moveType=m[0];if(DexAdapter.id(mv)==='weatherball'&&opt.field==='sun')moveType='Fire';if(DexAdapter.id(mv)==='weatherball'&&opt.field==='rain')moveType='Water';let atkTypes=opt.attackerTera?[opt.attackerTeraType||aa.tera||types(aa)[0]]:types(aa),defTypes=opt.defenderTera?[opt.defenderTeraType||dd.tera||types(dd)[0]]:types(dd),blockedBy=moveBlockingAbility(moveType,cat,dd.ability),eff=blockedBy?0:mult(moveType,defTypes),stab=atkTypes.includes(moveType)?1.5:1,mod=eff*stab;if(ai==='Life Orb')mod*=1.3;if(ai==='Expert Belt'&&eff>1)mod*=1.2;if(ai==='Black Glasses'&&moveType==='Dark')mod*=1.2;if(ai==='Charcoal'&&moveType==='Fire')mod*=1.2;if(aa.ability==='Solar Power'&&opt.field==='sun'&&cat==='Special')mod*=1.5;if(opt.field==='rain'&&moveType==='Water')mod*=1.5;if(opt.field==='rain'&&moveType==='Fire')mod*=.5;if(opt.field==='sun'&&moveType==='Fire')mod*=1.5;if(opt.field==='sun'&&moveType==='Water')mod*=.5;if(opt.field==='reflect'&&cat==='Physical')mod*=.5;if(opt.field==='screen'&&cat==='Special')mod*=.5;let rolls=[];if(blockedBy)rolls=new Array(16).fill(0);else for(let r=85;r<=100;r++)rolls.push(Math.max(1,Math.floor(base*mod*r/100)));let hpPct=+opt.hpPct||100,hz=hazardPct(dd,opt.hazards||'none'),max=sd.hp,ehp=Math.max(1,Math.floor(max*Math.max(0,hpPct-hz)/100)),hit=(m[3]||100)/100,ko=rolls.filter(x=>x>=ehp).length/16*hit;let chanceN=(n=2)=>{let combos=[0];for(let i=0;i<n;i++){let next=[];for(let c of combos)for(let r of rolls)next.push(c+r);combos=next}return combos.filter(x=>x>=ehp).length/combos.length*Math.pow(hit,n)};return{att:aa,def:dd,mv,move:m,rolls,max,ehp,hz,min:Math.min(...rolls),maxd:Math.max(...rolls),minp:Math.min(...rolls)/max*100,maxp:Math.max(...rolls)/max*100,ko,two:chanceN(2),three:chanceN(3),eff,hit,moveType,blockedBy}}
@@ -351,10 +351,25 @@ class ReplayParser{
     const match=String(source||'').match(/^ability: (.+)$/);
     return match?match[1]:'';
   }
+  abilityRewardText(ability){
+    return ({
+      'Water Absorb':'healing and Water immunity',
+      'Volt Absorb':'healing and Electric immunity',
+      'Dry Skin':'healing and Water immunity',
+      'Storm Drain':'a Special Attack boost and Water immunity',
+      'Lightning Rod':'a Special Attack boost and Electric immunity',
+      'Motor Drive':'a Speed boost and Electric immunity',
+      'Sap Sipper':'an Attack boost and Grass immunity',
+      'Earth Eater':'healing and Ground immunity',
+      'Well-Baked Body':'a Defense boost and Fire immunity',
+      'Flash Fire':'Fire immunity and a Fire-power boost',
+      'Good as Gold':'status immunity against opposing moves'
+    })[ability]||'a revealed immunity interaction';
+  }
   abilityClueLabel(ability, move=''){
     if(!move)return `${ability} revealed`;
-    if(['Water Absorb','Volt Absorb','Dry Skin'].includes(ability))return `${ability} absorbed ${move}`;
-    if(['Storm Drain','Lightning Rod','Motor Drive','Sap Sipper'].includes(ability))return `${ability} activated on ${move}`;
+    if(['Water Absorb','Volt Absorb','Dry Skin','Earth Eater'].includes(ability))return `${ability} absorbed ${move}`;
+    if(['Storm Drain','Lightning Rod','Motor Drive','Sap Sipper','Well-Baked Body'].includes(ability))return `${ability} activated on ${move}`;
     return `${ability} revealed on ${move}`;
   }
   recordAbilityReveal(state, turn, ability, moveEvent, text, clueLabel=''){
@@ -568,7 +583,7 @@ class ReplayParser{
         const bestObservation=detectiveInputs[0]||null;
         const uniqueNotes=unique([
           state.revealedItem?`${state.revealedItem} confirmed`:null,
-          ...state.abilityHints.map(a=>`${a} revealed`),
+          ...state.abilityHints.map(a=>`${a} revealed (${this.abilityRewardText(a)})`),
           state.tookHazardDamage?'Boots ruled out':null,
           state.usedStatusMove?'Assault Vest ruled out':null,
           state.choiceContradiction?'Choice items contradicted':null,
@@ -1350,6 +1365,20 @@ function detectiveEvidenceNotes(input){
   if(input.revealedItem){notes.push(`${input.revealedItem} is already revealed, so non-${input.revealedItem} lines are dead.`); hardBlocks.push(`${input.revealedItem} confirmed`)}
   if(input.revealedAbility){notes.push(`${input.revealedAbility} is already revealed, so non-${input.revealedAbility} lines are dead.`); hardBlocks.push(`${input.revealedAbility} confirmed`)}
   else if((input.abilityHints||[]).length>1)notes.push(`Replay points toward ${input.abilityHints.join(' or ')}, but the exact ability is still not fully locked.`);
+  const abilityReward=({
+    'Water Absorb':'That also means Water attacks heal instead of damaging.',
+    'Volt Absorb':'That also means Electric attacks heal instead of damaging.',
+    'Dry Skin':'That also means Water attacks heal instead of damaging.',
+    'Storm Drain':'That also means Water attacks are dead lines and the reveal implies a Special Attack boost.',
+    'Lightning Rod':'That also means Electric attacks are dead lines and the reveal implies a Special Attack boost.',
+    'Motor Drive':'That also means Electric attacks are dead lines and the reveal implies a Speed boost.',
+    'Sap Sipper':'That also means Grass attacks are dead lines and the reveal implies an Attack boost.',
+    'Earth Eater':'That also means Ground attacks heal instead of damaging.',
+    'Well-Baked Body':'That also means Fire attacks are dead lines and the reveal implies a Defense boost.',
+    'Flash Fire':'That also means Fire attacks are dead lines and the reveal implies boosted Fire damage later.',
+    'Good as Gold':'That also means opposing status moves stay dead lines unless the log says otherwise.'
+  })[input.revealedAbility];
+  if(abilityReward)notes.push(abilityReward);
   if(input.repeatedDamagingMove)notes.push('Repeated damage leans toward Choice locking, but does not prove it.');
   if(input.speedContext?.relation==='fasterThan'&&input.speedContext?.opponentSpecies)notes.push(`Moved before ${input.speedContext.opponentSpecies} in a neutral-priority exchange, so clearly slower lines are weak fits.`);
   else if(input.speedContext?.relation==='slowerThan'&&input.speedContext?.opponentSpecies)notes.push(`Moved after ${input.speedContext.opponentSpecies} in a neutral-priority exchange, so clearly faster lines are weak fits.`);

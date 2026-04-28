@@ -328,6 +328,7 @@ vm.runInContext(
 const waterAbsorbRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
 assert(waterAbsorbRead.top.every(x => x.ability === 'Water Absorb'), 'ability-heal replay clues should collapse the detective ability pool');
 assert(/replay clues/i.test(waterAbsorbRead.summary.verdict), 'ability-heal replay clues should stay in the clue-only detective path');
+assert(waterAbsorbRead.summary.notes.some(x => /heal instead of damaging/i.test(x)), 'ability-heal replay clues should explain the downstream immunity reward');
 
 const lightningRodLog = '|turn|1\n|switch|p1a: Zapdos|Zapdos, L80\n|switch|p2a: Seaking|Seaking, L80\n|move|p1a: Zapdos|Thunderbolt|p2a: Seaking\n|-boost|p2a: Seaking|spa|1|[from] ability: Lightning Rod';
 const lightningRodParser = vm.runInContext(`(() => {
@@ -339,5 +340,81 @@ const lightningRodTarget = lightningRodParser.strongest;
 assert(lightningRodTarget?.species === 'Seaking', 'ability-boost replay clues should stay attached to the revealed target');
 assert(lightningRodTarget?.detectiveBranchCount === 1, 'ability-boost replay clues should stay detective-loadable without damage');
 assert(lightningRodTarget?.detectiveInputs?.[0]?.label.includes('Lightning Rod activated on Thunderbolt'), 'ability-boost replay clues should preserve the move-specific activation label');
+
+const earthEaterRoll = vm.runInContext(
+  `dmg(
+    preset('Great Tusk','Leftovers','Adamant',{hp:252,atk:252,def:4,spa:0,spd:0,spe:0},['Earthquake','Close Combat','Knock Off','Rapid Spin']),
+    {...preset('Orthworm','Leftovers','Impish',{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},['Body Press','Iron Head','Stealth Rock','Rest']), ability:'Earth Eater'},
+    'Earthquake',
+    {hpPct:100}
+  )`,
+  context,
+  { timeout: 10000 }
+);
+
+assert(earthEaterRoll.blockedBy === 'Earth Eater', 'revealed Earth Eater should zero out Ground damage math');
+assert(earthEaterRoll.maxd === 0, 'Earth Eater immunity should produce zero-damage rolls');
+
+const earthEaterLog = '|turn|1\n|switch|p1a: Great Tusk|Great Tusk, L80\n|switch|p2a: Orthworm|Orthworm, L80\n|move|p1a: Great Tusk|Earthquake|p2a: Orthworm\n|-heal|p2a: Orthworm|100/100|[from] ability: Earth Eater';
+const earthEaterParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(earthEaterLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const earthEaterTarget = earthEaterParser.strongest;
+assert(earthEaterTarget?.species === 'Orthworm', 'Earth Eater replay clues should stay attached to the healed target');
+assert(earthEaterTarget?.detectiveInputs?.[0]?.label.includes('Earth Eater absorbed Earthquake'), 'Earth Eater replay clues should preserve the move-specific absorb label');
+
+vm.runInContext(
+  `team=[
+    preset("Great Tusk","Heavy-Duty Boots","Impish",{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},["Close Combat","Headlong Rush","Rapid Spin","Knock Off"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: earthEaterTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const earthEaterRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(earthEaterRead.top.every(x => x.ability === 'Earth Eater'), 'Earth Eater replay clues should collapse the detective ability pool');
+assert(earthEaterRead.summary.notes.some(x => /Ground attacks heal instead of damaging/i.test(x)), 'Earth Eater replay clues should explain the healing consequence');
+
+const wellBakedRoll = vm.runInContext(
+  `dmg(
+    preset('Volcarona','Leftovers','Timid',{hp:0,atk:0,def:4,spa:252,spd:0,spe:252},['Flamethrower','Bug Buzz','Quiver Dance','Roost']),
+    {...preset('Dachsbun','Leftovers','Impish',{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},['Body Press','Play Rough','Wish','Protect']), ability:'Well-Baked Body'},
+    'Flamethrower',
+    {hpPct:100}
+  )`,
+  context,
+  { timeout: 10000 }
+);
+
+assert(wellBakedRoll.blockedBy === 'Well-Baked Body', 'revealed Well-Baked Body should zero out Fire damage math');
+assert(wellBakedRoll.maxd === 0, 'Well-Baked Body immunity should produce zero-damage rolls');
+
+const wellBakedLog = '|turn|1\n|switch|p1a: Volcarona|Volcarona, L80\n|switch|p2a: Dachsbun|Dachsbun, L80\n|move|p1a: Volcarona|Flamethrower|p2a: Dachsbun\n|-boost|p2a: Dachsbun|def|2|[from] ability: Well-Baked Body';
+const wellBakedParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(wellBakedLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const wellBakedTarget = wellBakedParser.strongest;
+assert(wellBakedTarget?.species === 'Dachsbun', 'Well-Baked Body replay clues should stay attached to the boosted target');
+assert(wellBakedTarget?.detectiveInputs?.[0]?.label.includes('Well-Baked Body activated on Flamethrower'), 'Well-Baked Body replay clues should preserve the move-specific activation label');
+
+vm.runInContext(
+  `team=[
+    preset("Great Tusk","Heavy-Duty Boots","Impish",{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},["Close Combat","Headlong Rush","Rapid Spin","Knock Off"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: wellBakedTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const wellBakedRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(wellBakedRead.top.every(x => x.ability === 'Well-Baked Body'), 'Well-Baked Body replay clues should collapse the detective ability pool');
+assert(wellBakedRead.summary.notes.some(x => /Defense boost/i.test(x)), 'Well-Baked Body replay clues should explain the boost consequence');
 
 console.log('[OK] hidden info detective reasoning passed');
