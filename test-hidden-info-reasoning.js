@@ -465,4 +465,18 @@ const wellBakedRead = vm.runInContext('lastDetectiveRead', context, { timeout: 1
 assert(wellBakedRead.top.every(x => x.ability === 'Well-Baked Body'), 'Well-Baked Body replay clues should collapse the detective ability pool');
 assert(wellBakedRead.summary.notes.some(x => /Defense boost/i.test(x)), 'Well-Baked Body replay clues should explain the boost consequence');
 
+const switchedTargetLog = '|turn|1\n|switch|p1a: Great Tusk|Great Tusk, L80\n|switch|p2a: Dragapult|Dragapult, L80\n|move|p2a: Dragapult|Shadow Ball|p1a: Great Tusk\n|-damage|p1a: Great Tusk|57/100\n|-item|p2a: Dragapult|Leftovers\n|turn|2\n|switch|p2a: Gholdengo|Gholdengo, L80\n|turn|3\n|switch|p2a: Dragapult|Dragapult, L80\n|move|p2a: Dragapult|Draco Meteor|p1a: Great Tusk\n|-damage|p1a: Great Tusk|12/100';
+const switchedTargetParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(switchedTargetLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const switchedDragapult = switchedTargetParser.targets.find(t => t.species === 'Dragapult');
+assert(switchedDragapult, 'ReplayParser should keep evidence for a species after it leaves the active slot');
+assert(switchedDragapult.revealedItem === 'Leftovers', 'ReplayParser should preserve revealed items across later slot changes');
+assert(switchedDragapult.detectiveBranchCount === 2, 'ReplayParser should keep both same-species damage branches across separate field entries');
+assert(!switchedDragapult.choiceContradiction, 'ReplayParser should not fake a Choice contradiction across a real switch');
+assert(switchedDragapult.detectiveInputs.some(input => input.move === 'Shadow Ball'), 'ReplayParser should keep the pre-switch damage branch');
+assert(switchedDragapult.detectiveInputs.some(input => input.move === 'Draco Meteor'), 'ReplayParser should keep the post-switch damage branch');
+
 console.log('[OK] hidden info detective reasoning passed');

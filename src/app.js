@@ -233,6 +233,7 @@ class ReplayParser{
     this.turns=[];
     this.evidence=[];
     this.slotState={};
+    this.speciesState={};
     this.turnMoves=[];
     this.replayRead={targets:[],strongest:null};
   }
@@ -240,6 +241,7 @@ class ReplayParser{
     this.turns=[];
     this.evidence=[];
     this.slotState={};
+    this.speciesState={};
     this.turnMoves=[];
     this.replayRead={targets:[],strongest:null};
   }
@@ -312,9 +314,11 @@ class ReplayParser{
   }
   ensureState(token,details=''){
     const slot=this.slotId(token);
-    const species=this.detailsSpecies(details)||this.tokenSpecies(token)||this.slotState[slot]?.species||'';
-    if(!this.slotState[slot]||this.slotState[slot].species!==species){
-      this.slotState[slot]={
+    const species=this.detailsSpecies(details)||this.tokenSpecies(token)||this.slotState[slot]||'';
+    const key=species||`__slot_${slot}`;
+    if(slot&&species)this.slotState[slot]=species;
+    if(!this.speciesState[key]){
+      this.speciesState[key]={
         slot,
         species,
         evidence:[],
@@ -335,7 +339,9 @@ class ReplayParser{
         lastMoveTurn:0
       };
     }
-    return this.slotState[slot];
+    if(slot)this.speciesState[key].slot=slot;
+    if(species)this.speciesState[key].species=species;
+    return this.speciesState[key];
   }
   addDamageObservation(state, observation){
     if(!state||!observation?.move||observation.observedDamage==null)return;
@@ -479,7 +485,12 @@ class ReplayParser{
   }
   extractEvidence(event,turn){
     if(event.type==='switch'||event.type==='drag'){
-      this.ensureState(event.pokemon,event.details);
+      const state=this.ensureState(event.pokemon,event.details);
+      if(state){
+        state.lastMove='';
+        state.lastDamagingMove='';
+        state.lastMoveTurn=0;
+      }
       return;
     }
     if(event.type==='move'&&event.attacker){
@@ -580,7 +591,7 @@ class ReplayParser{
     }
   }
   buildReplayRead(){
-    const targets=Object.values(this.slotState)
+    const targets=Object.values(this.speciesState)
       .filter(state=>state.species&&state.evidence.length)
       .map(state=>{
         const detectiveInputs=this.detectiveInputsFromState(state);
