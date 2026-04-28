@@ -318,6 +318,7 @@ class ReplayParser{
       }else if(event.type==='-status'){
         event.target=parts[1];
         event.status=parts[2];
+        event.from=parts.find(p=>p.startsWith('[from]'))?.replace('[from] ','')||'';
       }else if(event.type==='-item'||event.type==='-enditem'){
         event.target=parts[1];
         event.item=parts[2];
@@ -326,7 +327,12 @@ class ReplayParser{
       }else if(event.type==='-immune'){
         event.target=parts[1];
         event.from=parts.find(p=>p.startsWith('[from]'))?.replace('[from] ','')||'';
-      }else if(event.type==='-activate'||event.type==='-ability'){
+      }else if(event.type==='-activate'){
+        event.target=parts[1];
+        const source=parts[2]||'';
+        if(/^ability: /i.test(source))event.ability=source.replace(/^ability: /i,'');
+        else event.effect=source.replace(/^move: /i,'');
+      }else if(event.type==='-ability'){
         event.target=parts[1];
         event.ability=(parts[2]||'').replace(/^ability: /,'');
       }else if(event.type==='-boost'){
@@ -570,12 +576,32 @@ class ReplayParser{
   canMeaningfullyMissStealthRock(state){
     return !detectiveAbilities(state?.species).includes('Magic Guard');
   }
+  canMeaningfullyMissToxicSpikes(state){
+    const species=DexAdapter.getSpecies(state?.species);
+    const types=species?.types||[];
+    if(types.includes('Flying')||types.includes('Poison')||types.includes('Steel'))return false;
+    const abilities=detectiveAbilities(state?.species);
+    if(abilities.includes('Levitate'))return false;
+    if(abilities.includes('Immunity')||abilities.includes('Pastel Veil'))return false;
+    return true;
+  }
+  canMeaningfullyMissStickyWeb(state){
+    const species=DexAdapter.getSpecies(state?.species);
+    const types=species?.types||[];
+    if(types.includes('Flying'))return false;
+    const abilities=detectiveAbilities(state?.species);
+    if(abilities.includes('Levitate'))return false;
+    if(abilities.includes('Clear Body')||abilities.includes('White Smoke')||abilities.includes('Full Metal Body'))return false;
+    return true;
+  }
   pendingEntryHazards(state){
     if(!state?.itemGone||!state.side)return [];
     const hazards=this.activeSideConditions(state.side);
     const expected=[];
     if(hazards['Spikes']&&this.canMeaningfullyMissSpikes(state))expected.push('Spikes');
     if(hazards['Stealth Rock']&&this.canMeaningfullyMissStealthRock(state))expected.push('Stealth Rock');
+    if(hazards['Toxic Spikes']&&this.canMeaningfullyMissToxicSpikes(state))expected.push('Toxic Spikes');
+    if(hazards['Sticky Web']&&this.canMeaningfullyMissStickyWeb(state))expected.push('Sticky Web');
     return expected;
   }
   queueEntryCheck(state, turn){
@@ -591,13 +617,18 @@ class ReplayParser{
   }
   postItemLossProtectionNote(state, hazard=''){
     const label=this.normalizedHazardName(hazard)||String(hazard||'hazards').trim()||'hazards';
+    const missedEffect=label==='Toxic Spikes'
+      ? 'without getting poisoned'
+      : label==='Sticky Web'
+        ? 'without getting slowed'
+        : 'without taking chip';
     if(state?.removedItem==='Air Balloon'){
-      return `Later switched through ${label} after Air Balloon popped without taking chip, so the post-pop state regained entry protection before this switch.`;
+      return `Later switched through ${label} after Air Balloon popped ${missedEffect}, so the post-pop state regained entry protection before this switch.`;
     }
     if(state?.removedItem==='Heavy-Duty Boots'){
-      return `Later switched through ${label} after Heavy-Duty Boots were removed without taking chip, so the post-Knock Off state later regained hazard protection.`;
+      return `Later switched through ${label} after Heavy-Duty Boots were removed ${missedEffect}, so the post-Knock Off state later regained hazard protection.`;
     }
-    return `Later switched through ${label} after ${state?.removedItem||'the old item'} left the slot without taking chip, so the current state picked up fresh entry protection after the item loss.`;
+    return `Later switched through ${label} after ${state?.removedItem||'the old item'} left the slot ${missedEffect}, so the current state picked up fresh entry protection after the item loss.`;
   }
   markPostItemLossProtection(state, hazard=''){
     if(!state)return;
@@ -608,7 +639,11 @@ class ReplayParser{
     if(!this.pendingEntryChecks.length)return;
     const remaining=[];
     const eventSlot=event?.target?this.slotId(event.target):'';
-    const eventHazard=event?.type==='-damage'?this.normalizedHazardName(event.from):'';
+    const eventHazard=event?.type==='-damage'||event?.type==='-status'
+      ? this.normalizedHazardName(event.from)
+      : event?.type==='-activate'
+        ? this.normalizedHazardName(event.effect||event.from)
+        : '';
     this.pendingEntryChecks.forEach(check=>{
       if((check.turn||0)>turn){
         remaining.push(check);
@@ -637,11 +672,28 @@ class ReplayParser{
     });
     this.pendingEntryChecks=[];
   }
-  hazardTimelineNote(state){
+  hazardTimelineNote(state, hazard=''){
     if(!state?.itemGone||!state.itemLossTurn)return '';
-    const laterHazard=[...(state.hazardEvents||[])].find(event=>(event.turn||0)>=state.itemLossTurn);
-    if(!laterHazard)return '';
-    const source=laterHazard.source||'hazards';
+    const source=this.normalizedHazardName(hazard)||String(hazard||'').trim()||([...(state.hazardEvents||[])].find(event=>(event.turn||0)>=state.itemLossTurn)?.source||'');
+    if(!source)return '';
+    if(source==='Toxic Spikes'){
+      if(state.removedItem==='Air Balloon'){
+        return 'Later got poisoned by Toxic Spikes after Air Balloon popped, confirming the old Ground immunity really ended.';
+      }
+      if(state.removedItem==='Heavy-Duty Boots'){
+        return 'Later got poisoned by Toxic Spikes after Heavy-Duty Boots were removed, so the grounded status clue belongs to the new post-Knock Off item state.';
+      }
+      return `Later got poisoned by Toxic Spikes after ${state.removedItem||'the old item'} left the slot, so the replay keeps that grounded status clue aligned with the current item state.`;
+    }
+    if(source==='Sticky Web'){
+      if(state.removedItem==='Air Balloon'){
+        return 'Later triggered Sticky Web after Air Balloon popped, confirming the old Ground immunity really ended.';
+      }
+      if(state.removedItem==='Heavy-Duty Boots'){
+        return 'Later triggered Sticky Web after Heavy-Duty Boots were removed, so the speed-drop clue belongs to the new post-Knock Off item state.';
+      }
+      return `Later triggered Sticky Web after ${state.removedItem||'the old item'} left the slot, so the replay keeps that grounded speed-drop clue aligned with the current item state.`;
+    }
     if(state.removedItem==='Air Balloon'&&/Spikes|Toxic Spikes|Sticky Web/i.test(source)){
       return `Later took ${source} after Air Balloon popped, confirming the old Ground immunity really ended.`;
     }
@@ -824,7 +876,7 @@ class ReplayParser{
       if(event.from&&/Stealth Rock|Spikes|Toxic Spikes/i.test(event.from)){
         state.tookHazardDamage=true;
         this.addHazardEvent(state,turn,event.from);
-        if(state.itemGone)this.addPostItemLossNote(state,this.hazardTimelineNote(state));
+        if(state.itemGone)this.addPostItemLossNote(state,this.hazardTimelineNote(state,event.from));
         this.addEvidence(state,turn,'hazard',`${state.species} took hazard damage`,'Heavy-Duty Boots: IMPOSSIBLE',4,{hard:true});
         return;
       }
@@ -843,6 +895,17 @@ class ReplayParser{
         this.addEvidence(state,turn,'damage',`${state.species} changed to ${pct}% HP`,'Damage-roll evidence available',0.5,{observedDamage:pct});
       }
       return;
+    }
+    if(event.type==='-status'&&event.target&&event.from){
+      const state=this.ensureState(event.target);
+      const hazard=this.normalizedHazardName(event.from);
+      if(hazard==='Toxic Spikes'){
+        state.tookHazardDamage=true;
+        this.addHazardEvent(state,turn,hazard);
+        if(state.itemGone)this.addPostItemLossNote(state,this.hazardTimelineNote(state,hazard));
+        this.addEvidence(state,turn,'hazard',`${state.species} was afflicted by Toxic Spikes`,'Heavy-Duty Boots: IMPOSSIBLE',4,{hard:true});
+        return;
+      }
     }
     if(event.type==='-item'&&event.target&&event.item){
       const state=this.ensureState(event.target);
@@ -875,6 +938,17 @@ class ReplayParser{
       this.addEvidence(state,turn,'reveal',`${state.species} lost ${event.item}${sourceDetail}`,'Current item no longer present',4.5,{hard:true,removedItem:event.item,itemGone:true});
       this.addClueObservation(state,{turn,label:loss.clueLabel});
       return;
+    }
+    if(event.type==='-activate'&&event.target&&event.effect){
+      const state=this.ensureState(event.target);
+      const hazard=this.normalizedHazardName(event.effect);
+      if(hazard==='Sticky Web'){
+        state.tookHazardDamage=true;
+        this.addHazardEvent(state,turn,hazard);
+        if(state.itemGone)this.addPostItemLossNote(state,this.hazardTimelineNote(state,hazard));
+        this.addEvidence(state,turn,'hazard',`${state.species} triggered Sticky Web`,'Heavy-Duty Boots: IMPOSSIBLE',4,{hard:true});
+        return;
+      }
     }
     if((event.type==='-sidestart'||event.type==='-sideend')&&event.side&&event.condition){
       this.setSideCondition(event.side,event.condition,event.type==='-sidestart');

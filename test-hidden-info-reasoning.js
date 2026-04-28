@@ -663,6 +663,98 @@ const bootsProtectionReturnRead = vm.runInContext('lastDetectiveRead', context, 
 assert(bootsProtectionReturnRead.summary.notes.some(x => /empty slot is no longer the only live current-item story/i.test(x)), 'post-Boots protection return should reopen the current-item story instead of locking on No Item');
 assert(bootsProtectionReturnRead.itemRows[0][0] !== 'No Item', 'post-Boots protection return should stop anchoring the current item read to an empty slot');
 
+const airBalloonToxicSpikesLog = '|turn|1\n|switch|p1a: Gliscor|Gliscor, L80\n|-sidestart|p2: Great Tusk|move: Toxic Spikes\n|switch|p2a: Great Tusk|Great Tusk, L80\n|-item|p2a: Great Tusk|Air Balloon\n|move|p1a: Gliscor|Knock Off|p2a: Great Tusk\n|-enditem|p2a: Great Tusk|Air Balloon\n|turn|2\n|switch|p2a: Great Tusk|Great Tusk, L80\n|-status|p2a: Great Tusk|psn|[from] move: Toxic Spikes';
+const airBalloonToxicSpikesParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(airBalloonToxicSpikesLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const airBalloonToxicSpikesTarget = airBalloonToxicSpikesParser.targets.find(t => t.species === 'Great Tusk');
+assert(airBalloonToxicSpikesTarget?.notes?.some(note => /Later got poisoned by Toxic Spikes after Air Balloon popped/i.test(note)), 'post-pop Toxic Spikes clues should explain that the grounded poison clue happened after the Balloon was gone');
+
+vm.runInContext(
+  `team=[
+    preset("Great Tusk","Heavy-Duty Boots","Impish",{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},["Close Combat","Headlong Rush","Rapid Spin","Knock Off"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: airBalloonToxicSpikesTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const airBalloonToxicSpikesRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(airBalloonToxicSpikesRead.summary.notes.some(x => /Later got poisoned by Toxic Spikes after Air Balloon popped/i.test(x)), 'post-pop Toxic Spikes clues should stay visible in detective notes');
+
+const bootsToxicSpikesProtectionReturnLog = '|turn|1\n|switch|p1a: Gliscor|Gliscor, L80\n|-sidestart|p2: Great Tusk|move: Toxic Spikes\n|switch|p2a: Great Tusk|Great Tusk, L80\n|-item|p2a: Great Tusk|Heavy-Duty Boots\n|move|p1a: Gliscor|Knock Off|p2a: Great Tusk\n|-enditem|p2a: Great Tusk|Heavy-Duty Boots|[from] move: Knock Off\n|turn|2\n|switch|p2a: Great Tusk|Great Tusk, L80';
+const bootsToxicSpikesProtectionReturnParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(bootsToxicSpikesProtectionReturnLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const bootsToxicSpikesProtectionReturnTarget = bootsToxicSpikesProtectionReturnParser.targets.find(t => t.species === 'Great Tusk');
+assert(bootsToxicSpikesProtectionReturnTarget?.postItemLossProtectionRecovered, 'post-Boots no-status Toxic Spikes entries should mark that protection later returned');
+assert(bootsToxicSpikesProtectionReturnTarget?.notes?.some(note => /without getting poisoned/i.test(note)), 'post-Boots no-status Toxic Spikes entries should explain that the later state regained protection');
+
+vm.runInContext(
+  `team=[
+    preset("Great Tusk","Heavy-Duty Boots","Impish",{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},["Close Combat","Headlong Rush","Rapid Spin","Knock Off"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: bootsToxicSpikesProtectionReturnTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const bootsToxicSpikesProtectionReturnRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(bootsToxicSpikesProtectionReturnRead.summary.notes.some(x => /empty slot is no longer the only live current-item story/i.test(x)), 'post-Boots Toxic Spikes protection return should reopen the current item story instead of locking on No Item');
+assert(bootsToxicSpikesProtectionReturnRead.itemRows[0][0] !== 'No Item', 'post-Boots Toxic Spikes protection return should stop anchoring the current item read to an empty slot');
+
+const airBalloonStickyWebLog = '|turn|1\n|switch|p1a: Ribombee|Ribombee, L80\n|-sidestart|p2: Great Tusk|move: Sticky Web\n|switch|p2a: Great Tusk|Great Tusk, L80\n|-item|p2a: Great Tusk|Air Balloon\n|move|p1a: Ribombee|Knock Off|p2a: Great Tusk\n|-enditem|p2a: Great Tusk|Air Balloon\n|turn|2\n|switch|p2a: Great Tusk|Great Tusk, L80\n|-activate|p2a: Great Tusk|move: Sticky Web';
+const airBalloonStickyWebParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(airBalloonStickyWebLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const airBalloonStickyWebTarget = airBalloonStickyWebParser.targets.find(t => t.species === 'Great Tusk');
+assert(airBalloonStickyWebTarget?.notes?.some(note => /Later triggered Sticky Web after Air Balloon popped/i.test(note)), 'post-pop Sticky Web clues should explain that the grounded speed-drop clue happened after the Balloon was gone');
+
+vm.runInContext(
+  `team=[
+    preset("Great Tusk","Heavy-Duty Boots","Impish",{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},["Close Combat","Headlong Rush","Rapid Spin","Knock Off"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: airBalloonStickyWebTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const airBalloonStickyWebRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(airBalloonStickyWebRead.summary.notes.some(x => /Later triggered Sticky Web after Air Balloon popped/i.test(x)), 'post-pop Sticky Web clues should stay visible in detective notes');
+
+const bootsStickyWebProtectionReturnLog = '|turn|1\n|switch|p1a: Ribombee|Ribombee, L80\n|-sidestart|p2: Great Tusk|move: Sticky Web\n|switch|p2a: Great Tusk|Great Tusk, L80\n|-item|p2a: Great Tusk|Heavy-Duty Boots\n|move|p1a: Ribombee|Knock Off|p2a: Great Tusk\n|-enditem|p2a: Great Tusk|Heavy-Duty Boots|[from] move: Knock Off\n|turn|2\n|switch|p2a: Great Tusk|Great Tusk, L80';
+const bootsStickyWebProtectionReturnParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(bootsStickyWebProtectionReturnLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const bootsStickyWebProtectionReturnTarget = bootsStickyWebProtectionReturnParser.targets.find(t => t.species === 'Great Tusk');
+assert(bootsStickyWebProtectionReturnTarget?.postItemLossProtectionRecovered, 'post-Boots no-activate Sticky Web entries should mark that protection later returned');
+assert(bootsStickyWebProtectionReturnTarget?.notes?.some(note => /without getting slowed/i.test(note)), 'post-Boots no-activate Sticky Web entries should explain that the later state regained protection');
+
+vm.runInContext(
+  `team=[
+    preset("Great Tusk","Heavy-Duty Boots","Impish",{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},["Close Combat","Headlong Rush","Rapid Spin","Knock Off"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: bootsStickyWebProtectionReturnTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const bootsStickyWebProtectionReturnRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(bootsStickyWebProtectionReturnRead.summary.notes.some(x => /empty slot is no longer the only live current-item story/i.test(x)), 'post-Boots Sticky Web protection return should reopen the current item story instead of locking on No Item');
+assert(bootsStickyWebProtectionReturnRead.itemRows[0][0] !== 'No Item', 'post-Boots Sticky Web protection return should stop anchoring the current item read to an empty slot');
+
 const goodAsGoldEncoreLog = '|turn|1\n|switch|p1a: Grimmsnarl|Grimmsnarl, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|move|p1a: Grimmsnarl|Encore|p2a: Gholdengo\n|-immune|p2a: Gholdengo|[from] ability: Good as Gold';
 const goodAsGoldEncoreParser = vm.runInContext(`(() => {
   const parser = new ReplayParser();
