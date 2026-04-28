@@ -378,6 +378,15 @@ assert(waterAbsorbRead.top.every(x => x.ability === 'Water Absorb'), 'ability-he
 assert(/replay clues/i.test(waterAbsorbRead.summary.verdict), 'ability-heal replay clues should stay in the clue-only detective path');
 assert(waterAbsorbRead.summary.notes.some(x => /heal instead of damaging/i.test(x)), 'ability-heal replay clues should explain the downstream immunity reward');
 
+const hydroPumpLog = '|turn|1\n|switch|p1a: Primarina|Primarina, L80\n|switch|p2a: Clodsire|Clodsire, L80\n|move|p1a: Primarina|Hydro Pump|p2a: Clodsire\n|-heal|p2a: Clodsire|100/100|[from] ability: Water Absorb';
+const hydroPumpParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(hydroPumpLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const hydroPumpTarget = hydroPumpParser.strongest;
+assert(hydroPumpTarget?.detectiveInputs?.[0]?.label.includes('Water Absorb absorbed Hydro Pump'), 'replay move hints should keep Hydro Pump ability clues move-specific even without full local move data');
+
 const lightningRodLog = '|turn|1\n|switch|p1a: Zapdos|Zapdos, L80\n|switch|p2a: Seaking|Seaking, L80\n|move|p1a: Zapdos|Thunderbolt|p2a: Seaking\n|-boost|p2a: Seaking|spa|1|[from] ability: Lightning Rod';
 const lightningRodParser = vm.runInContext(`(() => {
   const parser = new ReplayParser();
@@ -476,6 +485,35 @@ assert(speedBoostTarget?.species === 'Blaziken', 'generic ability replay clues s
 assert(speedBoostTarget?.detectiveInputs?.[0]?.label === 'Speed Boost revealed', 'generic ability reveals should not pretend they were caused by the last move');
 assert(speedBoostTarget?.notes?.includes('Speed Boost revealed'), 'generic ability reveals should stay descriptive without fake immunity text');
 assert(!speedBoostTarget?.notes?.some(note => /immunity interaction/i.test(note)), 'generic ability reveals should not be mislabeled as immunity interactions');
+
+const goodAsGoldEncoreLog = '|turn|1\n|switch|p1a: Grimmsnarl|Grimmsnarl, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|move|p1a: Grimmsnarl|Encore|p2a: Gholdengo\n|-immune|p2a: Gholdengo|[from] ability: Good as Gold';
+const goodAsGoldEncoreParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(goodAsGoldEncoreLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const goodAsGoldEncoreTarget = goodAsGoldEncoreParser.strongest;
+assert(goodAsGoldEncoreTarget?.detectiveInputs?.[0]?.label === 'Good as Gold blocked Encore', 'replay move hints should keep blocked-status clues move-specific for unseen status moves');
+
+const tauntLog = '|turn|1\n|switch|p2a: Dragapult|Dragapult, L80\n|move|p2a: Dragapult|Taunt|p1a: Great Tusk';
+const tauntParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(tauntLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const tauntTarget = tauntParser.targets.find(t => t.species === 'Dragapult');
+assert(tauntTarget?.usedStatusMove, 'replay move hints should still mark unseen status moves as Assault Vest contradictions');
+assert(tauntTarget?.notes?.includes('Assault Vest ruled out'), 'replay move hints should surface the status-move contradiction in replay notes');
+
+const thunderclapSpeedLog = '|turn|1\n|switch|p1a: Great Tusk|Great Tusk, L80\n|switch|p2a: Raging Bolt|Raging Bolt, L80\n|move|p2a: Raging Bolt|Thunderclap|p1a: Great Tusk\n|-damage|p1a: Great Tusk|78/100\n|move|p1a: Great Tusk|Earthquake|p2a: Raging Bolt\n|-damage|p2a: Raging Bolt|32/100';
+const thunderclapSpeedParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(thunderclapSpeedLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const thunderclapTarget = thunderclapSpeedParser.targets.find(t => t.species === 'Raging Bolt');
+const thunderclapBranch = thunderclapTarget?.detectiveInputs?.find(input => input.move === 'Thunderclap' && input.evidence === 'they_hit_me');
+assert(!thunderclapBranch?.speedContext, 'priority replay move hints should prevent fake neutral-priority speed clues from Thunderclap sequences');
 
 const switchedTargetLog = '|turn|1\n|switch|p1a: Great Tusk|Great Tusk, L80\n|switch|p2a: Dragapult|Dragapult, L80\n|move|p2a: Dragapult|Shadow Ball|p1a: Great Tusk\n|-damage|p1a: Great Tusk|57/100\n|-item|p2a: Dragapult|Leftovers\n|turn|2\n|switch|p2a: Gholdengo|Gholdengo, L80\n|turn|3\n|switch|p2a: Dragapult|Dragapult, L80\n|move|p2a: Dragapult|Draco Meteor|p1a: Great Tusk\n|-damage|p1a: Great Tusk|12/100';
 const switchedTargetParser = vm.runInContext(`(() => {

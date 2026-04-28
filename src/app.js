@@ -21,6 +21,40 @@ Pecharunt:[["Poison","Ghost"],[88,88,160,88,110,60]],
 "Ogerpon-Hearthflame":[["Grass","Fire"],[80,120,84,60,96,110]],
 "Ogerpon-Cornerstone":[["Grass","Rock"],[80,120,84,60,96,110]]};
 const MOVES={"Shadow Ball":["Ghost","Special",80,100],"Draco Meteor":["Dragon","Special",130,90],Flamethrower:["Fire","Special",90,100],"U-turn":["Bug","Physical",70,100],"Dragon Darts":["Dragon","Physical",100,100],"Will-O-Wisp":["Fire","Status",0,85],Thunderbolt:["Electric","Special",90,100],"Ice Beam":["Ice","Special",90,100],Moonblast:["Fairy","Special",95,100],"Close Combat":["Fighting","Physical",120,100],"Headlong Rush":["Ground","Physical",120,100],Earthquake:["Ground","Physical",100,100],"Ice Spinner":["Ice","Physical",80,100],"Rapid Spin":["Normal","Physical",50,100],"Knock Off":["Dark","Physical",65,100],"Sucker Punch":["Dark","Physical",70,100,1],"Kowtow Cleave":["Dark","Physical",85,100],"Iron Head":["Steel","Physical",80,100],"Swords Dance":["Normal","Status",0,100],Roost:["Flying","Status",0,100],Defog:["Flying","Status",0,100],"Body Press":["Fighting","Physical",80,100,0,"def"],"Stealth Rock":["Rock","Status",0,100],Spikes:["Ground","Status",0,100],"Toxic Spikes":["Poison","Status",0,100],"Sticky Web":["Bug","Status",0,100],"Volt Switch":["Electric","Special",70,100],"Flip Turn":["Water","Physical",60,100],Recover:["Normal","Status",0,100],"Slack Off":["Normal","Status",0,100],Wish:["Normal","Status",0,100],Protect:["Normal","Status",0,100],Toxic:["Poison","Status",0,90],"Thunder Wave":["Electric","Status",0,90],Spore:["Grass","Status",0,100],"Calm Mind":["Psychic","Status",0,100],"Dragon Dance":["Dragon","Status",0,100],"Nasty Plot":["Dark","Status",0,100],"Bulk Up":["Fighting","Status",0,100],"Quiver Dance":["Bug","Status",0,100],"Extreme Speed":["Normal","Physical",80,100,2],"Fire Punch":["Fire","Physical",75,100],Hurricane:["Flying","Special",110,70],"Brave Bird":["Flying","Physical",120,100],"Make It Rain":["Steel","Special",120,100],"Focus Blast":["Fighting","Special",120,70],Psychic:["Psychic","Special",90,100],"Psychic Noise":["Psychic","Special",75,100],Psyshock:["Psychic","Special",80,100,0,"targetDef"],"Giga Drain":["Grass","Special",75,100],"Energy Ball":["Grass","Special",90,100],"Earth Power":["Ground","Special",90,100],"Weather Ball":["Normal","Special",50,100],"Dazzling Gleam":["Fairy","Special",80,100],"Flower Trick":["Grass","Physical",70,100],"Play Rough":["Fairy","Physical",90,90],"Flash Cannon":["Steel","Special",80,100],"Stone Edge":["Rock","Physical",100,80],"Rock Slide":["Rock","Physical",75,90],"Fiery Dance":["Fire","Special",80,100],"Bug Buzz":["Bug","Special",90,100],"Torch Song":["Fire","Special",80,100],"Dark Pulse":["Dark","Special",80,100],Crunch:["Dark","Physical",80,100],"Icicle Crash":["Ice","Physical",85,90],Outrage:["Dragon","Physical",120,100],"Aqua Jet":["Water","Physical",40,100,1],Waterfall:["Water","Physical",80,100],"Air Slash":["Flying","Special",75,95],Thunder:["Electric","Special",110,70],"Magma Storm":["Fire","Special",100,75],"Lava Plume":["Fire","Special",80,100],Eruption:["Fire","Special",150,100],"Tera Blast":["Normal","Special",80,100],"Hyperspace Fury":["Dark","Physical",100,100],"Drain Punch":["Fighting","Physical",75,100],"Trick Room":["Psychic","Status",0,100],"Healing Wish":["Psychic","Status",0,100],"Lunar Dance":["Psychic","Status",0,100],Moonlight:["Fairy","Status",0,100],Facade:["Normal","Physical",70,100],Roar:["Normal","Status",0,100]};
+const REPLAY_MOVE_HINTS={
+  "Surf":["Water","Special",0],
+  "Hydro Pump":["Water","Special",0],
+  "Scald":["Water","Special",0],
+  "Chilling Water":["Water","Special",0],
+  "Muddy Water":["Water","Special",0],
+  "Hydro Steam":["Water","Special",0],
+  "Water Spout":["Water","Special",0],
+  "Discharge":["Electric","Special",0],
+  "Thunderclap":["Electric","Special",1],
+  "Wild Charge":["Electric","Physical",0],
+  "Nuzzle":["Electric","Status",0],
+  "Electro Shot":["Electric","Special",0],
+  "Leaf Storm":["Grass","Special",0],
+  "Power Whip":["Grass","Physical",0],
+  "Seed Bomb":["Grass","Physical",0],
+  "Wood Hammer":["Grass","Physical",0],
+  "Trailblaze":["Grass","Physical",0],
+  "Fire Blast":["Fire","Special",0],
+  "Overheat":["Fire","Special",0],
+  "Heat Wave":["Fire","Special",0],
+  "Flare Blitz":["Fire","Physical",0],
+  "Bulldoze":["Ground","Physical",0],
+  "Stomping Tantrum":["Ground","Physical",0],
+  "Mud Shot":["Ground","Special",0],
+  Encore:["Normal","Status",0],
+  Taunt:["Dark","Status",0],
+  "Parting Shot":["Dark","Status",0],
+  Haze:["Ice","Status",0],
+  Yawn:["Normal","Status",0],
+  Disable:["Normal","Status",0],
+  "Leech Seed":["Grass","Status",0],
+  Memento:["Dark","Status",0]
+};
 const SAMPLE=`Charizard @ Heavy-Duty Boots\nAbility: Blaze\nTera Type: Fire\nEVs: 4 Def / 252 SpA / 252 Spe\nTimid Nature\n- Flamethrower\n- Hurricane\n- Defog\n- Roost\n\nDragonite @ Heavy-Duty Boots\nAbility: Multiscale\nTera Type: Normal\nEVs: 252 Atk / 4 SpD / 252 Spe\nAdamant Nature\n- Dragon Dance\n- Extreme Speed\n- Earthquake\n- Fire Punch\n\nGarchomp @ Rocky Helmet\nAbility: Rough Skin\nTera Type: Steel\nEVs: 252 HP / 164 Def / 92 Spe\nImpish Nature\n- Stealth Rock\n- Earthquake\n- Dragon Tail\n- Toxic\n\nSalamence @ Life Orb\nAbility: Moxie\nTera Type: Flying\nEVs: 252 Atk / 4 SpD / 252 Spe\nJolly Nature\n- Dragon Dance\n- Earthquake\n- Outrage\n- Stone Edge\n\nHydreigon @ Choice Specs\nAbility: Levitate\nTera Type: Steel\nEVs: 4 Def / 252 SpA / 252 Spe\nTimid Nature\n- Draco Meteor\n- Dark Pulse\n- Flamethrower\n- U-turn\n\nDragapult @ Choice Band\nAbility: Infiltrator\nTera Type: Dragon\nEVs: 252 Atk / 4 SpD / 252 Spe\nJolly Nature\n- Dragon Darts\n- U-turn\n- Sucker Punch\n- Tera Blast`;
 const REGRESSION_TEAMS={
   dragonSpam:SAMPLE,
@@ -179,7 +213,7 @@ const DexAdapter={dex:null,useDex:false,learnsets:null,init(){if(typeof window!=
   'pult':'Dragapult','tusk':'Great Tusk','gambit':'Kingambit','valiant':'Iron Valiant','hoopau':'Hoopa-Unbound','lando':'Landorus-Therian'
 };let alias=aliases[this.id(raw)]||raw;if(this.useDex){let direct=this.dex.species.get(alias);if(direct&&direct.exists!==false&&direct.name)return direct.name;let hit=this.speciesNames().find(k=>this.id(k)===this.id(alias));if(hit)return hit}return alias.replace(/\b\w/g,c=>c.toUpperCase())},resolveMoveName(name){let raw=String(name||'').trim();if(!raw)return'';let local=keys(MOVES).find(k=>this.id(k)===this.id(raw));if(local)return local;if(this.useDex){let direct=this.dex.moves.get(raw);if(direct&&direct.exists!==false&&direct.name)return direct.name;let hit=this.moveNames().find(k=>this.id(k)===this.id(raw));if(hit)return hit}return raw},getSpecies(name){let n=this.resolveSpeciesName(name);if(this.useDex){let s=this.dex.species.get(n);if(s&&s.exists!==false&&s.baseStats)return{name:s.name,types:s.types||['Normal'],baseStats:[s.baseStats.hp,s.baseStats.atk,s.baseStats.def,s.baseStats.spa,s.baseStats.spd,s.baseStats.spe],abilities:s.abilities||{}}}return P[n]?{name:n,types:P[n][0],baseStats:P[n][1]}:null},getMove(name){let n=this.resolveMoveName(name);if(this.useDex){let m=this.dex.moves.get(n);if(m&&m.exists!==false&&m.name){let acc=m.accuracy===true?100:(m.accuracy||100),extra=null,id=this.id(m.name);if(id==='bodypress')extra='def';if(['psyshock','psystrike','secretsword'].includes(id))extra='targetDef';return[m.type||'Normal',m.category||'Status',m.basePower||0,acc,m.priority||0,extra]}}return MOVES[n]||null},async loadLearnsets(){if(this.learnsets)return this.learnsets;if(!this.useDex||typeof this.dex.getLearnsets!=='function')return null;try{this.learnsets=await this.dex.getLearnsets();return this.learnsets}catch(e){return null}},async canLearn(species,move){let s=this.useDex?this.dex.species.get(species):null,m=this.useDex?this.dex.moves.get(move):null;if(!this.useDex||!s||!m||s.exists===false||m.exists===false){return {known:false,can:null,reason:'learnset data unavailable in fallback mode'}}let all=await this.loadLearnsets();let data=all?.learnsets?.[s.id]||all?.[s.id]||this.dex.data?.Learnsets?.[s.id];let learnset=data?.learnset||data;if(!learnset)return {known:false,can:null,reason:'learnset not loaded for this species'};return {known:true,can:!!learnset[m.id],reason:learnset[m.id]?'move present in learnset':'move not found in learnset'}}};
 DexAdapter.init();
-function moveData(n){return DexAdapter.getMove(n)}function moveCategory(n){return moveData(n)?.[1]||'Status'}function movePriority(n){return moveData(n)?.[4]||0}function speciesNames(){return DexAdapter.speciesNames()}function moveNames(){return DexAdapter.moveNames()}function norm(s){if(!s)return'';let m=String(s).match(/\(([^)]+)\)/);return DexAdapter.resolveSpeciesName(m?m[1]:s)}function moveName(s){return DexAdapter.resolveMoveName(s)}
+function moveData(n){return DexAdapter.getMove(n)}function moveMeta(n){let data=moveData(n);if(data)return data;let hint=REPLAY_MOVE_HINTS[DexAdapter.resolveMoveName(n)]||REPLAY_MOVE_HINTS[String(n||'').trim()];return hint?[hint[0],hint[1],0,100,hint[2]||0]:null}function moveCategory(n){return moveMeta(n)?.[1]||'Status'}function movePriority(n){return moveMeta(n)?.[4]||0}function speciesNames(){return DexAdapter.speciesNames()}function moveNames(){return moveNamesWithHints()}function moveNamesWithHints(){return unique([...DexAdapter.moveNames(),...keys(REPLAY_MOVE_HINTS)])}function norm(s){if(!s)return'';let m=String(s).match(/\(([^)]+)\)/);return DexAdapter.resolveSpeciesName(m?m[1]:s)}function moveName(s){return DexAdapter.resolveMoveName(s)}
 function parseEV(line,def=0){let e={hp:def,atk:def,def:def,spa:def,spd:def,spe:def},map={HP:'hp',Atk:'atk',Def:'def',SpA:'spa',SpD:'spd',Spe:'spe'};(line||'').replace(/^EVs:|^IVs:/i,'').split('/').forEach(x=>{let m=x.trim().match(/(\d+)\s+(HP|Atk|Def|SpA|SpD|Spe)/i);if(m)e[map[m[2]]]=+m[1]});return e}
 function parseTeam(t){return t.split(/\n\s*\n/).map((b,i)=>{let l=b.split(/\n/).map(x=>x.trim()).filter(Boolean);if(!l.length)return null;let first=l[0],sp=first,item='None';if(first.includes(' @ ')){let parts=first.split(' @ ');sp=parts[0];item=parts.slice(1).join(' @ ').trim()}let mon={id:i,species:norm(sp),item,ability:'',tera:'',nature:'Hardy',evs:{hp:0,atk:0,def:0,spa:0,spd:0,spe:0},ivs:{hp:31,atk:31,def:31,spa:31,spd:31,spe:31},moves:[],level:100,shiny:false};l.slice(1).forEach(x=>{if(/^Ability:/i.test(x))mon.ability=x.replace(/^Ability:\s*/i,'');else if(/^Tera Type:/i.test(x))mon.tera=norm(x.replace(/^Tera Type:\s*/i,''));else if(/^EVs:/i.test(x))mon.evs=parseEV(x,0);else if(/^IVs:/i.test(x))mon.ivs=parseEV(x,31);else if(/^Shiny:/i.test(x))mon.shiny=/yes/i.test(x);else if(/^Level:/i.test(x))mon.level=+x.replace(/^Level:\s*/i,'')||100;else if(/Nature$/i.test(x))mon.nature=x.replace(/\s*Nature$/i,'');else if(/^-/.test(x))mon.moves.push(moveName(x.replace(/^[- ]+/,'')))});return mon}).filter(Boolean).slice(0,6)}
 function moveBlockingAbility(moveType,category,ability){let name=String(ability||'');if(!name)return'';if(name==='Levitate'&&moveType==='Ground')return'Levitate';if(name==='Flash Fire'&&moveType==='Fire')return'Flash Fire';if(name==='Well-Baked Body'&&moveType==='Fire')return'Well-Baked Body';if(name==='Good as Gold'&&category==='Status')return'Good as Gold';if(['Water Absorb','Dry Skin','Storm Drain'].includes(name)&&moveType==='Water')return name;if(['Volt Absorb','Motor Drive','Lightning Rod'].includes(name)&&moveType==='Electric')return name;if(['Sap Sipper'].includes(name)&&moveType==='Grass')return name;if(name==='Earth Eater'&&moveType==='Ground')return'Earth Eater';return''}
@@ -417,10 +451,9 @@ class ReplayParser{
     })[ability]||'';
   }
   abilityTriggeredByMove(ability, move=''){
-    const type=moveData(move)?.[0]||({
-      Surf:'Water'
-    })[move]||'';
-    const category=moveCategory(move);
+    const meta=moveMeta(move);
+    const type=meta?.[0]||'';
+    const category=meta?.[1]||'Status';
     if(['Water Absorb','Storm Drain','Dry Skin'].includes(ability))return type==='Water';
     if(['Volt Absorb','Lightning Rod','Motor Drive'].includes(ability))return type==='Electric';
     if(ability==='Sap Sipper')return type==='Grass';
@@ -552,11 +585,11 @@ class ReplayParser{
     if(event.type==='move'&&event.attacker){
       const state=this.ensureState(event.attacker);
       state.lastMove=event.move;
-      const md=moveData(event.move);
-      if(md&&md[1]==='Status'){
+      const meta=moveMeta(event.move);
+      if(meta&&meta[1]==='Status'){
         state.usedStatusMove=true;
         this.addEvidence(state,turn,'status',`${state.species} used status move ${event.move}`,'Assault Vest: IMPOSSIBLE',4,{hard:true});
-      }else if(md&&md[1]!=='Status'){
+      }else if(meta&&meta[1]!=='Status'){
         if(state.lastDamagingMove&&state.lastMoveTurn!==turn){
           if(state.lastDamagingMove===event.move){
             state.repeatedDamagingMove=true;
