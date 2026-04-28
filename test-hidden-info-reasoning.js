@@ -561,6 +561,28 @@ vm.runInContext(
 const airBalloonHazardRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
 assert(airBalloonHazardRead.summary.notes.some(x => /Later took Spikes after Air Balloon popped/i.test(x)), 'post-pop Spikes clues should stay visible in detective notes');
 
+const airBalloonGroundLog = '|turn|1\n|switch|p1a: Great Tusk|Great Tusk, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|-item|p2a: Gholdengo|Air Balloon\n|move|p1a: Great Tusk|Knock Off|p2a: Gholdengo\n|-enditem|p2a: Gholdengo|Air Balloon\n|turn|2\n|move|p1a: Great Tusk|Headlong Rush|p2a: Gholdengo\n|-damage|p2a: Gholdengo|38/100';
+const airBalloonGroundParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(airBalloonGroundLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const airBalloonGroundTarget = airBalloonGroundParser.targets.find(t => t.species === 'Gholdengo');
+assert(airBalloonGroundTarget?.notes?.some(note => /Later took Headlong Rush after Air Balloon popped/i.test(note)), 'post-pop Ground-damage clues should explain that the grounded hit happened after the Balloon was gone');
+
+vm.runInContext(
+  `team=[
+    preset("Great Tusk","Heavy-Duty Boots","Impish",{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},["Close Combat","Headlong Rush","Rapid Spin","Knock Off"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: airBalloonGroundTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const airBalloonGroundRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(airBalloonGroundRead.summary.notes.some(x => /Later took Headlong Rush after Air Balloon popped/i.test(x)), 'post-pop Ground-damage clues should stay visible in detective notes');
+
 const boosterLog = '|turn|1\n|switch|p2a: Raging Bolt|Raging Bolt, L80\n|-item|p2a: Raging Bolt|Booster Energy\n|-enditem|p2a: Raging Bolt|Booster Energy|[from] ability: Protosynthesis';
 const boosterParser = vm.runInContext(`(() => {
   const parser = new ReplayParser();

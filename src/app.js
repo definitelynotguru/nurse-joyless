@@ -384,7 +384,7 @@ class ReplayParser{
         itemLossNote:'',
         itemLossTurn:0,
         hazardEvents:[],
-        postItemLossHazardNote:'',
+        postItemLossNotes:[],
         abilityHints:[],
         damageObservations:[],
         clueObservations:[],
@@ -414,6 +414,14 @@ class ReplayParser{
     if(!state||!turn)return;
     const label=String(source||'').trim()||'hazards';
     state.hazardEvents=[...(state.hazardEvents||[]),{turn,source:label}].slice(-6);
+  }
+  addPostItemLossNote(state, note=''){
+    const text=String(note||'').trim();
+    if(!state||!text)return;
+    if(!state.postItemLossNotes)state.postItemLossNotes=[];
+    if(!state.postItemLossNotes.includes(text)){
+      state.postItemLossNotes=[...state.postItemLossNotes,text].slice(-4);
+    }
   }
   turnSpeedContext(state, turn){
     if(!state||!turn)return null;
@@ -537,6 +545,13 @@ class ReplayParser{
     }
     return `Later took ${source} after ${state.removedItem||'the old item'} left the slot, so the replay keeps the hazard timing aligned with the current item state.`;
   }
+  groundTimelineNote(state, move=''){
+    if(!state?.itemGone||!state.itemLossTurn||state.removedItem!=='Air Balloon')return '';
+    const moveName=String(move||'').trim();
+    const meta=moveMeta(moveName);
+    if(!moveName||!meta||meta[0]!=='Ground'||meta[1]==='Status')return '';
+    return `Later took ${moveName} after Air Balloon popped, confirming the old Ground immunity really ended.`;
+  }
   recordAbilityReveal(state, turn, ability, moveEvent, text, clueLabel=''){
     if(!state||!ability)return;
     if(!state.abilityHints.includes(ability))state.abilityHints.push(ability);
@@ -568,7 +583,7 @@ class ReplayParser{
       itemGone:!!state.itemGone,
       itemLossLabel:state.itemLossLabel||undefined,
       itemLossNote:state.itemLossNote||undefined,
-      postItemLossHazardNote:state.postItemLossHazardNote||undefined,
+      postItemLossNotes:(state.postItemLossNotes||[]).slice(),
       revealedItem:state.revealedItem||undefined,
       _index:index,
       _turn:obs.turn||0
@@ -593,7 +608,7 @@ class ReplayParser{
           itemGone:!!state.itemGone,
           itemLossLabel:state.itemLossLabel||undefined,
           itemLossNote:state.itemLossNote||undefined,
-          postItemLossHazardNote:state.postItemLossHazardNote||undefined,
+          postItemLossNotes:(state.postItemLossNotes||[]).slice(),
           revealedItem:state.revealedItem||undefined,
           _index:index,
           _turn:obs.turn||0
@@ -700,12 +715,13 @@ class ReplayParser{
       if(event.from&&/Stealth Rock|Spikes|Toxic Spikes/i.test(event.from)){
         state.tookHazardDamage=true;
         this.addHazardEvent(state,turn,event.from);
-        if(state.itemGone)state.postItemLossHazardNote=this.hazardTimelineNote(state);
+        if(state.itemGone)this.addPostItemLossNote(state,this.hazardTimelineNote(state));
         this.addEvidence(state,turn,'hazard',`${state.species} took hazard damage`,'Heavy-Duty Boots: IMPOSSIBLE',4,{hard:true});
         return;
       }
       const pct=this.pctFromFraction(event.damage);
       const moveEvent=[...this.turnMoves].reverse().find(x=>x.species&&state.slot!==x.slot);
+      if(state.itemGone)this.addPostItemLossNote(state,this.groundTimelineNote(state,moveEvent?.move));
       if(pct!==null&&moveEvent){
         this.addEvidence(this.ensureState(moveEvent.slot),turn,'damage',`${moveEvent.species} dealt ${pct}% with ${moveEvent.move}`,'Damage-roll evidence available',1,{move:moveEvent.move,observedDamage:pct,evidenceType:'they_hit_me',targetSpecies:state.species});
         const attackerState=this.ensureState(moveEvent.slot);
@@ -727,7 +743,7 @@ class ReplayParser{
       state.itemLossLabel='';
       state.itemLossNote='';
       state.itemLossTurn=0;
-      state.postItemLossHazardNote='';
+      state.postItemLossNotes=[];
       this.addEvidence(state,turn,'reveal',`${state.species} revealed ${event.item}`,'Item confirmed',5,{hard:true,revealedItem:event.item});
       this.addClueObservation(state,{turn,label:this.itemClueLabel(event.item)});
       return;
@@ -741,7 +757,8 @@ class ReplayParser{
       state.itemLossNote=loss.note;
       state.itemLossTurn=turn;
       if(state.revealedItem===event.item)state.revealedItem='';
-      state.postItemLossHazardNote=this.hazardTimelineNote(state);
+      state.postItemLossNotes=[];
+      this.addPostItemLossNote(state,this.hazardTimelineNote(state));
       const sourceText=String(event.from||'').trim();
       const sourceDetail=sourceText?` via ${sourceText.replace(/^move: /,'')}`:'';
       this.addEvidence(state,turn,'reveal',`${state.species} lost ${event.item}${sourceDetail}`,'Current item no longer present',4.5,{hard:true,removedItem:event.item,itemGone:true});
@@ -796,7 +813,7 @@ class ReplayParser{
           state.revealedItem?`${state.revealedItem} confirmed`:null,
           state.itemGone?(state.itemLossLabel||`${state.removedItem} was removed`):null,
           state.itemGone&&state.itemLossNote?state.itemLossNote:null,
-          state.itemGone&&state.postItemLossHazardNote?state.postItemLossHazardNote:null,
+          ...(state.postItemLossNotes||[]),
           ...state.abilityHints.map(a=>{
             const reward=this.abilityRewardText(a);
             return reward?`${a} revealed (${reward})`:`${a} revealed`;
@@ -820,7 +837,7 @@ class ReplayParser{
           removedItem:state.removedItem||undefined,
           itemGone:state.itemGone,
           revealedAbility:state.abilityHints.length===1?state.abilityHints[0]:undefined,
-          postItemLossHazardNote:state.postItemLossHazardNote||undefined,
+          postItemLossNotes:(state.postItemLossNotes||[]).slice(),
           abilityHints:state.abilityHints.slice(),
           usedStatusMove:state.usedStatusMove,
           tookHazardDamage:state.tookHazardDamage,
@@ -1609,7 +1626,7 @@ function detectiveEvidenceNotes(input){
     hardBlocks.push(`${input.removedItem} no longer current item`);
     notes.push(input.itemLossNote||`${input.removedItem} was removed, so the old item is dead and the slot may now be empty.`);
   }
-  if(input.postItemLossHazardNote)notes.push(input.postItemLossHazardNote);
+  (input.postItemLossNotes||[]).forEach(note=>notes.push(note));
   if(input.repeatedDamagingMove)notes.push('Repeated damage leans toward Choice locking, but does not prove it.');
   if(input.speedContext?.relation==='fasterThan'&&input.speedContext?.opponentSpecies)notes.push(`Moved before ${input.speedContext.opponentSpecies} in a neutral-priority exchange, so clearly slower lines are weak fits.`);
   else if(input.speedContext?.relation==='slowerThan'&&input.speedContext?.opponentSpecies)notes.push(`Moved after ${input.speedContext.opponentSpecies} in a neutral-priority exchange, so clearly faster lines are weak fits.`);
