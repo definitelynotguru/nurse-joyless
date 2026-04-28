@@ -561,6 +561,30 @@ vm.runInContext(
 const airBalloonHazardRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
 assert(airBalloonHazardRead.summary.notes.some(x => /Later took Spikes after Air Balloon popped/i.test(x)), 'post-pop Spikes clues should stay visible in detective notes');
 
+const airBalloonProtectionReturnLog = '|turn|1\n|switch|p1a: Ting-Lu|Ting-Lu, L80\n|-sidestart|p2: Gholdengo|move: Spikes\n|switch|p2a: Gholdengo|Gholdengo, L80\n|-item|p2a: Gholdengo|Air Balloon\n|move|p1a: Ting-Lu|Knock Off|p2a: Gholdengo\n|-enditem|p2a: Gholdengo|Air Balloon\n|turn|2\n|switch|p2a: Gholdengo|Gholdengo, L80';
+const airBalloonProtectionReturnParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(airBalloonProtectionReturnLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const airBalloonProtectionReturnTarget = airBalloonProtectionReturnParser.targets.find(t => t.species === 'Gholdengo');
+assert(airBalloonProtectionReturnTarget?.postItemLossProtectionRecovered, 'post-pop no-chip hazard entries should mark that protection returned after Air Balloon was gone');
+assert(airBalloonProtectionReturnTarget?.notes?.some(note => /regained entry protection/i.test(note)), 'post-pop no-chip hazard entries should explain that the later state regained entry protection');
+
+vm.runInContext(
+  `team=[
+    preset("Great Tusk","Heavy-Duty Boots","Impish",{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},["Close Combat","Headlong Rush","Rapid Spin","Knock Off"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: airBalloonProtectionReturnTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const airBalloonProtectionReturnRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(airBalloonProtectionReturnRead.summary.notes.some(x => /empty slot is no longer the only live current-item story/i.test(x)), 'post-pop protection return should reopen the current-item story instead of locking on No Item');
+assert(airBalloonProtectionReturnRead.itemRows[0][0] !== 'No Item', 'post-pop protection return should stop anchoring the current item read to an empty slot');
+
 const airBalloonGroundLog = '|turn|1\n|switch|p1a: Great Tusk|Great Tusk, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|-item|p2a: Gholdengo|Air Balloon\n|move|p1a: Great Tusk|Knock Off|p2a: Gholdengo\n|-enditem|p2a: Gholdengo|Air Balloon\n|turn|2\n|move|p1a: Great Tusk|Headlong Rush|p2a: Gholdengo\n|-damage|p2a: Gholdengo|38/100';
 const airBalloonGroundParser = vm.runInContext(`(() => {
   const parser = new ReplayParser();
@@ -614,6 +638,30 @@ vm.runInContext(
 
 const bootsRemovalHazardRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
 assert(bootsRemovalHazardRead.summary.notes.some(x => /Later took Stealth Rock after Heavy-Duty Boots were removed/i.test(x)), 'post-removal hazard timing should stay visible in detective notes');
+
+const bootsProtectionReturnLog = '|turn|1\n|switch|p1a: Ting-Lu|Ting-Lu, L80\n|-sidestart|p2: Dragapult|move: Stealth Rock\n|switch|p2a: Dragapult|Dragapult, L80\n|-item|p2a: Dragapult|Heavy-Duty Boots\n|move|p1a: Ting-Lu|Knock Off|p2a: Dragapult\n|-enditem|p2a: Dragapult|Heavy-Duty Boots|[from] move: Knock Off\n|turn|2\n|switch|p2a: Dragapult|Dragapult, L80';
+const bootsProtectionReturnParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(bootsProtectionReturnLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const bootsProtectionReturnTarget = bootsProtectionReturnParser.targets.find(t => t.species === 'Dragapult');
+assert(bootsProtectionReturnTarget?.postItemLossProtectionRecovered, 'post-Boots no-chip hazard entries should mark that protection later returned');
+assert(bootsProtectionReturnTarget?.notes?.some(note => /regained hazard protection/i.test(note)), 'post-Boots no-chip hazard entries should explain that the later state regained protection');
+
+vm.runInContext(
+  `team=[
+    preset("Great Tusk","Heavy-Duty Boots","Impish",{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},["Close Combat","Headlong Rush","Rapid Spin","Knock Off"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: bootsProtectionReturnTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const bootsProtectionReturnRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(bootsProtectionReturnRead.summary.notes.some(x => /empty slot is no longer the only live current-item story/i.test(x)), 'post-Boots protection return should reopen the current-item story instead of locking on No Item');
+assert(bootsProtectionReturnRead.itemRows[0][0] !== 'No Item', 'post-Boots protection return should stop anchoring the current item read to an empty slot');
 
 const goodAsGoldEncoreLog = '|turn|1\n|switch|p1a: Grimmsnarl|Grimmsnarl, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|move|p1a: Grimmsnarl|Encore|p2a: Gholdengo\n|-immune|p2a: Gholdengo|[from] ability: Good as Gold';
 const goodAsGoldEncoreParser = vm.runInContext(`(() => {

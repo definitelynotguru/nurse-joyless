@@ -268,6 +268,8 @@ class ReplayParser{
     this.evidence=[];
     this.slotState={};
     this.speciesState={};
+    this.sideConditions={};
+    this.pendingEntryChecks=[];
     this.turnMoves=[];
     this.replayRead={targets:[],strongest:null};
   }
@@ -276,6 +278,8 @@ class ReplayParser{
     this.evidence=[];
     this.slotState={};
     this.speciesState={};
+    this.sideConditions={p1:{},p2:{}};
+    this.pendingEntryChecks=[];
     this.turnMoves=[];
     this.replayRead={targets:[],strongest:null};
   }
@@ -332,10 +336,14 @@ class ReplayParser{
         event.from=parts.find(p=>p.startsWith('[from]'))?.replace('[from] ','')||'';
       }else if(event.type==='-weather'){
         event.weather=parts[1];
+      }else if(event.type==='-sidestart'||event.type==='-sideend'){
+        event.side=parts[1];
+        event.condition=(parts[2]||'').replace(/^move: /,'');
       }
       this.turns[this.turns.length-1]?.events.push(event);
       this.extractEvidence(event,currentTurn);
     });
+    this.flushPendingEntryChecks();
     this.replayRead=this.buildReplayRead();
     return this.turns;
   }
@@ -385,6 +393,7 @@ class ReplayParser{
         itemLossTurn:0,
         hazardEvents:[],
         postItemLossNotes:[],
+        postItemLossProtectionRecovered:false,
         abilityHints:[],
         damageObservations:[],
         clueObservations:[],
@@ -532,6 +541,102 @@ class ReplayParser{
     if(['Flash Fire','Good as Gold'].includes(ability))return `${ability} blocked ${move}`;
     return `${ability} revealed`;
   }
+  normalizedHazardName(name=''){
+    const raw=String(name||'').replace(/^move: /,'').trim();
+    if(/Stealth Rock/i.test(raw))return 'Stealth Rock';
+    if(/Spikes/i.test(raw)&&!/Toxic Spikes/i.test(raw))return 'Spikes';
+    if(/Toxic Spikes/i.test(raw))return 'Toxic Spikes';
+    if(/Sticky Web/i.test(raw))return 'Sticky Web';
+    return '';
+  }
+  setSideCondition(side, hazard, active){
+    const key=this.slotSide(side);
+    const label=this.normalizedHazardName(hazard);
+    if(!key||!label)return;
+    if(!this.sideConditions[key])this.sideConditions[key]={};
+    this.sideConditions[key][label]=!!active;
+  }
+  activeSideConditions(side){
+    const key=this.slotSide(side);
+    return this.sideConditions[key]||{};
+  }
+  canMeaningfullyMissSpikes(state){
+    const species=DexAdapter.getSpecies(state?.species);
+    const types=species?.types||[];
+    if(types.includes('Flying'))return false;
+    if(detectiveAbilities(state?.species).includes('Levitate'))return false;
+    return true;
+  }
+  canMeaningfullyMissStealthRock(state){
+    return !detectiveAbilities(state?.species).includes('Magic Guard');
+  }
+  pendingEntryHazards(state){
+    if(!state?.itemGone||!state.side)return [];
+    const hazards=this.activeSideConditions(state.side);
+    const expected=[];
+    if(hazards['Spikes']&&this.canMeaningfullyMissSpikes(state))expected.push('Spikes');
+    if(hazards['Stealth Rock']&&this.canMeaningfullyMissStealthRock(state))expected.push('Stealth Rock');
+    return expected;
+  }
+  queueEntryCheck(state, turn){
+    const hazards=this.pendingEntryHazards(state);
+    if(!hazards.length)return;
+    const key=this.stateKey(state.slot,state.species);
+    const existing=this.pendingEntryChecks.find(check=>check.key===key&&check.turn===turn);
+    if(existing){
+      existing.hazards=unique([...(existing.hazards||[]),...hazards]);
+      return;
+    }
+    this.pendingEntryChecks.push({key,slot:state.slot,turn,hazards});
+  }
+  postItemLossProtectionNote(state, hazard=''){
+    const label=this.normalizedHazardName(hazard)||String(hazard||'hazards').trim()||'hazards';
+    if(state?.removedItem==='Air Balloon'){
+      return `Later switched through ${label} after Air Balloon popped without taking chip, so the post-pop state regained entry protection before this switch.`;
+    }
+    if(state?.removedItem==='Heavy-Duty Boots'){
+      return `Later switched through ${label} after Heavy-Duty Boots were removed without taking chip, so the post-Knock Off state later regained hazard protection.`;
+    }
+    return `Later switched through ${label} after ${state?.removedItem||'the old item'} left the slot without taking chip, so the current state picked up fresh entry protection after the item loss.`;
+  }
+  markPostItemLossProtection(state, hazard=''){
+    if(!state)return;
+    state.postItemLossProtectionRecovered=true;
+    this.addPostItemLossNote(state,this.postItemLossProtectionNote(state,hazard));
+  }
+  resolvePendingEntryChecksForEvent(turn, event){
+    if(!this.pendingEntryChecks.length)return;
+    const remaining=[];
+    const eventSlot=event?.target?this.slotId(event.target):'';
+    const eventHazard=event?.type==='-damage'?this.normalizedHazardName(event.from):'';
+    this.pendingEntryChecks.forEach(check=>{
+      if((check.turn||0)>turn){
+        remaining.push(check);
+        return;
+      }
+      if((check.turn||0)<turn){
+        const state=this.speciesState[check.key];
+        (check.hazards||[]).forEach(hazard=>this.markPostItemLossProtection(state,hazard));
+        return;
+      }
+      if(event?.type==='-damage'&&eventSlot===check.slot&&eventHazard&&check.hazards.includes(eventHazard)){
+        const hazards=(check.hazards||[]).filter(hazard=>hazard!==eventHazard);
+        if(hazards.length)remaining.push({...check,hazards});
+        return;
+      }
+      const state=this.speciesState[check.key];
+      (check.hazards||[]).forEach(hazard=>this.markPostItemLossProtection(state,hazard));
+    });
+    this.pendingEntryChecks=remaining;
+  }
+  flushPendingEntryChecks(){
+    if(!this.pendingEntryChecks.length)return;
+    this.pendingEntryChecks.forEach(check=>{
+      const state=this.speciesState[check.key];
+      (check.hazards||[]).forEach(hazard=>this.markPostItemLossProtection(state,hazard));
+    });
+    this.pendingEntryChecks=[];
+  }
   hazardTimelineNote(state){
     if(!state?.itemGone||!state.itemLossTurn)return '';
     const laterHazard=[...(state.hazardEvents||[])].find(event=>(event.turn||0)>=state.itemLossTurn);
@@ -583,6 +688,7 @@ class ReplayParser{
       itemGone:!!state.itemGone,
       itemLossLabel:state.itemLossLabel||undefined,
       itemLossNote:state.itemLossNote||undefined,
+      postItemLossProtectionRecovered:!!state.postItemLossProtectionRecovered,
       postItemLossNotes:(state.postItemLossNotes||[]).slice(),
       revealedItem:state.revealedItem||undefined,
       _index:index,
@@ -608,6 +714,7 @@ class ReplayParser{
           itemGone:!!state.itemGone,
           itemLossLabel:state.itemLossLabel||undefined,
           itemLossNote:state.itemLossNote||undefined,
+          postItemLossProtectionRecovered:!!state.postItemLossProtectionRecovered,
           postItemLossNotes:(state.postItemLossNotes||[]).slice(),
           revealedItem:state.revealedItem||undefined,
           _index:index,
@@ -666,12 +773,14 @@ class ReplayParser{
     this.evidence.push(item);
   }
   extractEvidence(event,turn){
+    this.resolvePendingEntryChecksForEvent(turn,event);
     if(event.type==='switch'||event.type==='drag'){
       const state=this.ensureState(event.pokemon,event.details);
       if(state){
         state.lastMove='';
         state.lastDamagingMove='';
         state.lastMoveTurn=0;
+        this.queueEntryCheck(state,turn);
       }
       return;
     }
@@ -744,6 +853,7 @@ class ReplayParser{
       state.itemLossNote='';
       state.itemLossTurn=0;
       state.postItemLossNotes=[];
+      state.postItemLossProtectionRecovered=false;
       this.addEvidence(state,turn,'reveal',`${state.species} revealed ${event.item}`,'Item confirmed',5,{hard:true,revealedItem:event.item});
       this.addClueObservation(state,{turn,label:this.itemClueLabel(event.item)});
       return;
@@ -758,11 +868,16 @@ class ReplayParser{
       state.itemLossTurn=turn;
       if(state.revealedItem===event.item)state.revealedItem='';
       state.postItemLossNotes=[];
+      state.postItemLossProtectionRecovered=false;
       this.addPostItemLossNote(state,this.hazardTimelineNote(state));
       const sourceText=String(event.from||'').trim();
       const sourceDetail=sourceText?` via ${sourceText.replace(/^move: /,'')}`:'';
       this.addEvidence(state,turn,'reveal',`${state.species} lost ${event.item}${sourceDetail}`,'Current item no longer present',4.5,{hard:true,removedItem:event.item,itemGone:true});
       this.addClueObservation(state,{turn,label:loss.clueLabel});
+      return;
+    }
+    if((event.type==='-sidestart'||event.type==='-sideend')&&event.side&&event.condition){
+      this.setSideCondition(event.side,event.condition,event.type==='-sidestart');
       return;
     }
     if((event.type==='-activate'||event.type==='-ability')&&event.target&&event.ability){
@@ -837,6 +952,7 @@ class ReplayParser{
           removedItem:state.removedItem||undefined,
           itemGone:state.itemGone,
           revealedAbility:state.abilityHints.length===1?state.abilityHints[0]:undefined,
+          postItemLossProtectionRecovered:!!state.postItemLossProtectionRecovered,
           postItemLossNotes:(state.postItemLossNotes||[]).slice(),
           abilityHints:state.abilityHints.slice(),
           usedStatusMove:state.usedStatusMove,
@@ -1626,6 +1742,9 @@ function detectiveEvidenceNotes(input){
     hardBlocks.push(`${input.removedItem} no longer current item`);
     notes.push(input.itemLossNote||`${input.removedItem} was removed, so the old item is dead and the slot may now be empty.`);
   }
+  if(input.postItemLossProtectionRecovered){
+    notes.push('Later entry behavior shows the post-loss state regained protection, so an empty slot is no longer the only live current-item story.');
+  }
   (input.postItemLossNotes||[]).forEach(note=>notes.push(note));
   if(input.repeatedDamagingMove)notes.push('Repeated damage leans toward Choice locking, but does not prove it.');
   if(input.speedContext?.relation==='fasterThan'&&input.speedContext?.opponentSpecies)notes.push(`Moved before ${input.speedContext.opponentSpecies} in a neutral-priority exchange, so clearly slower lines are weak fits.`);
@@ -1691,6 +1810,7 @@ function buildDetectiveRead(input){
     if(input.choiceContradiction&&['Choice Band','Choice Specs','Choice Scarf'].includes(c.item)&&(!input.revealedItem||c.item!==input.revealedItem)){c.prob=0;c.eliminated=true;c.reasons.push('hard rule-out: changed damaging moves without switching')}
     if(input.itemGone&&input.removedItem&&c.item===input.removedItem){c.prob=0;c.eliminated=true;c.reasons.push(`hard rule-out: ${input.removedItem} is already gone`)}
     if(input.itemGone&&c.item==='No Item'){c.prob*=1.7;c.reasons.push('hard anchor: replay proved the old item left the slot')}
+    if(input.postItemLossProtectionRecovered&&c.item==='No Item'){c.prob*=0.55;c.reasons.push('soft penalty: later entry protection means the slot may not still be empty')}
     if(input.revealedItem&&c.item!==input.revealedItem){c.prob=0;c.eliminated=true;c.reasons.push(`hard rule-out: replay revealed ${input.revealedItem}`)}
     if(input.revealedItem&&c.item===input.revealedItem){c.prob*=1.8;c.reasons.push(`hard anchor: revealed item is ${input.revealedItem}`)}
     if(input.revealedAbility&&c.ability!==input.revealedAbility){c.prob=0;c.eliminated=true;c.reasons.push(`hard rule-out: replay revealed ${input.revealedAbility}`)}
