@@ -169,6 +169,20 @@ assert(clueOnlyAbilityRead.abilityRows[0][0] === 'Good as Gold', 'clue-only reve
 assert(/replay clues/i.test(clueOnlyAbilityRead.summary.verdict), 'clue-only detective verdict should explain the replay-clue reasoning path');
 assert(clueOnlyAbilityRead.top.every(x => x.ability === 'Good as Gold'), 'clue-only revealed ability should still prune incompatible ability lines');
 
+const waterAbsorbRoll = vm.runInContext(
+  `dmg(
+    preset('Primarina','Leftovers','Modest',{hp:252,atk:0,def:0,spa:252,spd:4,spe:0},['Waterfall','Moonblast','Protect','Psychic Noise']),
+    {...preset('Clodsire','Leftovers','Careful',{hp:252,atk:4,def:0,spa:0,spd:252,spe:0},['Recover','Earthquake','Toxic','Protect']), ability:'Water Absorb'},
+    'Waterfall',
+    {hpPct:100}
+  )`,
+  context,
+  { timeout: 10000 }
+);
+
+assert(waterAbsorbRoll.blockedBy === 'Water Absorb', 'revealed Water Absorb should zero out Water damage math');
+assert(waterAbsorbRoll.maxd === 0, 'Water Absorb immunity should produce zero-damage rolls');
+
 const dragoniteUser = vm.runInContext(
   "preset('Dragonite','Heavy-Duty Boots','Jolly',{hp:0,atk:252,def:4,spa:0,spd:0,spe:252},['Dragon Dance','Extreme Speed','Earthquake','Fire Punch'])",
   context
@@ -289,5 +303,41 @@ vm.runInContext(
 const alternateReplayRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
 assert(alternateReplayRead.input.evidence === 'they_hit_me', 'alternate replay detective branch should stay loadable');
 assert(alternateReplayRead.input.move === 'Make It Rain', 'alternate replay detective branch should preserve its move context');
+
+const waterAbsorbLog = '|turn|1\n|switch|p1a: Primarina|Primarina, L80\n|switch|p2a: Clodsire|Clodsire, L80\n|move|p1a: Primarina|Surf|p2a: Clodsire\n|-heal|p2a: Clodsire|100/100|[from] ability: Water Absorb';
+const waterAbsorbParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(waterAbsorbLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const waterAbsorbTarget = waterAbsorbParser.strongest;
+assert(waterAbsorbTarget?.species === 'Clodsire', 'ability-heal replay clues should stay attached to the revealed target');
+assert(waterAbsorbTarget?.detectiveBranchCount === 1, 'ability-heal replay clues should still create a detective-ready branch');
+assert(waterAbsorbTarget?.detectiveInputs?.[0]?.label.includes('Water Absorb absorbed Surf'), 'ability-heal replay clues should preserve the move-specific clue label');
+
+vm.runInContext(
+  `team=[
+    preset("Great Tusk","Heavy-Duty Boots","Impish",{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},["Close Combat","Headlong Rush","Rapid Spin","Knock Off"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: waterAbsorbTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const waterAbsorbRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(waterAbsorbRead.top.every(x => x.ability === 'Water Absorb'), 'ability-heal replay clues should collapse the detective ability pool');
+assert(/replay clues/i.test(waterAbsorbRead.summary.verdict), 'ability-heal replay clues should stay in the clue-only detective path');
+
+const lightningRodLog = '|turn|1\n|switch|p1a: Zapdos|Zapdos, L80\n|switch|p2a: Seaking|Seaking, L80\n|move|p1a: Zapdos|Thunderbolt|p2a: Seaking\n|-boost|p2a: Seaking|spa|1|[from] ability: Lightning Rod';
+const lightningRodParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(lightningRodLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const lightningRodTarget = lightningRodParser.strongest;
+assert(lightningRodTarget?.species === 'Seaking', 'ability-boost replay clues should stay attached to the revealed target');
+assert(lightningRodTarget?.detectiveBranchCount === 1, 'ability-boost replay clues should stay detective-loadable without damage');
+assert(lightningRodTarget?.detectiveInputs?.[0]?.label.includes('Lightning Rod activated on Thunderbolt'), 'ability-boost replay clues should preserve the move-specific activation label');
 
 console.log('[OK] hidden info detective reasoning passed');

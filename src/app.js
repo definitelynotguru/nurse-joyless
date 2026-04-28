@@ -182,7 +182,7 @@ DexAdapter.init();
 function moveData(n){return DexAdapter.getMove(n)}function moveCategory(n){return moveData(n)?.[1]||'Status'}function movePriority(n){return moveData(n)?.[4]||0}function speciesNames(){return DexAdapter.speciesNames()}function moveNames(){return DexAdapter.moveNames()}function norm(s){if(!s)return'';let m=String(s).match(/\(([^)]+)\)/);return DexAdapter.resolveSpeciesName(m?m[1]:s)}function moveName(s){return DexAdapter.resolveMoveName(s)}
 function parseEV(line,def=0){let e={hp:def,atk:def,def:def,spa:def,spd:def,spe:def},map={HP:'hp',Atk:'atk',Def:'def',SpA:'spa',SpD:'spd',Spe:'spe'};(line||'').replace(/^EVs:|^IVs:/i,'').split('/').forEach(x=>{let m=x.trim().match(/(\d+)\s+(HP|Atk|Def|SpA|SpD|Spe)/i);if(m)e[map[m[2]]]=+m[1]});return e}
 function parseTeam(t){return t.split(/\n\s*\n/).map((b,i)=>{let l=b.split(/\n/).map(x=>x.trim()).filter(Boolean);if(!l.length)return null;let first=l[0],sp=first,item='None';if(first.includes(' @ ')){let parts=first.split(' @ ');sp=parts[0];item=parts.slice(1).join(' @ ').trim()}let mon={id:i,species:norm(sp),item,ability:'',tera:'',nature:'Hardy',evs:{hp:0,atk:0,def:0,spa:0,spd:0,spe:0},ivs:{hp:31,atk:31,def:31,spa:31,spd:31,spe:31},moves:[],level:100,shiny:false};l.slice(1).forEach(x=>{if(/^Ability:/i.test(x))mon.ability=x.replace(/^Ability:\s*/i,'');else if(/^Tera Type:/i.test(x))mon.tera=norm(x.replace(/^Tera Type:\s*/i,''));else if(/^EVs:/i.test(x))mon.evs=parseEV(x,0);else if(/^IVs:/i.test(x))mon.ivs=parseEV(x,31);else if(/^Shiny:/i.test(x))mon.shiny=/yes/i.test(x);else if(/^Level:/i.test(x))mon.level=+x.replace(/^Level:\s*/i,'')||100;else if(/Nature$/i.test(x))mon.nature=x.replace(/\s*Nature$/i,'');else if(/^-/.test(x))mon.moves.push(moveName(x.replace(/^[- ]+/,'')))});return mon}).filter(Boolean).slice(0,6)}
-function moveBlockingAbility(moveType,category,ability){let name=String(ability||'');if(!name)return'';if(name==='Levitate'&&moveType==='Ground')return'Levitate';if(name==='Flash Fire'&&moveType==='Fire')return'Flash Fire';if(name==='Good as Gold'&&category==='Status')return'Good as Gold';return''}
+function moveBlockingAbility(moveType,category,ability){let name=String(ability||'');if(!name)return'';if(name==='Levitate'&&moveType==='Ground')return'Levitate';if(name==='Flash Fire'&&moveType==='Fire')return'Flash Fire';if(name==='Good as Gold'&&category==='Status')return'Good as Gold';if(['Water Absorb','Dry Skin','Storm Drain'].includes(name)&&moveType==='Water')return name;if(['Volt Absorb','Motor Drive','Lightning Rod'].includes(name)&&moveType==='Electric')return name;if(name==='Sap Sipper'&&moveType==='Grass')return'Sap Sipper';return''}
 function mult(atk,defs){return defs.reduce((a,t)=>a*((CHART[atk]&&CHART[atk][t]!==undefined)?CHART[atk][t]:1),1)}function nmod(n,s){let o=NATURE[n]||{};return o.up===s?1.1:o.down===s?.9:1}function stats(m,over={}){let base=DexAdapter.getSpecies(m?.species)?.baseStats||[80,80,80,80,80,80],e=over.evs||m.evs||{},iv=m.ivs||parseEV('',31),n=over.nature||m.nature||'Hardy',L=m.level||100,out={};out.hp=Math.floor(((2*base[0]+(iv.hp||31)+Math.floor((e.hp||0)/4))*L)/100)+L+10;['atk','def','spa','spd','spe'].forEach((s,i)=>{out[s]=Math.floor((Math.floor(((2*base[i+1]+(iv[s]??31)+Math.floor((e[s]||0)/4))*L)/100)+5)*nmod(n,s))});return out}function grounded(m){return !types(m).includes('Flying')&&m.ability!=='Levitate'&&m.item!=='Air Balloon'}function hazardPct(m,h){if(h==='none'||m.item==='Heavy-Duty Boots')return 0;if(h==='rocks')return 12.5*mult('Rock',types(m));if(!grounded(m))return 0;return h==='spikes1'?12.5:h==='spikes2'?16.67:h==='spikes3'?25:0}
 function effectiveSet(m,opts={}){let copy={...m};if(opts.attackerTera||opts.defenderTera){copy.tera=opts.teraType||m.tera}return copy}
 function dmg(att,def,mv,opt={}){let m=moveData(mv);if(!m)throw Error('Unknown move: '+mv);if(m[1]==='Status')throw Error(mv+' is a status move.');let aa=effectiveSet(att,{attackerTera:opt.attackerTera,teraType:opt.attackerTeraType}),dd=effectiveSet(def,{defenderTera:opt.defenderTera,teraType:opt.defenderTeraType});let sa=stats(aa,opt.attOver||{}),sd=stats(dd,opt.defOver||{}),cat=m[1],A=cat==='Physical'?sa.atk:sa.spa,D=cat==='Physical'?sd.def:sd.spd;if(m[5]==='def')A=sa.def;if(m[5]==='targetDef')D=sd.def;let ai=opt.attOver?.item||aa.item,di=opt.defOver?.item||dd.item;if(cat==='Physical'&&ai==='Choice Band')A*=1.5;if(cat==='Special'&&ai==='Choice Specs')A*=1.5;if(cat==='Special'&&di==='Assault Vest')D*=1.5;let bp=m[2];if(DexAdapter.id(mv)==='weatherball'&&(opt.field==='sun'||opt.field==='rain'))bp=100;let base=Math.floor(Math.floor(Math.floor((2*(aa.level||100)/5+2)*bp*A/D)/50)+2),moveType=m[0];if(DexAdapter.id(mv)==='weatherball'&&opt.field==='sun')moveType='Fire';if(DexAdapter.id(mv)==='weatherball'&&opt.field==='rain')moveType='Water';let atkTypes=opt.attackerTera?[opt.attackerTeraType||aa.tera||types(aa)[0]]:types(aa),defTypes=opt.defenderTera?[opt.defenderTeraType||dd.tera||types(dd)[0]]:types(dd),blockedBy=moveBlockingAbility(moveType,cat,dd.ability),eff=blockedBy?0:mult(moveType,defTypes),stab=atkTypes.includes(moveType)?1.5:1,mod=eff*stab;if(ai==='Life Orb')mod*=1.3;if(ai==='Expert Belt'&&eff>1)mod*=1.2;if(ai==='Black Glasses'&&moveType==='Dark')mod*=1.2;if(ai==='Charcoal'&&moveType==='Fire')mod*=1.2;if(aa.ability==='Solar Power'&&opt.field==='sun'&&cat==='Special')mod*=1.5;if(opt.field==='rain'&&moveType==='Water')mod*=1.5;if(opt.field==='rain'&&moveType==='Fire')mod*=.5;if(opt.field==='sun'&&moveType==='Fire')mod*=1.5;if(opt.field==='sun'&&moveType==='Water')mod*=.5;if(opt.field==='reflect'&&cat==='Physical')mod*=.5;if(opt.field==='screen'&&cat==='Special')mod*=.5;let rolls=[];if(blockedBy)rolls=new Array(16).fill(0);else for(let r=85;r<=100;r++)rolls.push(Math.max(1,Math.floor(base*mod*r/100)));let hpPct=+opt.hpPct||100,hz=hazardPct(dd,opt.hazards||'none'),max=sd.hp,ehp=Math.max(1,Math.floor(max*Math.max(0,hpPct-hz)/100)),hit=(m[3]||100)/100,ko=rolls.filter(x=>x>=ehp).length/16*hit;let chanceN=(n=2)=>{let combos=[0];for(let i=0;i<n;i++){let next=[];for(let c of combos)for(let r of rolls)next.push(c+r);combos=next}return combos.filter(x=>x>=ehp).length/combos.length*Math.pow(hit,n)};return{att:aa,def:dd,mv,move:m,rolls,max,ehp,hz,min:Math.min(...rolls),maxd:Math.max(...rolls),minp:Math.min(...rolls)/max*100,maxp:Math.max(...rolls)/max*100,ko,two:chanceN(2),three:chanceN(3),eff,hit,moveType,blockedBy}}
@@ -274,6 +274,7 @@ class ReplayParser{
       }else if(event.type==='-heal'){
         event.target=parts[1];
         event.heal=parts[2];
+        event.from=parts.find(p=>p.startsWith('[from]'))?.replace('[from] ','')||'';
       }else if(event.type==='-status'){
         event.target=parts[1];
         event.status=parts[2];
@@ -286,6 +287,11 @@ class ReplayParser{
       }else if(event.type==='-activate'||event.type==='-ability'){
         event.target=parts[1];
         event.ability=(parts[2]||'').replace(/^ability: /,'');
+      }else if(event.type==='-boost'){
+        event.target=parts[1];
+        event.stat=parts[2];
+        event.amount=parts[3];
+        event.from=parts.find(p=>p.startsWith('[from]'))?.replace('[from] ','')||'';
       }else if(event.type==='-weather'){
         event.weather=parts[1];
       }
@@ -340,6 +346,22 @@ class ReplayParser{
     if(!state||!observation?.label)return;
     state.clueObservations.push({...observation, turn:observation.turn||0});
     if(state.clueObservations.length>4)state.clueObservations=state.clueObservations.slice(-4);
+  }
+  abilitySource(source){
+    const match=String(source||'').match(/^ability: (.+)$/);
+    return match?match[1]:'';
+  }
+  abilityClueLabel(ability, move=''){
+    if(!move)return `${ability} revealed`;
+    if(['Water Absorb','Volt Absorb','Dry Skin'].includes(ability))return `${ability} absorbed ${move}`;
+    if(['Storm Drain','Lightning Rod','Motor Drive','Sap Sipper'].includes(ability))return `${ability} activated on ${move}`;
+    return `${ability} revealed on ${move}`;
+  }
+  recordAbilityReveal(state, turn, ability, moveEvent, text, clueLabel=''){
+    if(!state||!ability)return;
+    if(!state.abilityHints.includes(ability))state.abilityHints.push(ability);
+    this.addEvidence(state,turn,'reveal',text||`${state.species} revealed ${ability}`,'Ability revealed',3.5,{hard:true,ability});
+    this.addClueObservation(state,{turn,move:moveEvent?.move||'',label:clueLabel||this.abilityClueLabel(ability,moveEvent?.move)});
   }
   bestDamageObservation(state){
     return this.detectiveInputsFromState(state)[0]||null;
@@ -507,19 +529,34 @@ class ReplayParser{
     }
     if((event.type==='-activate'||event.type==='-ability')&&event.target&&event.ability){
       const state=this.ensureState(event.target);
-      if(!state.abilityHints.includes(event.ability))state.abilityHints.push(event.ability);
-      this.addEvidence(state,turn,'reveal',`${state.species} revealed ${event.ability}`,'Ability revealed',3.5,{hard:true,ability:event.ability});
+      this.recordAbilityReveal(state,turn,event.ability,null,`${state.species} revealed ${event.ability}`);
+      return;
+    }
+    if(event.type==='-heal'&&event.target&&event.from){
+      const state=this.ensureState(event.target);
+      const ability=this.abilitySource(event.from);
+      if(ability){
+        const moveEvent=[...this.turnMoves].reverse().find(x=>x.species&&state.slot!==x.slot);
+        this.recordAbilityReveal(state,turn,ability,moveEvent,`${state.species} restored HP with ${ability}`);
+      }
+      return;
+    }
+    if(event.type==='-boost'&&event.target&&event.from){
+      const state=this.ensureState(event.target);
+      const ability=this.abilitySource(event.from);
+      if(ability){
+        const moveEvent=[...this.turnMoves].reverse().find(x=>x.species&&state.slot!==x.slot);
+        this.recordAbilityReveal(state,turn,ability,moveEvent,`${state.species} gained a boost from ${ability}`);
+      }
       return;
     }
     if(event.type==='-immune'&&event.target&&event.from){
-      const ability=event.from.replace(/^ability: /,'');
-      if(ability&&ability!==event.from){
+      const ability=this.abilitySource(event.from);
+      if(ability){
         const state=this.ensureState(event.target);
-        if(!state.abilityHints.includes(ability))state.abilityHints.push(ability);
         const moveEvent=[...this.turnMoves].reverse().find(x=>x.species&&state.slot!==x.slot);
         const clueLabel=moveEvent?.move?`${ability} blocked ${moveEvent.move}`:`${ability} revealed`;
-        this.addEvidence(state,turn,'reveal',`${state.species} was protected by ${ability}`,'Ability revealed',3.5,{hard:true,ability});
-        this.addClueObservation(state,{turn,move:moveEvent?.move||'',label:clueLabel});
+        this.recordAbilityReveal(state,turn,ability,moveEvent,`${state.species} was protected by ${ability}`,clueLabel);
       }
     }
   }
