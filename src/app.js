@@ -318,6 +318,7 @@ class ReplayParser{
         event.target=parts[1];
         event.item=parts[2];
         event.from=parts.find(p=>p.startsWith('[from]'))?.replace('[from] ','')||'';
+        event.tags=parts.slice(3).filter(p=>/^\[[^\]]+\]$/.test(p));
       }else if(event.type==='-immune'){
         event.target=parts[1];
         event.from=parts.find(p=>p.startsWith('[from]'))?.replace('[from] ','')||'';
@@ -379,6 +380,8 @@ class ReplayParser{
         revealedItem:'',
         removedItem:'',
         itemGone:false,
+        itemLossLabel:'',
+        itemLossNote:'',
         abilityHints:[],
         damageObservations:[],
         clueObservations:[],
@@ -438,6 +441,42 @@ class ReplayParser{
     const move=String(source||'').match(/^move: (.+)$/)?.[1]||'';
     if(item&&move)return `${item} was removed by ${move}`;
     return item?`${item} was removed`:'Item was removed';
+  }
+  describeItemLoss(event={}){
+    const item=String(event.item||'').trim();
+    const source=String(event.from||'').trim();
+    const tags=event.tags||[];
+    const hasTag=tag=>tags.includes(tag);
+    if(item==='Air Balloon'){
+      return {
+        clueLabel:'Air Balloon popped',
+        note:'Air Balloon popped, so the old Ground immunity is gone and the item slot is now empty.'
+      };
+    }
+    if(item==='Booster Energy'){
+      const mode=source.replace(/^ability: /,'').trim();
+      return {
+        clueLabel:mode?`Booster Energy activated ${mode}`:'Booster Energy was consumed',
+        note:'Booster Energy is a one-shot item, so the stat trigger stays informative but the current item slot is now empty.'
+      };
+    }
+    if(item==='Red Card'){
+      return {
+        clueLabel:'Red Card triggered',
+        note:'Red Card already fired, so that forced-switch item can no longer be the current item.'
+      };
+    }
+    if(hasTag('[eat]')||/Berry$/i.test(item)){
+      return {
+        clueLabel:item?`${item} was eaten`:'Berry was eaten',
+        note:`${item||'That berry'} was consumed, so the recovery clue stays useful but the item slot is now empty.`
+      };
+    }
+    const clueLabel=this.itemLossClueLabel(item,source);
+    return {
+      clueLabel,
+      note:item?`${clueLabel}, so that item can no longer be the current item.`:'The old item is gone, so current item inference should stay open.'
+    };
   }
   abilitySource(source){
     const match=String(source||'').match(/^ability: (.+)$/);
@@ -506,6 +545,8 @@ class ReplayParser{
       choiceContradiction:state.choiceContradiction,
       removedItem:state.removedItem||undefined,
       itemGone:!!state.itemGone,
+      itemLossLabel:state.itemLossLabel||undefined,
+      itemLossNote:state.itemLossNote||undefined,
       revealedItem:state.revealedItem||undefined,
       _index:index,
       _turn:obs.turn||0
@@ -528,6 +569,8 @@ class ReplayParser{
           choiceContradiction:state.choiceContradiction,
           removedItem:state.removedItem||undefined,
           itemGone:!!state.itemGone,
+          itemLossLabel:state.itemLossLabel||undefined,
+          itemLossNote:state.itemLossNote||undefined,
           revealedItem:state.revealedItem||undefined,
           _index:index,
           _turn:obs.turn||0
@@ -656,19 +699,24 @@ class ReplayParser{
       state.revealedItem=event.item;
       state.removedItem='';
       state.itemGone=false;
+      state.itemLossLabel='';
+      state.itemLossNote='';
       this.addEvidence(state,turn,'reveal',`${state.species} revealed ${event.item}`,'Item confirmed',5,{hard:true,revealedItem:event.item});
       this.addClueObservation(state,{turn,label:this.itemClueLabel(event.item)});
       return;
     }
     if(event.type==='-enditem'&&event.target&&event.item){
       const state=this.ensureState(event.target);
+      const loss=this.describeItemLoss(event);
       state.removedItem=event.item;
       state.itemGone=true;
+      state.itemLossLabel=loss.clueLabel;
+      state.itemLossNote=loss.note;
       if(state.revealedItem===event.item)state.revealedItem='';
       const sourceText=String(event.from||'').trim();
       const sourceDetail=sourceText?` via ${sourceText.replace(/^move: /,'')}`:'';
       this.addEvidence(state,turn,'reveal',`${state.species} lost ${event.item}${sourceDetail}`,'Current item no longer present',4.5,{hard:true,removedItem:event.item,itemGone:true});
-      this.addClueObservation(state,{turn,label:this.itemLossClueLabel(event.item,event.from)});
+      this.addClueObservation(state,{turn,label:loss.clueLabel});
       return;
     }
     if((event.type==='-activate'||event.type==='-ability')&&event.target&&event.ability){
@@ -717,7 +765,8 @@ class ReplayParser{
         }));
         const uniqueNotes=unique([
           state.revealedItem?`${state.revealedItem} confirmed`:null,
-          state.itemGone&&state.removedItem?`${state.removedItem} was removed`:null,
+          state.itemGone?(state.itemLossLabel||`${state.removedItem} was removed`):null,
+          state.itemGone&&state.itemLossNote?state.itemLossNote:null,
           ...state.abilityHints.map(a=>{
             const reward=this.abilityRewardText(a);
             return reward?`${a} revealed (${reward})`:`${a} revealed`;
@@ -1498,7 +1547,7 @@ function advice(r,rev){let risk=rev[0]?.ko||0;if(r.ko>=.999)return`Click ${r.mv}
 
 // V3.5 cleanup restore: hidden-info detective and prescription helpers.
 function detectiveAbilities(sp){let vals=unique(Object.values(DexAdapter.getSpecies(sp)?.abilities||{}).filter(Boolean));return vals.length?vals:['Unknown']}
-function candidates(sp,observedAbility=''){let prof=[['physical offense','Adamant',{hp:0,atk:252,def:0,spa:0,spd:4,spe:252},['Choice Band','Life Orb','Heavy-Duty Boots','Black Glasses']],['speed physical','Jolly',{hp:0,atk:252,def:0,spa:0,spd:4,spe:252},['Choice Scarf','Life Orb','Heavy-Duty Boots']],['special offense','Modest',{hp:0,atk:0,def:4,spa:252,spd:0,spe:252},['Choice Specs','Life Orb','Heavy-Duty Boots','Expert Belt']],['speed special','Timid',{hp:0,atk:0,def:4,spa:252,spd:0,spe:252},['Choice Scarf','Choice Specs','Heavy-Duty Boots']],['physical wall','Impish',{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},['Leftovers','Rocky Helmet','Heavy-Duty Boots']],['special wall','Calm',{hp:252,atk:0,def:4,spa:0,spd:252,spe:0},['Leftovers','Assault Vest','Heavy-Duty Boots']]],out=[],abilities=detectiveAbilities(sp);if(observedAbility&&!abilities.includes(observedAbility))abilities=abilities[0]==='Unknown'?[observedAbility]:unique([...abilities,observedAbility]);prof.forEach(p=>p[3].forEach(item=>abilities.forEach(ability=>out.push({species:sp,profile:p[0],nature:p[1],evs:p[2],item,ability,prob:1,reasons:[]}))));normC(out);return out}
+function candidates(sp,observedAbility='',options={}){let prof=[['physical offense','Adamant',{hp:0,atk:252,def:0,spa:0,spd:4,spe:252},['Choice Band','Life Orb','Heavy-Duty Boots','Black Glasses']],['speed physical','Jolly',{hp:0,atk:252,def:0,spa:0,spd:4,spe:252},['Choice Scarf','Life Orb','Heavy-Duty Boots']],['special offense','Modest',{hp:0,atk:0,def:4,spa:252,spd:0,spe:252},['Choice Specs','Life Orb','Heavy-Duty Boots','Expert Belt']],['speed special','Timid',{hp:0,atk:0,def:4,spa:252,spd:0,spe:252},['Choice Scarf','Choice Specs','Heavy-Duty Boots']],['physical wall','Impish',{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},['Leftovers','Rocky Helmet','Heavy-Duty Boots']],['special wall','Calm',{hp:252,atk:0,def:4,spa:0,spd:252,spe:0},['Leftovers','Assault Vest','Heavy-Duty Boots']]],out=[],abilities=detectiveAbilities(sp);if(observedAbility&&!abilities.includes(observedAbility))abilities=abilities[0]==='Unknown'?[observedAbility]:unique([...abilities,observedAbility]);prof.forEach(p=>{const items=options.allowItemless?unique([...p[3],'No Item']):p[3];items.forEach(item=>abilities.forEach(ability=>out.push({species:sp,profile:p[0],nature:p[1],evs:p[2],item,ability,prob:1,reasons:[]})))});normC(out);return out}
 function normC(c){let s=c.reduce((a,b)=>a+Math.max(0,b.prob),0)||1;c.forEach(x=>x.prob=Math.max(0,x.prob)/s)}
 function defaultMoves(sp,c){let pool={Dragapult:c.profile.includes('special')?['Shadow Ball','Draco Meteor','Flamethrower','U-turn']:['Dragon Darts','U-turn','Sucker Punch','Tera Blast'],Kingambit:['Kowtow Cleave','Sucker Punch','Iron Head','Swords Dance'],'Great Tusk':['Close Combat','Headlong Rush','Rapid Spin','Knock Off'],'Iron Valiant':['Moonblast','Close Combat','Thunderbolt','Calm Mind'],Gholdengo:['Make It Rain','Shadow Ball','Focus Blast','Recover'],Corviknight:['Roost','Defog','U-turn','Body Press'],Dragonite:['Dragon Dance','Extreme Speed','Earthquake','Fire Punch']};return pool[sp]||['Earthquake','Ice Beam','Moonblast','Thunderbolt']}
 function candSet(c){return {...preset(c.species,c.item,c.nature,c.evs,defaultMoves(c.species,c)),ability:c.ability||''}}
@@ -1525,7 +1574,10 @@ function detectiveEvidenceNotes(input){
     'Good as Gold':'That also means opposing status moves stay dead lines unless the log says otherwise.'
   })[input.revealedAbility];
   if(abilityReward)notes.push(abilityReward);
-  if(input.itemGone&&input.removedItem)notes.push(`${input.removedItem} was removed, so current item inference should stay open.`);
+  if(input.itemGone&&input.removedItem){
+    hardBlocks.push(`${input.removedItem} no longer current item`);
+    notes.push(input.itemLossNote||`${input.removedItem} was removed, so the old item is dead and the slot may now be empty.`);
+  }
   if(input.repeatedDamagingMove)notes.push('Repeated damage leans toward Choice locking, but does not prove it.');
   if(input.speedContext?.relation==='fasterThan'&&input.speedContext?.opponentSpecies)notes.push(`Moved before ${input.speedContext.opponentSpecies} in a neutral-priority exchange, so clearly slower lines are weak fits.`);
   else if(input.speedContext?.relation==='slowerThan'&&input.speedContext?.opponentSpecies)notes.push(`Moved after ${input.speedContext.opponentSpecies} in a neutral-priority exchange, so clearly faster lines are weak fits.`);
@@ -1582,12 +1634,14 @@ function detectiveSummary(top,input,notes){
 }
 function aggregateDetective(top,key){return Object.entries(top.reduce((o,c)=>(o[c[key]]=(o[c[key]]||0)+c.prob,o),{})).sort((a,b)=>b[1]-a[1])}
 function buildDetectiveRead(input){
-  const cs=candidates(input.species,input.revealedAbility).map(c=>({...c,reasons:[],eliminated:false,fitQuality:'unknown'}));
+  const cs=candidates(input.species,input.revealedAbility,{allowItemless:!!input.itemGone}).map(c=>({...c,reasons:[],eliminated:false,fitQuality:'unknown'}));
   const notes=detectiveEvidenceNotes(input);
   cs.forEach(c=>{
     if(input.usedStatusMove&&c.item==='Assault Vest'){c.prob=0;c.eliminated=true;c.reasons.push('hard rule-out: used a status move')}
     if(input.tookHazardDamage&&c.item==='Heavy-Duty Boots'){c.prob=0;c.eliminated=true;c.reasons.push('hard rule-out: took hazard damage')}
     if(input.choiceContradiction&&['Choice Band','Choice Specs','Choice Scarf'].includes(c.item)&&(!input.revealedItem||c.item!==input.revealedItem)){c.prob=0;c.eliminated=true;c.reasons.push('hard rule-out: changed damaging moves without switching')}
+    if(input.itemGone&&input.removedItem&&c.item===input.removedItem){c.prob=0;c.eliminated=true;c.reasons.push(`hard rule-out: ${input.removedItem} is already gone`)}
+    if(input.itemGone&&c.item==='No Item'){c.prob*=1.7;c.reasons.push('hard anchor: replay proved the old item left the slot')}
     if(input.revealedItem&&c.item!==input.revealedItem){c.prob=0;c.eliminated=true;c.reasons.push(`hard rule-out: replay revealed ${input.revealedItem}`)}
     if(input.revealedItem&&c.item===input.revealedItem){c.prob*=1.8;c.reasons.push(`hard anchor: revealed item is ${input.revealedItem}`)}
     if(input.revealedAbility&&c.ability!==input.revealedAbility){c.prob=0;c.eliminated=true;c.reasons.push(`hard rule-out: replay revealed ${input.revealedAbility}`)}

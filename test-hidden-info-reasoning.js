@@ -338,7 +338,7 @@ assert(removedItemTarget?.removedItem === 'Leftovers', 'replay item-loss clues s
 assert(removedItemTarget?.itemGone, 'replay item-loss clues should mark the item as no longer present');
 assert(!removedItemTarget?.revealedItem, 'replay item-loss clues should stop treating the removed item as a live confirmation');
 assert(removedItemTarget?.detectiveInputs?.[0]?.clueLabel === 'Leftovers was removed by Knock Off', 'replay item-loss clues should preserve the removal cause');
-assert(removedItemTarget?.notes?.includes('Leftovers was removed'), 'replay item-loss clues should surface the loss in summary notes');
+assert(removedItemTarget?.notes?.some(note => /Leftovers was removed/.test(note)), 'replay item-loss clues should surface the loss in summary notes');
 
 vm.runInContext(
   `team=[
@@ -351,8 +351,9 @@ vm.runInContext(
 );
 
 const removedItemRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
-assert(removedItemRead.summary.notes.some(x => /current item inference should stay open/i.test(x)), 'removed-item replay clues should explain that the old item no longer anchors the live read');
-assert(new Set(removedItemRead.top.map(x => x.item)).size > 1, 'removed-item replay clues should not collapse the detective to the lost item');
+assert(removedItemRead.summary.notes.some(x => /no longer be the current item/i.test(x)), 'removed-item replay clues should explain that the old item no longer anchors the live read');
+assert(removedItemRead.itemRows[0][0] === 'No Item', 'removed-item replay clues should let the detective represent an empty current item slot');
+assert(!removedItemRead.itemRows.some(([name]) => name === 'Leftovers'), 'removed-item replay clues should eliminate the lost item from the live current-item pool');
 
 const multiBranchLog = '|turn|1\n|switch|p1a: Great Tusk|Great Tusk, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|move|p2a: Gholdengo|Make It Rain|p1a: Great Tusk\n|-damage|p1a: Great Tusk|58/100\n|move|p1a: Great Tusk|Headlong Rush|p2a: Gholdengo\n|-damage|p2a: Gholdengo|29/100\n|-item|p2a: Gholdengo|Leftovers';
 const multiBranchParser = vm.runInContext(`(() => {
@@ -512,6 +513,41 @@ assert(speedBoostTarget?.species === 'Blaziken', 'generic ability replay clues s
 assert(speedBoostTarget?.detectiveInputs?.[0]?.label === 'Speed Boost revealed', 'generic ability reveals should not pretend they were caused by the last move');
 assert(speedBoostTarget?.notes?.includes('Speed Boost revealed'), 'generic ability reveals should stay descriptive without fake immunity text');
 assert(!speedBoostTarget?.notes?.some(note => /immunity interaction/i.test(note)), 'generic ability reveals should not be mislabeled as immunity interactions');
+
+const airBalloonLog = '|turn|1\n|switch|p1a: Great Tusk|Great Tusk, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|-item|p2a: Gholdengo|Air Balloon\n|move|p1a: Great Tusk|Knock Off|p2a: Gholdengo\n|-enditem|p2a: Gholdengo|Air Balloon';
+const airBalloonParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(airBalloonLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const airBalloonTarget = airBalloonParser.targets.find(t => t.species === 'Gholdengo');
+assert(airBalloonTarget?.detectiveInputs?.[0]?.clueLabel === 'Air Balloon popped', 'Air Balloon replay clues should keep a specific pop label instead of generic item removal wording');
+assert(airBalloonTarget?.notes?.some(note => /Ground immunity is gone/i.test(note)), 'Air Balloon replay clues should explain that the old Ground immunity ended');
+
+vm.runInContext(
+  `team=[
+    preset("Great Tusk","Heavy-Duty Boots","Impish",{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},["Close Combat","Headlong Rush","Rapid Spin","Knock Off"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: airBalloonTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const airBalloonRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(airBalloonRead.itemRows[0][0] === 'No Item', 'Air Balloon pop clues should anchor the current item read to an empty slot');
+assert(!airBalloonRead.itemRows.some(([name]) => name === 'Air Balloon'), 'Air Balloon pop clues should remove the popped Balloon from the live pool');
+assert(airBalloonRead.summary.notes.some(x => /Ground immunity is gone/i.test(x)), 'Air Balloon pop clues should carry the groundedness consequence into the detective notes');
+
+const boosterLog = '|turn|1\n|switch|p2a: Raging Bolt|Raging Bolt, L80\n|-item|p2a: Raging Bolt|Booster Energy\n|-enditem|p2a: Raging Bolt|Booster Energy|[from] ability: Protosynthesis';
+const boosterParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(boosterLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const boosterTarget = boosterParser.targets.find(t => t.species === 'Raging Bolt');
+assert(boosterTarget?.detectiveInputs?.[0]?.clueLabel === 'Booster Energy activated Protosynthesis', 'Booster Energy replay clues should keep the activation cause instead of generic removal wording');
+assert(boosterTarget?.notes?.some(note => /one-shot item/i.test(note)), 'Booster Energy replay clues should explain that the item was consumed and cannot still be current');
 
 const goodAsGoldEncoreLog = '|turn|1\n|switch|p1a: Grimmsnarl|Grimmsnarl, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|move|p1a: Grimmsnarl|Encore|p2a: Gholdengo\n|-immune|p2a: Gholdengo|[from] ability: Good as Gold';
 const goodAsGoldEncoreParser = vm.runInContext(`(() => {
