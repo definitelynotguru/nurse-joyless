@@ -436,6 +436,8 @@ class ReplayParser{
         postItemLossGroundProtectionItems:[],
         postItemLossGroundProtectionAbilities:[],
         abilityHints:[],
+        ruledOutAbilities:[],
+        abilityContradictionNotes:[],
         damageObservations:[],
         clueObservations:[],
         speedContexts:[],
@@ -488,6 +490,26 @@ class ReplayParser{
     if(!state.historicalItemNotes.includes(text)){
       state.historicalItemNotes=[...state.historicalItemNotes,text].slice(-4);
     }
+  }
+  addAbilityContradictionNote(state, note=''){
+    const text=String(note||'').trim();
+    if(!state||!text)return;
+    if(!state.abilityContradictionNotes)state.abilityContradictionNotes=[];
+    if(!state.abilityContradictionNotes.includes(text)){
+      state.abilityContradictionNotes=[...state.abilityContradictionNotes,text].slice(-4);
+    }
+  }
+  ruleOutAbilities(state, turn, abilities=[], note='', label=''){
+    if(!state)return;
+    const legalAbilities=detectiveAbilities(state.species);
+    const targets=unique((abilities||[]).filter(ability=>ability&&legalAbilities.includes(ability)));
+    if(!targets.length)return;
+    state.ruledOutAbilities=unique([...(state.ruledOutAbilities||[]),...targets]);
+    this.addAbilityContradictionNote(state,note);
+    if(label)this.addClueObservation(state,{turn,label});
+    targets.forEach(ability=>{
+      this.addEvidence(state,turn,'reveal',`${state.species} cannot be ${ability}`,'Ability contradicted',4,{hard:true,ruledOutAbility:ability});
+    });
   }
   joinWithOr(list=[]){
     const values=unique((list||[]).map(x=>String(x||'').trim()));
@@ -692,6 +714,47 @@ class ReplayParser{
     if(['Storm Drain','Lightning Rod','Motor Drive','Sap Sipper','Well-Baked Body'].includes(ability))return `${ability} activated on ${move}`;
     if(['Flash Fire','Good as Gold'].includes(ability))return `${ability} blocked ${move}`;
     return `${ability} revealed`;
+  }
+  moveBlockedAbilities(state, move=''){
+    const moveName=String(move||'').trim();
+    if(!moveName)return [];
+    return detectiveAbilities(state?.species).filter(ability=>this.abilityTriggeredByMove(ability,moveName));
+  }
+  moveContradictionNote(state, move=''){
+    const moveName=String(move||'').trim();
+    const abilities=this.moveBlockedAbilities(state,moveName);
+    if(!moveName||!abilities.length)return '';
+    return `Taking ${moveName} rules out ${this.joinWithOr(abilities)} as the current ability explanation.`;
+  }
+  hazardAbilityContradictions(state, hazard=''){
+    const label=this.normalizedHazardName(hazard);
+    if(!label)return [];
+    const abilities=detectiveAbilities(state?.species);
+    return abilities.filter(ability=>{
+      if(['Stealth Rock','Spikes'].includes(label)&&ability==='Magic Guard')return true;
+      if(['Spikes','Toxic Spikes','Sticky Web'].includes(label)&&ability==='Levitate')return true;
+      if(label==='Toxic Spikes'&&['Immunity','Pastel Veil'].includes(ability))return true;
+      if(label==='Sticky Web'&&['Clear Body','White Smoke','Full Metal Body'].includes(ability))return true;
+      return false;
+    });
+  }
+  hazardContradictionNote(state, hazard=''){
+    const label=this.normalizedHazardName(hazard);
+    const abilities=this.hazardAbilityContradictions(state,label);
+    if(!label||!abilities.length)return '';
+    if(label==='Toxic Spikes'){
+      return `Getting poisoned by Toxic Spikes rules out ${this.joinWithOr(abilities)} for the current ability state.`;
+    }
+    if(label==='Sticky Web'){
+      return `Triggering Sticky Web rules out ${this.joinWithOr(abilities)} for the current ability state.`;
+    }
+    return `Taking ${label} rules out ${this.joinWithOr(abilities)} for the current ability state.`;
+  }
+  abilityContradictionLabel(abilities=[], source=''){
+    const targets=unique((abilities||[]).filter(Boolean));
+    const cause=String(source||'').trim();
+    if(!targets.length)return '';
+    return cause?`${this.joinWithOr(targets)} contradicted by ${cause}`:`${this.joinWithOr(targets)} contradicted`;
   }
   normalizedHazardName(name=''){
     const raw=String(name||'').replace(/^move: /,'').trim();
@@ -914,6 +977,8 @@ class ReplayParser{
       repeatedDamagingMove:state.repeatedDamagingMove,
       revealedAbility:state.abilityHints.length===1?state.abilityHints[0]:undefined,
       abilityHints:state.abilityHints.slice(),
+      ruledOutAbilities:(state.ruledOutAbilities||[]).slice(),
+      abilityContradictionNotes:(state.abilityContradictionNotes||[]).slice(),
       movedFirst:obs.movedFirst??state.movedFirst,
       movedSecond:obs.movedSecond??state.movedSecond,
       speedContext:obs.speedContext?{...obs.speedContext}:(state.speedContext?{...state.speedContext}:null),
@@ -948,6 +1013,8 @@ class ReplayParser{
           repeatedDamagingMove:state.repeatedDamagingMove,
           revealedAbility:state.abilityHints.length===1?state.abilityHints[0]:undefined,
           abilityHints:state.abilityHints.slice(),
+          ruledOutAbilities:(state.ruledOutAbilities||[]).slice(),
+          abilityContradictionNotes:(state.abilityContradictionNotes||[]).slice(),
           movedFirst:obs.movedFirst??state.movedFirst,
           movedSecond:obs.movedSecond??state.movedSecond,
           speedContext:obs.speedContext?{...obs.speedContext}:(state.speedContext?{...state.speedContext}:null),
@@ -1074,12 +1141,14 @@ class ReplayParser{
         state.tookHazardDamage=true;
         this.addHazardEvent(state,turn,event.from);
         if(state.itemGone)this.addPostItemLossNote(state,this.hazardTimelineNote(state,event.from));
+        this.ruleOutAbilities(state,turn,this.hazardAbilityContradictions(state,event.from),this.hazardContradictionNote(state,event.from),this.abilityContradictionLabel(this.hazardAbilityContradictions(state,event.from),this.normalizedHazardName(event.from)));
         this.addEvidence(state,turn,'hazard',`${state.species} took hazard damage`,'Heavy-Duty Boots: IMPOSSIBLE',4,{hard:true});
         return;
       }
       const pct=this.pctFromFraction(event.damage);
       const moveEvent=[...this.turnMoves].reverse().find(x=>x.species&&state.slot!==x.slot);
       if(state.itemGone)this.addPostItemLossNote(state,this.groundTimelineNote(state,moveEvent?.move));
+      this.ruleOutAbilities(state,turn,this.moveBlockedAbilities(state,moveEvent?.move),this.moveContradictionNote(state,moveEvent?.move),this.abilityContradictionLabel(this.moveBlockedAbilities(state,moveEvent?.move),moveEvent?.move));
       if(pct!==null&&moveEvent){
         this.addEvidence(this.ensureState(moveEvent.slot),turn,'damage',`${moveEvent.species} dealt ${pct}% with ${moveEvent.move}`,'Damage-roll evidence available',1,{move:moveEvent.move,observedDamage:pct,evidenceType:'they_hit_me',targetSpecies:state.species});
         const attackerState=this.ensureState(moveEvent.slot);
@@ -1100,6 +1169,7 @@ class ReplayParser{
         state.tookHazardDamage=true;
         this.addHazardEvent(state,turn,hazard);
         if(state.itemGone)this.addPostItemLossNote(state,this.hazardTimelineNote(state,hazard));
+        this.ruleOutAbilities(state,turn,this.hazardAbilityContradictions(state,hazard),this.hazardContradictionNote(state,hazard),this.abilityContradictionLabel(this.hazardAbilityContradictions(state,hazard),hazard));
         this.addEvidence(state,turn,'hazard',`${state.species} was afflicted by Toxic Spikes`,'Heavy-Duty Boots: IMPOSSIBLE',4,{hard:true});
         return;
       }
@@ -1169,6 +1239,7 @@ class ReplayParser{
         state.tookHazardDamage=true;
         this.addHazardEvent(state,turn,hazard);
         if(state.itemGone)this.addPostItemLossNote(state,this.hazardTimelineNote(state,hazard));
+        this.ruleOutAbilities(state,turn,this.hazardAbilityContradictions(state,hazard),this.hazardContradictionNote(state,hazard),this.abilityContradictionLabel(this.hazardAbilityContradictions(state,hazard),hazard));
         this.addEvidence(state,turn,'hazard',`${state.species} triggered Sticky Web`,'Heavy-Duty Boots: IMPOSSIBLE',4,{hard:true});
         return;
       }
@@ -1253,6 +1324,7 @@ class ReplayParser{
           ...(state.historicalItemNotes||[]),
           ...(state.postItemLossNotes||[]),
           ...(state.postItemLossGroundNotes||[]),
+          ...(state.abilityContradictionNotes||[]),
           ...state.abilityHints.map(a=>{
             const reward=this.abilityRewardText(a);
             return reward?`${a} revealed (${reward})`:`${a} revealed`;
@@ -1276,6 +1348,8 @@ class ReplayParser{
           removedItem:state.removedItem||undefined,
           itemGone:state.itemGone,
           revealedAbility:state.abilityHints.length===1?state.abilityHints[0]:undefined,
+          ruledOutAbilities:(state.ruledOutAbilities||[]).slice(),
+          abilityContradictionNotes:(state.abilityContradictionNotes||[]).slice(),
           postItemLossProtectionRecovered:!!state.postItemLossProtectionRecovered,
           postItemLossNotes:(state.postItemLossNotes||[]).slice(),
           postItemLossGroundProtectionRecovered:!!state.postItemLossGroundProtectionRecovered,
@@ -2057,6 +2131,11 @@ function detectiveEvidenceNotes(input){
   if(input.revealedItem){notes.push(`${input.revealedItem} is already revealed, so non-${input.revealedItem} lines are dead.`); hardBlocks.push(`${input.revealedItem} confirmed`)}
   if(input.revealedAbility){notes.push(`${input.revealedAbility} is already revealed, so non-${input.revealedAbility} lines are dead.`); hardBlocks.push(`${input.revealedAbility} confirmed`)}
   else if((input.abilityHints||[]).length>1)notes.push(`Replay points toward ${input.abilityHints.join(' or ')}, but the exact ability is still not fully locked.`);
+  if((input.ruledOutAbilities||[]).length){
+    notes.push(`Replay also kills ${joinWithOr(input.ruledOutAbilities)} as live ability lines.`);
+    input.ruledOutAbilities.forEach(ability=>hardBlocks.push(`${ability} impossible`));
+  }
+  (input.abilityContradictionNotes||[]).forEach(note=>notes.push(note));
   const abilityReward=({
     'Water Absorb':'That also means Water attacks heal instead of damaging.',
     'Volt Absorb':'That also means Electric attacks heal instead of damaging.',
@@ -2135,6 +2214,13 @@ function detectiveSummary(top,input,notes){
   const conf=detectiveConfidence(top);
   const lead=top[0], itemLead=lead?`${lead.item} ${lead.nature} ${lead.profile}`:'no clean line';
   const isClueOnly=input.evidence==='clue_only'||input.observedDamage==null||!input.move;
+  if(!top.length){
+    return {
+      confidence:{label:'Blocked',reason:'the replay contradicted every modeled line, so the candidate pool needs a wider explanation'},
+      verdict:'Replay contradictions killed every modeled line in the current pool.',
+      notes:[...notes.hardBlocks,...notes.notes]
+    };
+  }
   const verdict=isClueOnly
     ? (conf.label==='High'
       ? `Best current read: ${itemLead}. The replay clues point strongly in one direction even without a damage roll.`
@@ -2169,6 +2255,7 @@ function buildDetectiveRead(input){
     if(input.revealedItem&&c.item===input.revealedItem){c.prob*=1.8;c.reasons.push(`hard anchor: revealed item is ${input.revealedItem}`)}
     if(input.revealedAbility&&c.ability!==input.revealedAbility){c.prob=0;c.eliminated=true;c.reasons.push(`hard rule-out: replay revealed ${input.revealedAbility}`)}
     if(input.revealedAbility&&c.ability===input.revealedAbility){c.prob*=1.8;c.reasons.push(`hard anchor: revealed ability is ${input.revealedAbility}`)}
+    if((input.ruledOutAbilities||[]).includes(c.ability)&&(!input.revealedAbility||c.ability!==input.revealedAbility)){c.prob=0;c.eliminated=true;c.reasons.push(`hard rule-out: replay contradicted ${c.ability}`)}
     if(input.repeatedDamagingMove&&['Choice Band','Choice Specs','Choice Scarf'].includes(c.item)){c.prob*=1.35;c.reasons.push('soft boost: repeated damage points toward a Choice item')}
     if(input.movedFirst&&(['Timid','Jolly'].includes(c.nature)||c.item==='Choice Scarf')){c.prob*=1.22;c.reasons.push('soft boost: speed clue supports fast lines')}
     const speedFit=detectiveSpeedFit(c,input);
@@ -2191,7 +2278,7 @@ function buildDetectiveRead(input){
   normC(cs);
   cs.sort((a,b)=>b.prob-a.prob);
   const live=cs.filter(c=>c.prob>0);
-  const top=(live.length?live:cs).slice(0,8), eliminated=cs.filter(c=>c.eliminated), summary=detectiveSummary(top,input,notes);
+  const top=live.slice(0,8), eliminated=cs.filter(c=>c.eliminated), summary=detectiveSummary(top,input,notes);
   return {
     input,
     summary,

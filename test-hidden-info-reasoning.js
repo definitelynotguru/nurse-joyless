@@ -1056,7 +1056,7 @@ const clefableMagicGuardRecoveryParser = vm.runInContext(`(() => {
   return parser.replayRead;
 })()`, context, { timeout: 10000 });
 const clefableMagicGuardRecoveryTarget = clefableMagicGuardRecoveryParser.targets.find(t => t.species === 'Clefable');
-assert(clefableMagicGuardRecoveryTarget?.detectiveInputs?.[0]?.postItemLossProtectionAbilities?.includes('Magic Guard'), 'offline replay reasoning should keep Magic Guard live when later Stealth Rock no-chip can explain the new state');
+assert(clefableMagicGuardRecoveryTarget?.ruledOutAbilities?.includes('Magic Guard'), 'taking Stealth Rock earlier should hard-rule out Magic Guard even if later protection returns');
 
 vm.runInContext(
   `team=[
@@ -1068,7 +1068,65 @@ vm.runInContext(
   { timeout: 10000 }
 );
 const clefableMagicGuardRecoveryRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
-assert(clefableMagicGuardRecoveryRead.summary.notes.some(x => /Magic Guard/i.test(x)), 'offline replay reads should explain that Magic Guard stays live after post-loss Stealth Rock immunity');
-assert(clefableMagicGuardRecoveryRead.abilityRows[0][0] === 'Magic Guard', 'offline replay reads should let Magic Guard lead the ability ranking when it fits the later hazard immunity');
+assert(clefableMagicGuardRecoveryRead.summary.notes.some(x => /Magic Guard impossible/i.test(x)), 'offline replay reads should surface Magic Guard as contradicted after earlier Stealth Rock chip');
+assert(!clefableMagicGuardRecoveryRead.abilityRows.some(([name]) => name === 'Magic Guard'), 'offline replay reads should remove Magic Guard after earlier Stealth Rock chip proves it impossible');
+
+const hydreigonSpikesLog = '|turn|1\n|-sidestart|p2: Hydreigon|move: Spikes\n|switch|p2a: Hydreigon|Hydreigon, L80\n|-damage|p2a: Hydreigon|88/100|[from] Spikes';
+const hydreigonSpikesParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(hydreigonSpikesLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const hydreigonSpikesTarget = hydreigonSpikesParser.targets.find(t => t.species === 'Hydreigon');
+assert(hydreigonSpikesTarget?.ruledOutAbilities?.includes('Levitate'), 'taking Spikes should hard-rule out Levitate for grounded current-state reads');
+assert(hydreigonSpikesTarget?.notes?.some(note => /Taking Spikes rules out Levitate/i.test(note)), 'taking Spikes should explain why Levitate is impossible');
+
+vm.runInContext(
+  `lastDetectiveRead = buildDetectiveRead(${JSON.stringify(hydreigonSpikesTarget.detectiveInputs[0])});`,
+  context,
+  { timeout: 10000 }
+);
+const hydreigonSpikesRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(!hydreigonSpikesRead.abilityRows.some(([name]) => name === 'Levitate'), 'taking Spikes should remove Levitate from the live detective pool');
+assert(hydreigonSpikesRead.summary.notes.some(x => /Levitate/i.test(x)), 'taking Spikes should surface Levitate as a hard ability contradiction');
+
+const clefableRocksLog = '|turn|1\n|-sidestart|p2: Clefable|move: Stealth Rock\n|switch|p2a: Clefable|Clefable, L80\n|-damage|p2a: Clefable|88/100|[from] Stealth Rock';
+const clefableRocksParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(clefableRocksLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const clefableRocksTarget = clefableRocksParser.targets.find(t => t.species === 'Clefable');
+assert(clefableRocksTarget?.ruledOutAbilities?.includes('Magic Guard'), 'taking Stealth Rock should hard-rule out Magic Guard');
+assert(clefableRocksTarget?.notes?.some(note => /Taking Stealth Rock rules out Magic Guard/i.test(note)), 'taking Stealth Rock should explain why Magic Guard is impossible');
+
+vm.runInContext(
+  `lastDetectiveRead = buildDetectiveRead(${JSON.stringify(clefableRocksTarget.detectiveInputs[0])});`,
+  context,
+  { timeout: 10000 }
+);
+const clefableRocksRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(!clefableRocksRead.abilityRows.some(([name]) => name === 'Magic Guard'), 'taking Stealth Rock should remove Magic Guard from the live detective pool');
+
+const heatranFireHitLog = '|turn|1\n|switch|p1a: Volcarona|Volcarona, L80\n|switch|p2a: Heatran|Heatran, L80\n|move|p1a: Volcarona|Flamethrower|p2a: Heatran\n|-damage|p2a: Heatran|72/100';
+const heatranFireHitParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(heatranFireHitLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const heatranFireHitTarget = heatranFireHitParser.targets.find(t => t.species === 'Heatran');
+assert(heatranFireHitTarget?.ruledOutAbilities?.includes('Flash Fire'), 'taking Flamethrower should hard-rule out Flash Fire');
+assert(heatranFireHitTarget?.notes?.some(note => /Taking Flamethrower rules out Flash Fire/i.test(note)), 'taking Flamethrower should explain why Flash Fire is impossible');
+
+vm.runInContext(
+  `lastDetectiveRead = buildDetectiveRead({
+    ...${JSON.stringify(heatranFireHitTarget.detectiveInputs[0])},
+    user: preset("Volcarona","Heavy-Duty Boots","Timid",{hp:0,atk:0,def:4,spa:252,spd:0,spe:252},["Flamethrower","Bug Buzz","Quiver Dance","Roost"])
+  });`,
+  context,
+  { timeout: 10000 }
+);
+const heatranFireHitRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(!heatranFireHitRead.abilityRows.some(([name]) => name === 'Flash Fire'), 'taking Flamethrower should remove Flash Fire from the live detective pool');
 
 console.log('[OK] hidden info detective reasoning passed');
