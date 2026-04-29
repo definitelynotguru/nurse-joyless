@@ -1,8 +1,9 @@
 (function(){
   const root=typeof window!=='undefined'?window:globalThis;
-  const legacyDmg=root.dmg;
-  const legacyGetAgentFacts=root.getAgentFacts;
-  const doc=(root.document||(typeof document!=='undefined'?document:null));
+  const host=typeof globalThis!=='undefined'?globalThis:root;
+  const legacyDmg=root.dmg||host.dmg;
+  const legacyGetAgentFacts=root.getAgentFacts||host.getAgentFacts;
+  const doc=(root.document||host.document||(typeof document!=='undefined'?document:null));
   const byId=id=>doc?.getElementById?.(id);
   const safeHtml=typeof html==='function'?html:(s=>String(s??''));
   const legacyNHitChance=typeof root.nHitChance==='function'?root.nHitChance:null;
@@ -14,6 +15,7 @@
     const legacyProtect=['reflect','screen','auroraveil'].includes(legacyField)?legacyField:'none';
     const state={
       weather:String(opt.weather||((legacyField==='rain'||legacyField==='sun')?legacyField:'none')||'none'),
+      terrain:String(opt.terrain||'none'),
       helpingHand:!!opt.helpingHand,
       attackerProtect:String(opt.attackerProtect||'none'),
       defenderProtect:String(opt.defenderProtect||'none'),
@@ -21,6 +23,8 @@
       attackerBulkStage:clampStage(opt.attackerBulkStage),
       defenderOffenseStage:clampStage(opt.defenderOffenseStage),
       defenderBulkStage:clampStage(opt.defenderBulkStage),
+      attackerStatus:String(opt.attackerStatus||'none'),
+      criticalHit:!!opt.criticalHit,
       extraEndSteps:Math.max(0,Math.min(3,Math.trunc(Number(opt.extraEndSteps)||0))),
       defenderEndStepDamagePct:Math.max(0,Math.min(100,Number(opt.defenderEndStepDamagePct)||0))
     };
@@ -31,6 +35,7 @@
     const battle=normalizeBattleState(state);
     return {
       weather:battle.weather,
+      terrain:battle.terrain,
       helpingHand:false,
       attackerProtect:battle.defenderProtect,
       defenderProtect:battle.attackerProtect,
@@ -38,17 +43,22 @@
       attackerBulkStage:battle.defenderBulkStage,
       defenderOffenseStage:battle.attackerOffenseStage,
       defenderBulkStage:battle.attackerBulkStage,
+      attackerStatus:'none',
+      criticalHit:false,
       extraEndSteps:0,
       defenderEndStepDamagePct:0
     };
   }
   function protectionLabel(protect=''){return({reflect:'Reflect',screen:'Light Screen',auroraveil:'Aurora Veil'})[protect]||''}
+  function terrainLabel(terrain=''){return({electric:'Electric Terrain',grassy:'Grassy Terrain',psychic:'Psychic Terrain',misty:'Misty Terrain'})[terrain]||''}
+  function statusLabel(status=''){return({burn:'Burned',poison:'Poisoned',toxic:'Badly poisoned',paralysis:'Paralyzed'})[status]||''}
   function signedStage(n,label){const v=clampStage(n);return v?`${v>0?'+':''}${v} ${label}`:''}
   function battleStateSummary(state={}){
     const battle=normalizeBattleState(state);
     const parts=[];
     if(battle.weather==='rain')parts.push('Rain');
     if(battle.weather==='sun')parts.push('Sun');
+    if(battle.terrain!=='none')parts.push(terrainLabel(battle.terrain));
     if(battle.helpingHand)parts.push('Helping Hand');
     if(battle.attackerProtect!=='none')parts.push(`attacker ${protectionLabel(battle.attackerProtect)}`);
     if(battle.defenderProtect!=='none')parts.push(`defender ${protectionLabel(battle.defenderProtect)}`);
@@ -56,6 +66,8 @@
     if(battle.attackerBulkStage)parts.push(`attacker ${signedStage(battle.attackerBulkStage,'bulk')}`);
     if(battle.defenderOffenseStage)parts.push(`defender ${signedStage(battle.defenderOffenseStage,'offense')}`);
     if(battle.defenderBulkStage)parts.push(`defender ${signedStage(battle.defenderBulkStage,'bulk')}`);
+    if(battle.attackerStatus!=='none')parts.push(`attacker ${statusLabel(battle.attackerStatus)}`);
+    if(battle.criticalHit)parts.push('critical hit');
     if(battle.extraEndSteps)parts.push(`${battle.extraEndSteps} extra end step${battle.extraEndSteps===1?'':'s'}`);
     if(battle.defenderEndStepDamagePct)parts.push(`defender loses ${battle.defenderEndStepDamagePct}% each end step`);
     return parts.length?parts.join(' • '):'Neutral';
@@ -64,6 +76,7 @@
     return normalizeBattleState({
       field:byId('field')?.value||'none',
       weather:byId('weather')?.value||'none',
+      terrain:byId('terrain')?.value||'none',
       helpingHand:byId('helpingHand')?.checked,
       attackerProtect:byId('attackerProtect')?.value||'none',
       defenderProtect:byId('defenderProtect')?.value||'none',
@@ -71,6 +84,8 @@
       attackerBulkStage:byId('attackerBulkStage')?.value||0,
       defenderOffenseStage:byId('defenderOffenseStage')?.value||0,
       defenderBulkStage:byId('defenderBulkStage')?.value||0,
+      attackerStatus:byId('attackerStatus')?.value||'none',
+      criticalHit:byId('criticalHit')?.checked,
       extraEndSteps:byId('extraEndSteps')?.value||0,
       defenderEndStepDamagePct:byId('defenderEndStepDamagePct')?.value||0
     });
@@ -91,15 +106,25 @@
   root.battleStateSummary=battleStateSummary;
   root.readKoBattleState=readKoBattleState;
   root.setStageOptions=setStageOptions;
+  if(host!==root){
+    host.clampStage=clampStage;
+    host.stageMultiplier=stageMultiplier;
+    host.normalizeBattleState=normalizeBattleState;
+    host.swapBattleState=swapBattleState;
+    host.battleStateSummary=battleStateSummary;
+    host.readKoBattleState=readKoBattleState;
+    host.setStageOptions=setStageOptions;
+  }
   root.nHitChance=function patchedNHitChance(r,hits){
     const battle=r?.battleState||{};
     const extraEndSteps=Math.max(0,Number(battle.extraEndSteps)||0);
     const endStepsPerGap=1+extraEndSteps;
     const leftoversPerTick=r.def.item==='Leftovers'?Math.floor(r.max/16):0;
+    const grassyRecoveryPerTick=battle.terrain==='grassy'&&grounded(r.def)?Math.floor(r.max/16):0;
     const passiveChipPct=Math.max(0,Number(battle.defenderEndStepDamagePct)||0);
     const passiveChipPerTick=passiveChipPct?Math.floor(r.max*passiveChipPct/100):0;
     const gaps=Math.max(0,hits-1);
-    const threshold=Math.max(1,r.ehp+(leftoversPerTick*endStepsPerGap*gaps)-(passiveChipPerTick*endStepsPerGap*gaps));
+    const threshold=Math.max(1,r.ehp+((leftoversPerTick+grassyRecoveryPerTick)*endStepsPerGap*gaps)-(passiveChipPerTick*endStepsPerGap*gaps));
     let sums={0:1};
     for(let i=0;i<hits;i++){
       const next={};
@@ -113,6 +138,8 @@
     const success=Object.entries(sums).reduce((a,[s,c])=>a+(+s>=threshold?c:0),0);
     return success/total*(r.hit**hits);
   };
+  if(host!==root)host.nHitChance=root.nHitChance;
+  try{nHitChance=root.nHitChance}catch(e){}
 
   root.dmg=function dmgWithBattleState(att,def,mv,opt={}){
     const m=moveData(mv);
@@ -128,19 +155,26 @@
     let D=cat==='Physical'?sd.def:sd.spd;
     if(m[5]==='def')A=sa.def;
     if(m[5]==='targetDef')D=sd.def;
-    A*=stageMultiplier(m[5]==='def'?battle.attackerBulkStage:battle.attackerOffenseStage);
-    D*=stageMultiplier(battle.defenderBulkStage);
+    const attackerOffenseStage=battle.criticalHit?Math.max(0,m[5]==='def'?battle.attackerBulkStage:battle.attackerOffenseStage):(m[5]==='def'?battle.attackerBulkStage:battle.attackerOffenseStage);
+    const defenderBulkStage=battle.criticalHit?Math.min(0,battle.defenderBulkStage):battle.defenderBulkStage;
+    A*=stageMultiplier(attackerOffenseStage);
+    D*=stageMultiplier(defenderBulkStage);
     const ai=opt.attOver?.item||aa.item;
     const di=opt.defOver?.item||dd.item;
     if(cat==='Physical'&&ai==='Choice Band')A*=1.5;
     if(cat==='Special'&&ai==='Choice Specs')A*=1.5;
     if(cat==='Special'&&di==='Assault Vest')D*=1.5;
     let bp=m[2];
+    const moveId=DexAdapter.id(mv);
     if(DexAdapter.id(mv)==='weatherball'&&(battle.weather==='sun'||battle.weather==='rain'))bp=100;
-    const base=Math.floor(Math.floor(Math.floor((2*(aa.level||100)/5+2)*bp*A/D)/50)+2);
     let moveType=m[0];
-    if(DexAdapter.id(mv)==='weatherball'&&battle.weather==='sun')moveType='Fire';
-    if(DexAdapter.id(mv)==='weatherball'&&battle.weather==='rain')moveType='Water';
+    if(moveId==='weatherball'&&battle.weather==='sun')moveType='Fire';
+    if(moveId==='weatherball'&&battle.weather==='rain')moveType='Water';
+    const attackerGrounded=grounded(aa);
+    const defenderGrounded=grounded(dd);
+    if(moveId==='facade'&&battle.attackerStatus!=='none')bp*=2;
+    if(battle.terrain==='grassy'&&defenderGrounded&&['earthquake','bulldoze','magnitude'].includes(moveId))bp*=0.5;
+    const base=Math.floor(Math.floor(Math.floor((2*(aa.level||100)/5+2)*bp*A/D)/50)+2);
     const atkTypes=opt.attackerTera?[opt.attackerTeraType||aa.tera||types(aa)[0]]:types(aa);
     const defTypes=opt.defenderTera?[opt.defenderTeraType||dd.tera||types(dd)[0]]:types(dd);
     const blockedBy=moveBlockingAbility(moveType,cat,dd.ability);
@@ -152,13 +186,20 @@
     if(ai==='Expert Belt'&&eff>1)mod*=1.2;
     if(ai==='Black Glasses'&&moveType==='Dark')mod*=1.2;
     if(ai==='Charcoal'&&moveType==='Fire')mod*=1.2;
+    if(cat==='Physical'&&battle.attackerStatus==='burn'&&aa.ability!=='Guts')mod*=0.5;
+    if(cat==='Physical'&&battle.attackerStatus!=='none'&&aa.ability==='Guts')mod*=1.5;
     if(aa.ability==='Solar Power'&&battle.weather==='sun'&&cat==='Special')mod*=1.5;
     if(battle.weather==='rain'&&moveType==='Water')mod*=1.5;
     if(battle.weather==='rain'&&moveType==='Fire')mod*=0.5;
     if(battle.weather==='sun'&&moveType==='Fire')mod*=1.5;
     if(battle.weather==='sun'&&moveType==='Water')mod*=0.5;
+    if(battle.terrain==='electric'&&attackerGrounded&&moveType==='Electric')mod*=1.3;
+    if(battle.terrain==='grassy'&&attackerGrounded&&moveType==='Grass')mod*=1.3;
+    if(battle.terrain==='psychic'&&attackerGrounded&&moveType==='Psychic')mod*=1.3;
+    if(battle.terrain==='misty'&&defenderGrounded&&moveType==='Dragon')mod*=0.5;
     if((battle.defenderProtect==='reflect'||battle.defenderProtect==='auroraveil')&&cat==='Physical')mod*=0.5;
     if((battle.defenderProtect==='screen'||battle.defenderProtect==='auroraveil')&&cat==='Special')mod*=0.5;
+    if(battle.criticalHit)mod*=1.5;
     const rolls=[];
     if(blockedBy)for(let i=0;i<16;i++)rolls.push(0);
     else for(let r=85;r<=100;r++)rolls.push(Math.max(1,Math.floor(base*mod*r/100)));
@@ -171,6 +212,8 @@
     const chanceN=(n=2)=>{let combos=[0];for(let i=0;i<n;i++){let next=[];for(const c of combos)for(const r of rolls)next.push(c+r);combos=next}return combos.filter(x=>x>=ehp).length/combos.length*Math.pow(hit,n)};
     return {att:aa,def:dd,mv,move:m,rolls,max,ehp,hz,min:Math.min(...rolls),maxd:Math.max(...rolls),minp:Math.min(...rolls)/max*100,maxp:Math.max(...rolls)/max*100,ko,two:chanceN(2),three:chanceN(3),eff,hit,moveType,blockedBy,battleState:battle};
   };
+  if(host!==root)host.dmg=root.dmg;
+  try{dmg=root.dmg}catch(e){}
 
   root.renderKo=function renderKoWithBattleState(){
     try{
@@ -203,6 +246,8 @@
       byId('ko').textContent=e.message;
     }
   };
+  if(host!==root)host.renderKo=root.renderKo;
+  try{renderKo=root.renderKo}catch(e){}
 
   root.getAgentFacts=function patchedGetAgentFacts(agent){
     const facts=legacyGetAgentFacts?legacyGetAgentFacts(agent):{};
@@ -233,6 +278,8 @@
     }
     return facts;
   };
+  if(host!==root)host.getAgentFacts=root.getAgentFacts;
+  try{getAgentFacts=root.getAgentFacts}catch(e){}
 
   if(typeof document!=='undefined'){
     const bindKoUpgrade=()=>{
