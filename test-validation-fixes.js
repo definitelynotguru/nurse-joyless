@@ -1,11 +1,6 @@
 const fs = require('fs');
-const vm = require('vm');
 const path = require('path');
-
-const source = [
-  fs.readFileSync(path.join(__dirname, 'src/app.js'), 'utf8'),
-  fs.readFileSync(path.join(__dirname, 'src/validation-fixes.js'), 'utf8'),
-].join('\n');
+const vm = require('vm');
 
 function makeFakeElement(value = '') {
   return {
@@ -18,7 +13,6 @@ function makeFakeElement(value = '') {
     _items: [],
     options: [],
     onclick: null,
-    onchange: null,
     style: {},
     dataset: {},
     classList: { add(){}, remove(){}, toggle(){} },
@@ -28,6 +22,7 @@ function makeFakeElement(value = '') {
     appendChild(){},
     click(){},
     closest(){ return null; },
+    getBoundingClientRect(){ return { top: 999 }; },
   };
 }
 
@@ -36,116 +31,144 @@ const context = {
   console,
   setTimeout(fn){ if (typeof fn === 'function') fn(); return 0; },
   clearTimeout(){},
+  TextDecoder,
   alert(){},
-  localStorage: { getItem(){ return null; }, setItem(){} },
+  localStorage: { getItem(){ return ''; }, setItem(){} },
   navigator: { clipboard: { writeText(){ return Promise.resolve(); } } },
   document: {
     addEventListener(){},
     getElementById(id) { if (!elements[id]) elements[id] = makeFakeElement(); return elements[id]; },
-    querySelectorAll() { return []; },
-    querySelector() { return null; },
-    createElement() { return makeFakeElement(); },
+    querySelectorAll(){ return []; },
+    querySelector(){ return null; },
+    createElement(){ return makeFakeElement(); },
   },
-  window: { addEventListener(){} },
+  window: null,
   URL: { createObjectURL(){ return 'blob:test'; }, revokeObjectURL(){} },
   Blob: function Blob(){},
   fetch: async () => { throw new Error('offline'); },
 };
 context.window = context;
+context.addEventListener = function(){};
 
-const teamText = `Pecharunt @ Heavy-Duty Boots
-Ability: Poison Puppeteer
-Tera Type: Fairy
-EVs: 112 HP / 144 SpA / 252 Spe
-Timid Nature
-IVs: 0 Atk
-- Malignant Chain
-- Shadow Ball
-- Nasty Plot
-- Recover
+vm.createContext(context);
+const source = [
+  fs.readFileSync(path.join(__dirname, 'src/app.js'), 'utf8'),
+  fs.readFileSync(path.join(__dirname, 'src/validation-fixes.js'), 'utf8'),
+].join('\n');
+vm.runInContext(source, context, { filename: 'validation-runtime.js', timeout: 10000 });
 
-Kingambit (F) @ Leftovers
+function assert(cond, msg) {
+  if (!cond) throw new Error(msg);
+}
+
+const TEAM = `Queenmaker (Kingambit) (F) @ Leftovers
 Ability: Supreme Overlord
-Tera Type: Fighting
-EVs: 4 HP / 252 Atk / 252 Spe
-Jolly Nature
+Tera Type: Dark
+EVs: 252 HP / 252 Atk / 4 SpD
+Adamant Nature
+- Kowtow Cleave
+- Sucker Punch
 - Iron Head
 - Low Kick
-- Sucker Punch
-- Swords Dance
 
-Volcanion @ Leftovers
+Volcanion @ Heavy-Duty Boots
 Ability: Water Absorb
-Tera Type: Poison
-EVs: 248 HP / 68 Def / 8 SpA / 184 Spe
+Tera Type: Stellar
+EVs: 248 HP / 252 SpA / 8 SpD
 Modest Nature
-IVs: 0 Atk
 - Steam Eruption
 - Flamethrower
 - Taunt
-- Will-O-Wisp
+- Protect
+
+Deoxys-Speed @ Life Orb
+Ability: Pressure
+Tera Type: Psychic
+EVs: 4 Def / 252 SpA / 252 Spe
+Timid Nature
+IVs: 0 Atk
+- Psycho Boost
+- Superpower
+- Taunt
+- Shadow Ball
 
 Iron Valiant @ Booster Energy
 Ability: Quark Drive
-Tera Type: Stellar
-EVs: 252 Atk / 4 SpA / 252 Spe
+Tera Type: Fairy
+EVs: 4 Atk / 252 SpA / 252 Spe
 Naive Nature
-- Close Combat
-- Knock Off
 - Moonblast
+- Close Combat
 - Encore
+- Knock Off
 
-Landorus-Therian @ Rocky Helmet
+Iron Treads @ Leftovers
+Ability: Quark Drive
+Tera Type: Ghost
+EVs: 252 Atk / 4 SpD / 252 Spe
+Jolly Nature
+- Stealth Rock
+- Earthquake
+- Knock Off
+- Rapid Spin
+
+Landorus-Therian @ Choice Scarf
 Ability: Intimidate
-Tera Type: Water
-EVs: 248 HP / 24 Def / 4 SpD / 232 Spe
+Tera Type: Flying
+EVs: 252 Atk / 4 Def / 252 Spe
 Jolly Nature
 - Earthquake
 - U-turn
-- Stealth Rock
-- Taunt
+- Stone Edge
+- Taunt`;
 
-Deoxys-Speed @ Eject Pack
-Ability: Pressure
-Tera Type: Fighting
-EVs: 200 Atk / 252 SpA / 56 Spe
-Naive Nature
-- Psycho Boost
-- Superpower
-- Knock Off
-- Spikes`;
+const parsedTeam = vm.runInContext(`parseTeam(${JSON.stringify(TEAM)})`, context, { timeout: 10000 });
+assert(parsedTeam.length === 6, 'expected all six sets to parse');
+assert(parsedTeam[0].species === 'Kingambit', 'gender tags should not replace the species name');
+assert(parsedTeam[0].item === 'Leftovers', 'gender-tag parsing should preserve the item');
+assert(parsedTeam[1].species === 'Volcanion', 'Volcanion should resolve through fallback species data');
+assert(parsedTeam[1].tera === 'Stellar', 'Stellar should be preserved through team parsing');
 
-const tests = String.raw`
-(function(){
-  function assert(cond, msg){ if(!cond) throw new Error(msg); }
-  const parsed = parseTeam(${JSON.stringify(teamText)});
-  assert(parsed.length === 6, 'team should parse into 6 members');
-  assert(parsed[1].species === 'Kingambit', 'gender marker (F) should not become species F');
-  assert(parsed[2].species === 'Volcanion', 'Volcanion should resolve through fallback data');
-  assert(parsed[5].species === 'Deoxys-Speed', 'Deoxys-Speed should resolve through fallback data');
-  assert(moveData('Low Kick'), 'Low Kick should be recognized');
-  assert(moveData('Steam Eruption'), 'Steam Eruption should be recognized');
-  assert(moveData('Taunt'), 'Taunt should be recognized by validation, not only replay hints');
-  assert(moveData('Psycho Boost'), 'Psycho Boost should be recognized');
-  assert(moveData('Superpower'), 'Superpower should be recognized');
+const validationRows = vm.runInContext(`validateTeamAdvanced(parseTeam(${JSON.stringify(TEAM)}))`, context, { timeout: 10000 });
+assert(validationRows.length === 6, 'validator should return one row per parsed set');
+validationRows.forEach(row => {
+  assert(row.status !== 'invalid', `${row.species} should not be marked invalid by fallback validator gaps`);
+  assert(!row.issues.some(issue => /unknown move/i.test(issue)), `${row.species} should not report unknown moves`);
+  assert(!row.issues.some(issue => /invalid tera type/i.test(issue)), `${row.species} should not report an invalid Tera type here`);
+  assert(!row.warnings.some(issue => /unknown or unsupported form/i.test(issue)), `${row.species} should not warn that a patched fallback species is unsupported`);
+  assert(!row.warnings.some(issue => /ability data unavailable/i.test(issue)), `${row.species} should not lose ability validation once fallback data is applied`);
+});
 
-  const rows = validateTeamAdvanced(parsed);
-  assert(Array.isArray(rows) && rows.length === 6, 'validation should return 6 rows');
-  const byName = Object.fromEntries(rows.map(row => [(row.mon?.species || row.species || row.name), row]));
-  assert(byName.Kingambit, 'validation should contain Kingambit, not F');
-  assert(!byName.F, 'validation must not create a fake F species row');
-  const rendered = JSON.stringify(rows);
-  ['unknown move: Low Kick','unknown move: Steam Eruption','unknown move: Taunt','unknown move: Psycho Boost','unknown move: Superpower','unknown or unsupported form','Ability data unavailable','invalid Tera type'].forEach(text => {
-    assert(!rendered.toLowerCase().includes(text.toLowerCase()), 'validation still contains false issue: ' + text);
-  });
-  ['Pecharunt','Kingambit','Volcanion','Iron Valiant','Landorus-Therian','Deoxys-Speed'].forEach(name => {
-    const row = byName[name];
-    assert(row, 'missing validation row for ' + name);
-    assert(String(row.status).toUpperCase() !== 'INVALID', name + ' should not be hard-invalid from local fallback gaps');
-  });
-  assert(NURSE_JOYLESS_VALIDATION_FIXES === true, 'validation fixes flag missing');
-  console.log('[OK] validation fixes regression passed');
-})();
-`;
+const volcanionRow = validationRows.find(row => row.species === 'Volcanion');
+assert(volcanionRow, 'Volcanion should stay present in the validation output');
 
-vm.runInNewContext(source + '\n' + tests, context, { timeout: 5000 });
+const ironValiantRow = validationRows.find(row => row.species === 'Iron Valiant');
+assert(ironValiantRow, 'Iron Valiant should stay present in the validation output');
+
+const rowSummary = JSON.stringify(validationRows);
+[
+  'unknown move: low kick',
+  'unknown move: steam eruption',
+  'unknown move: taunt',
+  'unknown move: psycho boost',
+  'unknown move: superpower',
+  'unknown or unsupported form',
+  'ability data unavailable',
+  'invalid tera type',
+].forEach(fragment => {
+  assert(!rowSummary.toLowerCase().includes(fragment), `validation output should not include false fallback gap text: ${fragment}`);
+});
+
+const dexChecks = vm.runInContext(`({
+  volcanion: !!DexAdapter.getSpecies('Volcanion'),
+  deoxysSpeed: !!DexAdapter.getSpecies('Deoxys-Speed'),
+  steamEruption: !!moveData('Steam Eruption'),
+  superpower: !!moveData('Superpower'),
+  lowKick: !!moveData('Low Kick'),
+  taunt: !!moveData('Taunt')
+})`, context, { timeout: 10000 });
+assert(Object.values(dexChecks).every(Boolean), 'fallback species and move tables should include the validator regression data');
+
+assert(vm.runInContext(`Boolean(NURSE_JOYLESS_VALIDATION_FIXES)`, context, { timeout: 10000 }), 'validation runtime fix flag should be set');
+
+console.log('[OK] validation fixes passed');
