@@ -86,6 +86,17 @@ assert(goodAsGoldTauntStartTarget?.ruledOutAbilities?.includes('Good as Gold'), 
 assert(goodAsGoldTauntStartTarget?.notes?.some(note => /Taunt successfully landed/i.test(note)), 'landed start effects should explain the successful-status contradiction in replay notes');
 assert(goodAsGoldTauntStartTarget?.detectiveInputs?.[0]?.label === 'Taunt landed', 'landed start effects should stay loadable as replay detective clues');
 
+const goodAsGoldThunderWaveStatusLog = '|turn|1\n|switch|p1a: Dragapult|Dragapult, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|move|p1a: Dragapult|Thunder Wave|p2a: Gholdengo\n|-status|p2a: Gholdengo|par';
+const goodAsGoldThunderWaveStatusParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(goodAsGoldThunderWaveStatusLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const goodAsGoldThunderWaveStatusTarget = goodAsGoldThunderWaveStatusParser.strongest;
+assert(goodAsGoldThunderWaveStatusTarget?.ruledOutAbilities?.includes('Good as Gold'), 'successful status application should rule out Good as Gold when the move actually connected');
+assert(goodAsGoldThunderWaveStatusTarget?.notes?.some(note => /Thunder Wave successfully landed/i.test(note)), 'successful status application should explain the landed-status contradiction in replay notes');
+assert(goodAsGoldThunderWaveStatusTarget?.detectiveInputs?.[0]?.label === 'Thunder Wave landed', 'successful status application should stay detective-loadable with the landed move name');
+
 const goodAsGoldConfuseRayLog = '|turn|1\n|switch|p1a: Flutter Mane|Flutter Mane, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|move|p1a: Flutter Mane|Confuse Ray|p2a: Gholdengo\n|-start|p2a: Gholdengo|confusion';
 const goodAsGoldConfuseRayParser = vm.runInContext(`(() => {
   const parser = new ReplayParser();
@@ -120,5 +131,15 @@ vm.runInContext(
 const leechSeedStartRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
 assert(leechSeedStartRead.summary.confidence.label === 'Blocked', 'landed Leech Seed contradictions should surface that every modeled Gholdengo line is dead');
 assert(leechSeedStartRead.summary.notes.some(x => /Good as Gold impossible/.test(x)), 'landed Leech Seed contradictions should surface Good as Gold elimination in detective notes');
+
+const nuzzleStatusLog = '|turn|1\n|switch|p1a: Dragapult|Dragapult, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|move|p1a: Dragapult|Nuzzle|p2a: Gholdengo\n|-damage|p2a: Gholdengo|92/100\n|-status|p2a: Gholdengo|par';
+const nuzzleStatusParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(nuzzleStatusLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const nuzzleStatusTarget = nuzzleStatusParser.strongest;
+assert(!nuzzleStatusTarget?.ruledOutAbilities?.includes('Good as Gold'), 'damaging status riders like Nuzzle should not fake a Good as Gold contradiction');
+assert(!nuzzleStatusTarget?.notes?.some(note => /Nuzzle successfully landed/i.test(note)), 'damaging status riders should not be mislabeled as landed status-move contradictions');
 
 console.log('[OK] replay ability upgrades passed');
