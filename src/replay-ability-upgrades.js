@@ -138,8 +138,7 @@
         if(hazards.length)remaining.push({...check,hazards});
         return;
       }
-      const state=this.speciesState[check.key];
-      (check.hazards||[]).forEach(hazard=>this.markPostItemLossProtection(state,hazard));
+      remaining.push(check);
     });
     this.pendingEntryChecks=remaining;
   };
