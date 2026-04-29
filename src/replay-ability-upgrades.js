@@ -13,6 +13,28 @@
     return String(effect||'').replace(/^move: /,'').trim();
   };
 
+  proto.knownStatusStartMove=function knownStatusStartMove(move=''){
+    return [
+      'Attract',
+      'Confuse Ray',
+      'Disable',
+      'Embargo',
+      'Encore',
+      'Flatter',
+      'Gastro Acid',
+      'Haze',
+      'Heal Block',
+      'Leech Seed',
+      'Memento',
+      'Parting Shot',
+      'Supersonic',
+      'Swagger',
+      'Taunt',
+      'Torment',
+      'Yawn'
+    ].includes(String(move||'').trim());
+  };
+
   proto.startEffectMove=function startEffectMove(event={}, moveEvent=null){
     const raw=String(event?.raw||'');
     const parts=raw?raw.split('|').filter(Boolean):[];
@@ -22,6 +44,8 @@
     const fromMove=from.match(/^move: (.+)$/)?.[1]||'';
     if(effect&&fromMove&&DexAdapter.id(effect)===DexAdapter.id(fromMove))return fromMove;
     if(effect&&moveEvent?.move&&DexAdapter.id(effect)===DexAdapter.id(moveEvent.move))return moveEvent.move;
+    const moveCategory=moveMeta(moveEvent?.move)?.[1]||'';
+    if(moveEvent?.move&&(moveCategory==='Status'||this.knownStatusStartMove(moveEvent.move)))return moveEvent.move;
     return '';
   };
 
