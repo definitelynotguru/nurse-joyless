@@ -108,6 +108,16 @@ assert(goodAsGoldConfuseRayTarget?.ruledOutAbilities?.includes('Good as Gold'), 
 assert(goodAsGoldConfuseRayTarget?.notes?.some(note => /Confuse Ray successfully landed/i.test(note)), 'landed alias effects should explain the underlying status-move contradiction in replay notes');
 assert(goodAsGoldConfuseRayTarget?.detectiveInputs?.[0]?.label === 'Confuse Ray landed', 'landed alias effects should stay detective-loadable with the actual move name');
 
+const magicBounceTauntStartLog = '|turn|1\n|switch|p1a: Grimmsnarl|Grimmsnarl, L80\n|switch|p2a: Hatterene|Hatterene, L80\n|move|p1a: Grimmsnarl|Taunt|p2a: Hatterene\n|-start|p2a: Hatterene|move: Taunt';
+const magicBounceTauntStartParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(magicBounceTauntStartLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const magicBounceTauntStartTarget = magicBounceTauntStartParser.strongest;
+assert(magicBounceTauntStartTarget?.ruledOutAbilities?.includes('Magic Bounce'), 'landed reflected-status effects should rule out Magic Bounce when the move actually connected');
+assert(magicBounceTauntStartTarget?.notes?.some(note => /Taunt successfully landed/i.test(note)), 'landed reflected-status effects should explain the Magic Bounce contradiction in replay notes');
+
 const leechSeedStartLog = '|turn|1\n|switch|p1a: Ferrothorn|Ferrothorn, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|move|p1a: Ferrothorn|Leech Seed|p2a: Gholdengo\n|-start|p2a: Gholdengo|move: Leech Seed';
 const leechSeedStartParser = vm.runInContext(`(() => {
   const parser = new ReplayParser();
@@ -141,6 +151,52 @@ const nuzzleStatusParser = vm.runInContext(`(() => {
 const nuzzleStatusTarget = nuzzleStatusParser.strongest;
 assert(!nuzzleStatusTarget?.ruledOutAbilities?.includes('Good as Gold'), 'damaging status riders like Nuzzle should not fake a Good as Gold contradiction');
 assert(!nuzzleStatusTarget?.notes?.some(note => /Nuzzle successfully landed/i.test(note)), 'damaging status riders should not be mislabeled as landed status-move contradictions');
+
+const limberNuzzleLog = '|turn|1\n|switch|p1a: Dragapult|Dragapult, L80\n|switch|p2a: Toxapex|Toxapex, L80\n|move|p1a: Dragapult|Nuzzle|p2a: Toxapex\n|-damage|p2a: Toxapex|94/100\n|-status|p2a: Toxapex|par';
+const limberNuzzleParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(limberNuzzleLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const limberNuzzleTarget = limberNuzzleParser.strongest;
+assert(limberNuzzleTarget?.ruledOutAbilities?.includes('Limber'), 'paralysis landing through Nuzzle should still rule out Limber even when Good as Gold is irrelevant');
+assert(limberNuzzleTarget?.notes?.some(note => /Nuzzle successfully caused paralysis/i.test(note)), 'damaging status riders should explain the real status-immunity contradiction they created');
+
+vm.runInContext(
+  `team=[
+    preset("Toxapex","Leftovers","Bold",{hp:252,atk:0,def:252,spa:0,spd:4,spe:0},["Surf","Recover","Haze","Toxic"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: limberNuzzleTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const limberNuzzleRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(!limberNuzzleRead.abilityRows.some(([name]) => name === 'Limber'), 'paralysis landing through Nuzzle should remove Limber from the live detective pool');
+
+const purifyingSaltThunderWaveLog = '|turn|1\n|switch|p1a: Dragapult|Dragapult, L80\n|switch|p2a: Garganacl|Garganacl, L80\n|move|p1a: Dragapult|Thunder Wave|p2a: Garganacl\n|-status|p2a: Garganacl|par';
+const purifyingSaltThunderWaveParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(purifyingSaltThunderWaveLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const purifyingSaltThunderWaveTarget = purifyingSaltThunderWaveParser.strongest;
+assert(purifyingSaltThunderWaveTarget?.ruledOutAbilities?.includes('Purifying Salt'), 'successful major-status application should rule out Purifying Salt when the target actually became paralyzed');
+
+vm.runInContext(
+  `team=[
+    preset("Garganacl","Leftovers","Careful",{hp:252,atk:4,def:0,spa:0,spd:252,spe:0},["Salt Cure","Recover","Stealth Rock","Protect"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: purifyingSaltThunderWaveTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const purifyingSaltThunderWaveRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(!purifyingSaltThunderWaveRead.abilityRows.some(([name]) => name === 'Purifying Salt'), 'successful major-status application should remove Purifying Salt from the live detective pool');
+assert(purifyingSaltThunderWaveRead.summary.notes.some(x => /Purifying Salt impossible/i.test(x)), 'successful major-status application should carry the Purifying Salt contradiction into detective notes');
 
 const strayBurnStatusLog = '|turn|1\n|switch|p1a: Skeledirge|Skeledirge, L80\n|switch|p2a: Great Tusk|Great Tusk, L80\n|-status|p2a: Great Tusk|brn';
 const strayBurnStatusParser = vm.runInContext(`(() => {
