@@ -12,6 +12,6 @@
     "v33-audit": "node test-v33-reasoner.js",
     "v35-gauntlet": "node test-v35-gauntlet.js",
     "v35-legacy": "node test-v35-legacy-and-suggestions.js",
-    "hidden-info": "node test-hidden-info-reasoning.js"
+    "hidden-info": "node test-hidden-info-reasoning.js && node test-replay-ability-upgrades.js"
   }
 }
