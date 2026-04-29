@@ -9,6 +9,29 @@
     return ['Water Absorb','Volt Absorb','Dry Skin','Storm Drain','Lightning Rod','Motor Drive','Sap Sipper','Earth Eater','Well-Baked Body','Flash Fire','Good as Gold'].includes(ability);
   };
 
+  proto.startEffectName=function startEffectName(effect=''){
+    return String(effect||'').replace(/^move: /,'').trim();
+  };
+
+  proto.startEffectMove=function startEffectMove(event={}, moveEvent=null){
+    const raw=String(event?.raw||'');
+    const parts=raw?raw.split('|').filter(Boolean):[];
+    const effect=this.startEffectName(event?.effect||parts[2]||'');
+    if(effect&&moveMeta(effect))return effect;
+    const from=String(event?.from||parts.find(part=>part.startsWith('[from]'))?.replace('[from] ','')||'');
+    const fromMove=from.match(/^move: (.+)$/)?.[1]||'';
+    if(effect&&fromMove&&DexAdapter.id(effect)===DexAdapter.id(fromMove))return fromMove;
+    if(effect&&moveEvent?.move&&DexAdapter.id(effect)===DexAdapter.id(moveEvent.move))return moveEvent.move;
+    return '';
+  };
+
+  proto.landedMoveContradictionNote=function landedMoveContradictionNote(state, move=''){
+    const moveName=String(move||'').trim();
+    const abilities=this.moveBlockedAbilities(state,moveName);
+    if(!moveName||!abilities.length)return '';
+    return `${moveName} successfully landed, ruling out ${this.joinWithOr(abilities)} as the current ability explanation.`;
+  };
+
   proto.abilityClueLabelWithProof=function abilityClueLabelWithProof(ability, move='', assumeTriggered=false){
     if(!move||(!assumeTriggered&&!this.abilityTriggeredByMove(ability, move)))return `${ability} revealed`;
     if(['Water Absorb','Volt Absorb','Dry Skin','Earth Eater'].includes(ability))return `${ability} absorbed ${move}`;
@@ -81,6 +104,26 @@
         }
         const clueLabel=moveEvent?.move?`${ability} blocked ${moveEvent.move}`:`${ability} revealed`;
         this.recordAbilityReveal(state,turn,ability,moveEvent,`${state.species} was protected by ${ability}`,clueLabel,{assumeReactiveMove:true});
+      }
+      return;
+    }
+    if(event?.type==='-start'){
+      const parts=String(event.raw||'').split('|').filter(Boolean);
+      const target=event.target||parts[1]||'';
+      const effect=event.effect||parts[2]||'';
+      if(target&&effect){
+        const state=this.ensureState(target);
+        const moveEvent=[...this.turnMoves].reverse().find(x=>x.species&&state.slot!==x.slot);
+        const landedMove=this.startEffectMove({...event,target,effect},moveEvent);
+        if(landedMove){
+          this.ruleOutAbilities(
+            state,
+            turn,
+            this.moveBlockedAbilities(state,landedMove),
+            this.landedMoveContradictionNote(state,landedMove),
+            `${landedMove} landed`
+          );
+        }
       }
       return;
     }
