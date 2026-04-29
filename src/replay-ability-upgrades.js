@@ -60,6 +60,29 @@
     return `${moveName} successfully landed, ruling out ${this.joinWithOr(abilities)} as the current ability explanation.`;
   };
 
+  proto.statusLabel=function statusLabel(status=''){
+    const value=String(status||'').trim();
+    return ({
+      brn:'burn',
+      psn:'poison',
+      tox:'bad poison',
+      par:'paralysis',
+      slp:'sleep',
+      frz:'freeze'
+    })[value]||'status';
+  };
+
+  proto.toxicSpikesBlockedByExistingStatus=function toxicSpikesBlockedByExistingStatus(state){
+    return !!String(state?.currentStatus||'').trim();
+  };
+
+  proto.postItemLossStatusBlockNote=function postItemLossStatusBlockNote(state, hazard=''){
+    const label=this.normalizedHazardName(hazard)||String(hazard||'hazards').trim()||'hazards';
+    if(label!=='Toxic Spikes'||!this.toxicSpikesBlockedByExistingStatus(state))return '';
+    const status=this.statusLabel(state.currentStatus);
+    return `Later switched through ${label} after ${state?.removedItem||'the old item'} left the slot without getting poisoned, but the standing ${status} already explains that outcome without implying fresh protection.`;
+  };
+
   proto.abilityClueLabelWithProof=function abilityClueLabelWithProof(ability, move='', assumeTriggered=false){
     if(!move||(!assumeTriggered&&!this.abilityTriggeredByMove(ability, move)))return `${ability} revealed`;
     if(['Water Absorb','Volt Absorb','Dry Skin','Earth Eater'].includes(ability))return `${ability} absorbed ${move}`;
@@ -81,14 +104,65 @@
     this.addClueObservation(state,{turn,move:reactiveMove?.move||'',label:clueLabel||this.abilityClueLabelWithProof(ability,reactiveMove?.move,assumeReactiveMove)});
   };
 
+  const originalMarkPostItemLossProtection=proto.markPostItemLossProtection;
+  proto.markPostItemLossProtection=function patchedMarkPostItemLossProtection(state, hazard=''){
+    if(this.normalizedHazardName(hazard)==='Toxic Spikes'&&this.toxicSpikesBlockedByExistingStatus(state)){
+      this.addPostItemLossNote(state,this.postItemLossStatusBlockNote(state,hazard));
+      return;
+    }
+    return originalMarkPostItemLossProtection.call(this,state,hazard);
+  };
+
+  const originalResolvePendingEntryChecksForEvent=proto.resolvePendingEntryChecksForEvent;
+  proto.resolvePendingEntryChecksForEvent=function patchedResolvePendingEntryChecksForEvent(turn, event){
+    if(!this.pendingEntryChecks?.length)return originalResolvePendingEntryChecksForEvent.call(this,turn,event);
+    const remaining=[];
+    const eventSlot=event?.target?this.slotId(event.target):'';
+    const eventHazard=event?.type==='-damage'||event?.type==='-status'
+      ? this.normalizedHazardName(event.from)
+      : event?.type==='-activate'
+        ? this.normalizedHazardName(event.effect||event.from)
+        : '';
+    this.pendingEntryChecks.forEach(check=>{
+      if((check.turn||0)>turn){
+        remaining.push(check);
+        return;
+      }
+      if((check.turn||0)<turn){
+        const state=this.speciesState[check.key];
+        (check.hazards||[]).forEach(hazard=>this.markPostItemLossProtection(state,hazard));
+        return;
+      }
+      if(eventSlot===check.slot&&eventHazard&&check.hazards.includes(eventHazard)){
+        const hazards=(check.hazards||[]).filter(hazard=>hazard!==eventHazard);
+        if(hazards.length)remaining.push({...check,hazards});
+        return;
+      }
+      const state=this.speciesState[check.key];
+      (check.hazards||[]).forEach(hazard=>this.markPostItemLossProtection(state,hazard));
+    });
+    this.pendingEntryChecks=remaining;
+  };
+
   const originalExtractEvidence=proto.extractEvidence;
   proto.extractEvidence=function patchedExtractEvidence(event, turn){
+    if(event?.type==='-status'&&event.target&&!this.normalizedHazardName(event.from)){
+      const state=this.ensureState(event.target);
+      state.currentStatus=event.status||state.currentStatus||'';
+    }else if(event?.type==='-curestatus'){
+      const parts=String(event.raw||'').split('|').filter(Boolean);
+      const target=event.target||parts[1]||'';
+      if(target){
+        const state=this.ensureState(target);
+        state.currentStatus='';
+      }
+    }
     if(event?.type==='-status'&&event.target){
       const hazard=this.normalizedHazardName(event.from);
       if(hazard!=='Toxic Spikes'&&!this.abilitySource(event.from)&&!this.itemSource(event.from)){
         const state=this.ensureState(event.target);
         const moveEvent=[...this.turnMoves].reverse().find(x=>x.species&&state.slot!==x.slot);
-        const landedMove=moveCategory(moveEvent?.move)==='Status'?moveEvent.move:'';
+        const landedMove=moveEvent?.move&&moveCategory(moveEvent.move)==='Status'?moveEvent.move:'';
         if(landedMove){
           this.ruleOutAbilities(
             state,
@@ -99,6 +173,9 @@
           );
         }
       }
+      return originalExtractEvidence.call(this,event,turn);
+    }
+    if(event?.type==='-curestatus'){
       return originalExtractEvidence.call(this,event,turn);
     }
     if(event?.type==='-heal'&&event.target&&event.from){
