@@ -13,6 +13,7 @@
       Object.assign(FALLBACK_ABILITIES, {
         Kingambit: {0: 'Defiant', 1: 'Supreme Overlord', H: 'Pressure'},
         "Iron Valiant": {0: 'Quark Drive'},
+        "Iron Treads": {0: 'Quark Drive'},
         Volcanion: {0: 'Water Absorb'},
         "Deoxys-Speed": {0: 'Pressure'},
         Pecharunt: {0: 'Poison Puppeteer'},
