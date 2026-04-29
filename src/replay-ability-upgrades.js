@@ -10,7 +10,7 @@
   }
 
   proto.reactiveAbilityProof=function reactiveAbilityProof(ability){
-    return ['Water Absorb','Volt Absorb','Dry Skin','Storm Drain','Lightning Rod','Motor Drive','Sap Sipper','Earth Eater','Well-Baked Body','Flash Fire','Good as Gold'].includes(ability);
+    return ['Water Absorb','Volt Absorb','Dry Skin','Storm Drain','Lightning Rod','Motor Drive','Sap Sipper','Earth Eater','Well-Baked Body','Flash Fire','Good as Gold','Magic Bounce'].includes(ability);
   };
 
   proto.startEffectName=function startEffectName(effect=''){
@@ -87,8 +87,53 @@
     if(!move||(!assumeTriggered&&!this.abilityTriggeredByMove(ability, move)))return `${ability} revealed`;
     if(['Water Absorb','Volt Absorb','Dry Skin','Earth Eater'].includes(ability))return `${ability} absorbed ${move}`;
     if(['Storm Drain','Lightning Rod','Motor Drive','Sap Sipper','Well-Baked Body'].includes(ability))return `${ability} activated on ${move}`;
+    if(ability==='Magic Bounce')return `${ability} reflected ${move}`;
     if(['Flash Fire','Good as Gold'].includes(ability))return `${ability} blocked ${move}`;
     return `${ability} revealed`;
+  };
+
+  const originalAbilityTriggeredByMove=proto.abilityTriggeredByMove;
+  proto.abilityTriggeredByMove=function patchedAbilityTriggeredByMove(ability, move=''){
+    const meta=moveMeta(move);
+    const category=meta?.[1]||'Status';
+    if(ability==='Magic Bounce')return category==='Status';
+    return originalAbilityTriggeredByMove.call(this,ability,move);
+  };
+
+  proto.majorStatusBlockingAbilities=function majorStatusBlockingAbilities(state, status=''){
+    const statusId=String(status||'').trim();
+    if(!statusId)return [];
+    return detectiveAbilities(state?.species).filter(ability=>{
+      if(ability==='Purifying Salt')return true;
+      if(statusId==='par'&&ability==='Limber')return true;
+      if((statusId==='psn'||statusId==='tox')&&['Immunity','Pastel Veil'].includes(ability))return true;
+      if(statusId==='brn'&&['Water Veil','Water Bubble'].includes(ability))return true;
+      if(statusId==='slp'&&['Insomnia','Vital Spirit','Sweet Veil'].includes(ability))return true;
+      if(statusId==='frz'&&ability==='Magma Armor')return true;
+      return false;
+    });
+  };
+
+  proto.statusImmunityContradictionLabel=function statusImmunityContradictionLabel(status='', move=''){
+    const effect=this.statusLabel(status);
+    const moveName=String(move||'').trim();
+    if(moveName&&effect!=='status')return `${moveName} caused ${effect}`;
+    if(moveName)return `${moveName} landed`;
+    return effect==='status'?'status landed':`${effect} landed`;
+  };
+
+  proto.statusImmunityContradictionNote=function statusImmunityContradictionNote(state, status='', move=''){
+    const abilities=this.majorStatusBlockingAbilities(state,status);
+    const effect=this.statusLabel(status);
+    const moveName=String(move||'').trim();
+    if(!abilities.length)return '';
+    if(moveName&&effect!=='status'){
+      return `${moveName} successfully caused ${effect}, ruling out ${this.joinWithOr(abilities)} as the current ability explanation.`;
+    }
+    if(effect!=='status'){
+      return `Actually becoming ${effect} rules out ${this.joinWithOr(abilities)} as the current ability explanation.`;
+    }
+    return `The landed status rules out ${this.joinWithOr(abilities)} as the current ability explanation.`;
   };
 
   proto.abilityClueLabel=function patchedAbilityClueLabel(ability, move=''){
@@ -158,9 +203,20 @@
     }
     if(event?.type==='-status'&&event.target){
       const hazard=this.normalizedHazardName(event.from);
+      const state=this.ensureState(event.target);
+      const moveEvent=[...this.turnMoves].reverse().find(x=>x.species&&state.slot!==x.slot);
+      const duplicateHazardAbilities=hazard==='Toxic Spikes'?this.hazardAbilityContradictions(state,hazard):[];
+      const statusAbilities=this.majorStatusBlockingAbilities(state,event.status).filter(ability=>!duplicateHazardAbilities.includes(ability));
+      if(statusAbilities.length){
+        this.ruleOutAbilities(
+          state,
+          turn,
+          statusAbilities,
+          this.statusImmunityContradictionNote(state,event.status,moveEvent?.move),
+          this.statusImmunityContradictionLabel(event.status,moveEvent?.move)
+        );
+      }
       if(hazard!=='Toxic Spikes'&&!this.abilitySource(event.from)&&!this.itemSource(event.from)){
-        const state=this.ensureState(event.target);
-        const moveEvent=[...this.turnMoves].reverse().find(x=>x.species&&state.slot!==x.slot);
         const landedMove=moveEvent?.move&&moveCategory(moveEvent.move)==='Status'?moveEvent.move:'';
         if(landedMove){
           this.ruleOutAbilities(
