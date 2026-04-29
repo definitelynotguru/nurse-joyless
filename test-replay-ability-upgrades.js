@@ -75,4 +75,39 @@ const goodAsGoldGlareParser = vm.runInContext(`(() => {
 const goodAsGoldGlareTarget = goodAsGoldGlareParser.strongest;
 assert(goodAsGoldGlareTarget?.detectiveInputs?.[0]?.label === 'Good as Gold blocked Glare', 'reactive status-immunity clues should stay move-specific even when the blocked move is outside the local replay hint table');
 
+const goodAsGoldTauntStartLog = '|turn|1\n|switch|p1a: Grimmsnarl|Grimmsnarl, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|move|p1a: Grimmsnarl|Taunt|p2a: Gholdengo\n|-start|p2a: Gholdengo|move: Taunt';
+const goodAsGoldTauntStartParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(goodAsGoldTauntStartLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const goodAsGoldTauntStartTarget = goodAsGoldTauntStartParser.strongest;
+assert(goodAsGoldTauntStartTarget?.ruledOutAbilities?.includes('Good as Gold'), 'landed start effects should rule out Good as Gold when the status move actually connected');
+assert(goodAsGoldTauntStartTarget?.notes?.some(note => /Taunt successfully landed/i.test(note)), 'landed start effects should explain the successful-status contradiction in replay notes');
+assert(goodAsGoldTauntStartTarget?.detectiveInputs?.[0]?.label === 'Taunt landed', 'landed start effects should stay loadable as replay detective clues');
+
+const leechSeedStartLog = '|turn|1\n|switch|p1a: Ferrothorn|Ferrothorn, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|move|p1a: Ferrothorn|Leech Seed|p2a: Gholdengo\n|-start|p2a: Gholdengo|move: Leech Seed';
+const leechSeedStartParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(leechSeedStartLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const leechSeedStartTarget = leechSeedStartParser.strongest;
+assert(leechSeedStartTarget?.ruledOutAbilities?.includes('Good as Gold'), 'landed Leech Seed should rule out Good as Gold once the status move is proven to have connected');
+assert(leechSeedStartTarget?.notes?.some(note => /Leech Seed successfully landed/i.test(note)), 'landed Leech Seed should explain the contradiction in replay notes');
+
+vm.runInContext(
+  `team=[
+    preset("Gholdengo","Air Balloon","Timid",{hp:0,atk:0,def:4,spa:252,spd:0,spe:252},["Make It Rain","Shadow Ball","Recover","Nasty Plot"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: leechSeedStartTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const leechSeedStartRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(leechSeedStartRead.summary.confidence.label === 'Blocked', 'landed Leech Seed contradictions should surface that every modeled Gholdengo line is dead');
+assert(leechSeedStartRead.summary.notes.some(x => /Good as Gold impossible/.test(x)), 'landed Leech Seed contradictions should surface Good as Gold elimination in detective notes');
+
 console.log('[OK] replay ability upgrades passed');
