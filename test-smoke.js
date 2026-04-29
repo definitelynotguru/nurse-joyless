@@ -114,9 +114,16 @@ const tests = String.raw`
   const boostedAuraSphere = calc(mt, bl, 'Aura Sphere', { hpPct: 100, attackerOffenseStage: 2 });
   const bulkedAuraSphere = calc(mt, bl, 'Aura Sphere', { hpPct: 100, defenderBulkStage: 2 });
   const helpingHandAuraSphere = calc(mt, bl, 'Aura Sphere', { hpPct: 100, helpingHand: true });
-  const helpingHandTwoHitAuraSphere = calc(mt, bl, 'Aura Sphere', { hpPct: 80, helpingHand: true });
-  const chipWindowAuraSphere = calc(mt, bl, 'Aura Sphere', { hpPct: 80, helpingHand: true, defenderEndStepDamagePct: 12.5, extraEndSteps: 1 });
+  const helpingHandTwoHitAuraSphere = calc(mt, bl, 'Aura Sphere', { hpPct: 90, helpingHand: true });
+  const chipWindowAuraSphere = calc(mt, bl, 'Aura Sphere', { hpPct: 90, helpingHand: true, defenderEndStepDamagePct: 12.5, extraEndSteps: 1 });
   const reverseHelpingHandAuraSphere = calc(bl, mt, 'Surf', { hpPct: 100, ...window.swapBattleState(window.normalizeBattleState({ helpingHand: true, defenderEndStepDamagePct: 12.5, extraEndSteps: 1 })) });
+  const electricThunderbolt = calc(mt, bl, 'Thunderbolt', { hpPct: 100, terrain: 'electric' });
+  const neutralThunderbolt = calc(mt, bl, 'Thunderbolt', { hpPct: 100 });
+  const grassyEarthquake = calc(preset('Great Tusk','Leftovers','Adamant',{hp:252,atk:252,def:4,spa:0,spd:0,spe:0},['Earthquake']), bl, 'Earthquake', { hpPct: 100, terrain: 'grassy' });
+  const neutralEarthquake = calc(preset('Great Tusk','Leftovers','Adamant',{hp:252,atk:252,def:4,spa:0,spd:0,spe:0},['Earthquake']), bl, 'Earthquake', { hpPct: 100 });
+  const burnedEarthquake = calc(preset('Great Tusk','Leftovers','Adamant',{hp:252,atk:252,def:4,spa:0,spd:0,spe:0},['Earthquake']), bl, 'Earthquake', { hpPct: 100, attackerStatus: 'burn' });
+  const critAuraSphere = calc(mt, bl, 'Aura Sphere', { hpPct: 100, criticalHit: true, defenderBulkStage: 4 });
+  const boostedBulkAuraSphere = calc(mt, bl, 'Aura Sphere', { hpPct: 100, defenderBulkStage: 4 });
   assert(yesTeraFire.maxd > noTeraFire.maxd * 1.2, 'attacker Tera type should increase STAB damage for matching Tera moves');
   assert(flashFireRoll.maxd === 0 && flashFireRoll.blockedBy === 'Flash Fire', 'damage engine should respect Flash Fire immunity');
   assert(stackedSurf.maxd < rainSurf.maxd && stackedSurf.maxd > screenSurf.maxd, 'KO calc should stack weather and defender screen instead of letting one overwrite the other');
@@ -126,6 +133,10 @@ const tests = String.raw`
   assert(helpingHandAuraSphere.maxd > ko.maxd * 1.45, 'Helping Hand should materially boost outgoing damage');
   assert(nHitChance(chipWindowAuraSphere, 2) > nHitChance(helpingHandTwoHitAuraSphere, 2), 'extra end-step chip windows should improve multi-hit KO odds when the damage range is already in play');
   assert(reverseHelpingHandAuraSphere.maxd === neutralSurf.maxd, 'reverse KO math should drop one-sided Helping Hand and chip-window context');
+  assert(electricThunderbolt.maxd > neutralThunderbolt.maxd * 1.25, 'Electric Terrain should materially boost grounded Electric attacks');
+  assert(grassyEarthquake.maxd < neutralEarthquake.maxd * 0.6, 'Grassy Terrain should heavily reduce grounded Earthquake damage');
+  assert(burnedEarthquake.maxd < neutralEarthquake.maxd * 0.6, 'burn should heavily reduce physical damage from non-Guts attackers');
+  assert(critAuraSphere.maxd > boostedBulkAuraSphere.maxd * 1.45, 'critical hits should punch through positive defender bulk stages');
   assert(ko.rolls.length === 16 && Number.isFinite(ko.ko), 'dmg() failed with Dex-only move/species');
   assert(nHitChance(ko,2) >= ko.ko, '2HKO chance should not be below OHKO chance');
 
@@ -222,13 +233,16 @@ const tests = String.raw`
   document.getElementById('attacker').value = '0'; document.getElementById('attacker')._items = [mt];
   document.getElementById('defender').value = '0'; document.getElementById('defender')._items = [bl];
   document.getElementById('move').value = 'Aura Sphere'; document.getElementById('hp').value = '50';
-  document.getElementById('hazards').value = 'none'; document.getElementById('weather').value = 'rain'; document.getElementById('helpingHand').checked = true; document.getElementById('defenderProtect').value = 'screen'; document.getElementById('attackerOffenseStage').value = '2'; document.getElementById('defenderBulkStage').value = '1'; document.getElementById('extraEndSteps').value = '1'; document.getElementById('defenderEndStepDamagePct').value = '12.5';
+  document.getElementById('hazards').value = 'none'; document.getElementById('weather').value = 'rain'; document.getElementById('terrain').value = 'electric'; document.getElementById('helpingHand').checked = true; document.getElementById('defenderProtect').value = 'screen'; document.getElementById('attackerOffenseStage').value = '2'; document.getElementById('defenderBulkStage').value = '1'; document.getElementById('attackerStatus').value = 'burn'; document.getElementById('criticalHit').checked = true; document.getElementById('extraEndSteps').value = '1'; document.getElementById('defenderEndStepDamagePct').value = '12.5';
   document.getElementById('attackerTera').checked = false; document.getElementById('defenderTera').checked = true; document.getElementById('defenderTeraType').value = 'Dark';
   renderKoCalc(); assert(document.getElementById('ko').innerHTML.includes('3HKO odds'), 'KO panel missing 3HKO odds');
   assert(document.getElementById('ko').innerHTML.includes('Battle state: Rain'), 'KO panel should summarize the active battle state');
+  assert(document.getElementById('ko').innerHTML.includes('Electric Terrain'), 'KO panel should summarize the active terrain');
   assert(document.getElementById('ko').innerHTML.includes('Helping Hand'), 'KO panel should summarize Helping Hand support');
   assert(document.getElementById('ko').innerHTML.includes('defender Light Screen'), 'KO panel should surface defender-side protection in the summary');
   assert(document.getElementById('ko').innerHTML.includes('attacker +2 offense'), 'KO panel should surface stage context in the summary');
+  assert(document.getElementById('ko').innerHTML.includes('attacker Burned'), 'KO panel should summarize attacker status');
+  assert(document.getElementById('ko').innerHTML.includes('critical hit'), 'KO panel should summarize critical-hit context');
   assert(document.getElementById('ko').innerHTML.includes('extra end-step window'), 'KO panel should explain extra end-step windows');
 
   const md = buildMarkdownReport(lastReasoning); assert(md.includes('Matchup Matrix') && md.includes('Suggested Additions'), 'Markdown report incomplete');
