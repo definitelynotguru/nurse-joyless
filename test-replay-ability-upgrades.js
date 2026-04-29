@@ -151,4 +151,29 @@ const strayBurnStatusParser = vm.runInContext(`(() => {
 const strayBurnStatusTarget = strayBurnStatusParser.strongest;
 assert(!strayBurnStatusTarget?.ruledOutAbilities?.length, 'status lines without a linked move should not fabricate landed-status contradictions');
 
+const delayedToxicSpikesStatusLog = '|turn|1\n|switch|p1a: Gliscor|Gliscor, L80\n|-sidestart|p2: Great Tusk|move: Toxic Spikes\n|switch|p2a: Great Tusk|Great Tusk, L80\n|-item|p2a: Great Tusk|Heavy-Duty Boots\n|move|p1a: Gliscor|Knock Off|p2a: Great Tusk\n|-enditem|p2a: Great Tusk|Heavy-Duty Boots|[from] move: Knock Off\n|turn|2\n|switch|p2a: Great Tusk|Great Tusk, L80\n|-ability|p1a: Gliscor|Poison Heal\n|-status|p2a: Great Tusk|psn|[from] move: Toxic Spikes';
+const delayedToxicSpikesStatusParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(delayedToxicSpikesStatusLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const delayedToxicSpikesStatusTarget = delayedToxicSpikesStatusParser.targets.find(t => t.species === 'Great Tusk');
+assert(!delayedToxicSpikesStatusTarget?.postItemLossProtectionRecovered, 'delayed Toxic Spikes aftermath should not be misread as protection returning just because an unrelated same-turn event happened first');
+assert(!delayedToxicSpikesStatusTarget?.notes?.some(note => /without getting poisoned/i.test(note)), 'delayed Toxic Spikes aftermath should not keep a fake no-poison note once the poison line arrives later that turn');
+assert(delayedToxicSpikesStatusTarget?.notes?.some(note => /Later got poisoned by Toxic Spikes after Heavy-Duty Boots were removed/i.test(note)), 'delayed Toxic Spikes aftermath should still keep the grounded status timing note');
+
+vm.runInContext(
+  `team=[
+    preset("Great Tusk","Heavy-Duty Boots","Impish",{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},["Close Combat","Headlong Rush","Rapid Spin","Knock Off"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: delayedToxicSpikesStatusTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const delayedToxicSpikesStatusRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(!delayedToxicSpikesStatusRead.summary.notes.some(x => /empty slot is no longer the only live current-item story/i.test(x)), 'delayed Toxic Spikes aftermath should not falsely reopen the current item story in detective notes');
+assert(delayedToxicSpikesStatusRead.itemRows[0][0] === 'No Item', 'delayed Toxic Spikes aftermath should leave the empty-slot read anchored once the poison line proves Boots stayed gone');
+
 console.log('[OK] replay ability upgrades passed');
