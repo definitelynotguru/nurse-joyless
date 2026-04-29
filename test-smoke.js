@@ -1,7 +1,10 @@
 const fs = require('fs');
 const vm = require('vm');
 const path = require('path');
-const source = fs.readFileSync(path.join(__dirname, 'src/app.js'), 'utf8');
+const source = [
+  fs.readFileSync(path.join(__dirname, 'src/app.js'), 'utf8'),
+  fs.readFileSync(path.join(__dirname, 'src/ko-upgrades.js'), 'utf8'),
+].join('\n');
 
 function makeFakeElement(value = '') {
   return {
@@ -75,12 +78,14 @@ const context = {
 const tests = String.raw`
 (function(){
   function assert(cond, msg){ if(!cond) throw new Error(msg); }
+  const calc = window.dmg || dmg;
+  const renderKoCalc = window.renderKo || renderKo;
   assert(DexAdapter.useDex === true, 'DexAdapter did not detect fake full Dex');
   assert(types({species:'Mewtwo'}).join('/') === 'Psychic', 'types() is not using DexAdapter species data');
   const mt = preset('Mewtwo','Life Orb','Timid',{hp:0,atk:0,def:0,spa:252,spd:4,spe:252},['Aura Sphere','Shadow Ball']);
   const bl = preset('Blastoise','Leftovers','Calm',{hp:252,atk:0,def:0,spa:0,spd:252,spe:4},['Surf']);
   assert(moveName('aura sphere') === 'Aura Sphere', 'moveName() is not using DexAdapter move resolver');
-  const ko = dmg(mt, bl, 'Aura Sphere', { hpPct: 50 });
+  const ko = calc(mt, bl, 'Aura Sphere', { hpPct: 50 });
   const abilityRead = buildDetectiveRead({
     species:'Dragapult',
     evidence:'they_hit_me',
@@ -95,13 +100,32 @@ const tests = String.raw`
   assert(html('\"x\" & <tag>') === '&quot;x&quot; &amp; &lt;tag&gt;', 'html() must escape quotes for attribute-safe rendering');
   const teraAtt = preset('Dragapult','Life Orb','Timid',{hp:0,atk:0,def:0,spa:252,spd:4,spe:252},['Flamethrower']);
   const teraDef = preset('Corviknight','Leftovers','Impish',{hp:248,atk:0,def:252,spa:0,spd:8,spe:0},['Roost']);
-  const noTeraFire = dmg(teraAtt, teraDef, 'Flamethrower', { hpPct: 100 });
-  const yesTeraFire = dmg(teraAtt, teraDef, 'Flamethrower', { hpPct: 100, attackerTera: true, attackerTeraType: 'Fire' });
+  const noTeraFire = calc(teraAtt, teraDef, 'Flamethrower', { hpPct: 100 });
+  const yesTeraFire = calc(teraAtt, teraDef, 'Flamethrower', { hpPct: 100, attackerTera: true, attackerTeraType: 'Fire' });
   const flashFireDef = preset('Heatran','Leftovers','Calm',{hp:252,atk:0,def:4,spa:0,spd:252,spe:0},['Flamethrower']);
   flashFireDef.ability = 'Flash Fire';
-  const flashFireRoll = dmg(teraAtt, flashFireDef, 'Flamethrower', { hpPct: 100 });
+  const flashFireRoll = calc(teraAtt, flashFireDef, 'Flamethrower', { hpPct: 100 });
+  const neutralSurf = calc(bl, mt, 'Surf', { hpPct: 100 });
+  const rainSurf = calc(bl, mt, 'Surf', { hpPct: 100, weather: 'rain' });
+  const screenSurf = calc(bl, mt, 'Surf', { hpPct: 100, defenderProtect: 'screen' });
+  const stackedSurf = calc(bl, mt, 'Surf', { hpPct: 100, weather: 'rain', defenderProtect: 'screen' });
+  const swappedScreenSurf = calc(bl, mt, 'Surf', { hpPct: 100, ...window.swapBattleState(window.normalizeBattleState({ weather: 'rain', defenderProtect: 'screen' })) });
+  const neutralAuraSphere = calc(mt, bl, 'Aura Sphere', { hpPct: 100 });
+  const boostedAuraSphere = calc(mt, bl, 'Aura Sphere', { hpPct: 100, attackerOffenseStage: 2 });
+  const bulkedAuraSphere = calc(mt, bl, 'Aura Sphere', { hpPct: 100, defenderBulkStage: 2 });
+  const helpingHandAuraSphere = calc(mt, bl, 'Aura Sphere', { hpPct: 100, helpingHand: true });
+  const helpingHandTwoHitAuraSphere = calc(mt, bl, 'Aura Sphere', { hpPct: 80, helpingHand: true });
+  const chipWindowAuraSphere = calc(mt, bl, 'Aura Sphere', { hpPct: 80, helpingHand: true, defenderEndStepDamagePct: 12.5, extraEndSteps: 1 });
+  const reverseHelpingHandAuraSphere = calc(bl, mt, 'Surf', { hpPct: 100, ...window.swapBattleState(window.normalizeBattleState({ helpingHand: true, defenderEndStepDamagePct: 12.5, extraEndSteps: 1 })) });
   assert(yesTeraFire.maxd > noTeraFire.maxd * 1.2, 'attacker Tera type should increase STAB damage for matching Tera moves');
   assert(flashFireRoll.maxd === 0 && flashFireRoll.blockedBy === 'Flash Fire', 'damage engine should respect Flash Fire immunity');
+  assert(stackedSurf.maxd < rainSurf.maxd && stackedSurf.maxd > screenSurf.maxd, 'KO calc should stack weather and defender screen instead of letting one overwrite the other');
+  assert(swappedScreenSurf.maxd === rainSurf.maxd, 'reverse KO math should not inherit the original defender screen onto the wrong side');
+  assert(boostedAuraSphere.maxd > ko.maxd, 'attacker offense stages should increase KO damage');
+  assert(bulkedAuraSphere.maxd < ko.maxd, 'defender bulk stages should reduce KO damage');
+  assert(helpingHandAuraSphere.maxd > ko.maxd * 1.45, 'Helping Hand should materially boost outgoing damage');
+  assert(nHitChance(chipWindowAuraSphere, 2) > nHitChance(helpingHandTwoHitAuraSphere, 2), 'extra end-step chip windows should improve multi-hit KO odds when the damage range is already in play');
+  assert(reverseHelpingHandAuraSphere.maxd === neutralSurf.maxd, 'reverse KO math should drop one-sided Helping Hand and chip-window context');
   assert(ko.rolls.length === 16 && Number.isFinite(ko.ko), 'dmg() failed with Dex-only move/species');
   assert(nHitChance(ko,2) >= ko.ko, '2HKO chance should not be below OHKO chance');
 
@@ -198,9 +222,14 @@ const tests = String.raw`
   document.getElementById('attacker').value = '0'; document.getElementById('attacker')._items = [mt];
   document.getElementById('defender').value = '0'; document.getElementById('defender')._items = [bl];
   document.getElementById('move').value = 'Aura Sphere'; document.getElementById('hp').value = '50';
-  document.getElementById('hazards').value = 'none'; document.getElementById('field').value = 'none';
+  document.getElementById('hazards').value = 'none'; document.getElementById('weather').value = 'rain'; document.getElementById('helpingHand').checked = true; document.getElementById('defenderProtect').value = 'screen'; document.getElementById('attackerOffenseStage').value = '2'; document.getElementById('defenderBulkStage').value = '1'; document.getElementById('extraEndSteps').value = '1'; document.getElementById('defenderEndStepDamagePct').value = '12.5';
   document.getElementById('attackerTera').checked = false; document.getElementById('defenderTera').checked = true; document.getElementById('defenderTeraType').value = 'Dark';
-  renderKo(); assert(document.getElementById('ko').innerHTML.includes('3HKO odds'), 'KO panel missing 3HKO odds');
+  renderKoCalc(); assert(document.getElementById('ko').innerHTML.includes('3HKO odds'), 'KO panel missing 3HKO odds');
+  assert(document.getElementById('ko').innerHTML.includes('Battle state: Rain'), 'KO panel should summarize the active battle state');
+  assert(document.getElementById('ko').innerHTML.includes('Helping Hand'), 'KO panel should summarize Helping Hand support');
+  assert(document.getElementById('ko').innerHTML.includes('defender Light Screen'), 'KO panel should surface defender-side protection in the summary');
+  assert(document.getElementById('ko').innerHTML.includes('attacker +2 offense'), 'KO panel should surface stage context in the summary');
+  assert(document.getElementById('ko').innerHTML.includes('extra end-step window'), 'KO panel should explain extra end-step windows');
 
   const md = buildMarkdownReport(lastReasoning); assert(md.includes('Matchup Matrix') && md.includes('Suggested Additions'), 'Markdown report incomplete');
   const val = validateTeamAdvanced(team); assert(val.length === 6, 'Validation did not process all team members');
