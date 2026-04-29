@@ -142,4 +142,13 @@ const nuzzleStatusTarget = nuzzleStatusParser.strongest;
 assert(!nuzzleStatusTarget?.ruledOutAbilities?.includes('Good as Gold'), 'damaging status riders like Nuzzle should not fake a Good as Gold contradiction');
 assert(!nuzzleStatusTarget?.notes?.some(note => /Nuzzle successfully landed/i.test(note)), 'damaging status riders should not be mislabeled as landed status-move contradictions');
 
+const strayBurnStatusLog = '|turn|1\n|switch|p1a: Skeledirge|Skeledirge, L80\n|switch|p2a: Great Tusk|Great Tusk, L80\n|-status|p2a: Great Tusk|brn';
+const strayBurnStatusParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(strayBurnStatusLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const strayBurnStatusTarget = strayBurnStatusParser.strongest;
+assert(!strayBurnStatusTarget?.ruledOutAbilities?.length, 'status lines without a linked move should not fabricate landed-status contradictions');
+
 console.log('[OK] replay ability upgrades passed');
