@@ -86,6 +86,17 @@ assert(goodAsGoldTauntStartTarget?.ruledOutAbilities?.includes('Good as Gold'), 
 assert(goodAsGoldTauntStartTarget?.notes?.some(note => /Taunt successfully landed/i.test(note)), 'landed start effects should explain the successful-status contradiction in replay notes');
 assert(goodAsGoldTauntStartTarget?.detectiveInputs?.[0]?.label === 'Taunt landed', 'landed start effects should stay loadable as replay detective clues');
 
+const goodAsGoldConfuseRayLog = '|turn|1\n|switch|p1a: Flutter Mane|Flutter Mane, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|move|p1a: Flutter Mane|Confuse Ray|p2a: Gholdengo\n|-start|p2a: Gholdengo|confusion';
+const goodAsGoldConfuseRayParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(goodAsGoldConfuseRayLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const goodAsGoldConfuseRayTarget = goodAsGoldConfuseRayParser.strongest;
+assert(goodAsGoldConfuseRayTarget?.ruledOutAbilities?.includes('Good as Gold'), 'landed alias effects should still rule out Good as Gold when the status move actually connected');
+assert(goodAsGoldConfuseRayTarget?.notes?.some(note => /Confuse Ray successfully landed/i.test(note)), 'landed alias effects should explain the underlying status-move contradiction in replay notes');
+assert(goodAsGoldConfuseRayTarget?.detectiveInputs?.[0]?.label === 'Confuse Ray landed', 'landed alias effects should stay detective-loadable with the actual move name');
+
 const leechSeedStartLog = '|turn|1\n|switch|p1a: Ferrothorn|Ferrothorn, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|move|p1a: Ferrothorn|Leech Seed|p2a: Gholdengo\n|-start|p2a: Gholdengo|move: Leech Seed';
 const leechSeedStartParser = vm.runInContext(`(() => {
   const parser = new ReplayParser();
