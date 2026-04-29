@@ -5,6 +5,10 @@
   const proto=ReplayParserRef?.prototype;
   if(!proto)return;
 
+  if(typeof REPLAY_MOVE_HINTS!=='undefined'){
+    REPLAY_MOVE_HINTS.Nuzzle=['Electric','Physical',0];
+  }
+
   proto.reactiveAbilityProof=function reactiveAbilityProof(ability){
     return ['Water Absorb','Volt Absorb','Dry Skin','Storm Drain','Lightning Rod','Motor Drive','Sap Sipper','Earth Eater','Well-Baked Body','Flash Fire','Good as Gold'].includes(ability);
   };
@@ -79,6 +83,24 @@
 
   const originalExtractEvidence=proto.extractEvidence;
   proto.extractEvidence=function patchedExtractEvidence(event, turn){
+    if(event?.type==='-status'&&event.target){
+      const hazard=this.normalizedHazardName(event.from);
+      if(hazard!=='Toxic Spikes'&&!this.abilitySource(event.from)&&!this.itemSource(event.from)){
+        const state=this.ensureState(event.target);
+        const moveEvent=[...this.turnMoves].reverse().find(x=>x.species&&state.slot!==x.slot);
+        const landedMove=moveCategory(moveEvent?.move)==='Status'?moveEvent.move:'';
+        if(landedMove){
+          this.ruleOutAbilities(
+            state,
+            turn,
+            this.moveBlockedAbilities(state,landedMove),
+            this.landedMoveContradictionNote(state,landedMove),
+            `${landedMove} landed`
+          );
+        }
+      }
+      return originalExtractEvidence.call(this,event,turn);
+    }
     if(event?.type==='-heal'&&event.target&&event.from){
       const state=this.ensureState(event.target);
       const ability=this.abilitySource(event.from);
