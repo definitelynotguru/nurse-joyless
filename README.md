@@ -126,7 +126,7 @@ The app is dependency-light by design. Most of the hackathon logic lives in the 
 ## Run locally
 
 ```bash
-python3 -m http.server 8000
+npm run serve
 ```
 
 Then open:
@@ -136,6 +136,8 @@ http://localhost:8000
 ```
 
 A local server is recommended for online enrichment and browser-origin consistency. Opening `index.html` directly can work for offline features, but browser security rules may block some fetch-based flows.
+
+`npm run serve` also provides the same-origin `/api/ollama/chat` proxy required for Ollama Cloud API keys. The pure static fallback (`npm run serve:static`) cannot test or call Ollama Cloud because `https://ollama.com/api/chat` does not allow browser CORS preflight requests with `Authorization`.
 
 ## Test suite
 
