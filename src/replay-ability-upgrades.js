@@ -125,9 +125,49 @@
     return originalAbilityTriggeredByMove.call(this,ability,move);
   };
 
+  proto.abilitySuppressionEffect=function abilitySuppressionEffect(effect=''){
+    const label=this.startEffectName(effect);
+    return label==='Gastro Acid'?label:'';
+  };
+
+  proto.abilitySuppressionActive=function abilitySuppressionActive(state){
+    return !!state?.abilitySuppressed;
+  };
+
+  proto.abilitySuppressionNote=function abilitySuppressionNote(effect=''){
+    const label=this.abilitySuppressionEffect(effect);
+    if(!label)return '';
+    return `${label} suppressed the target's ability for part of the replay, so landed move and status clues from that window do not rule out the base ability.`;
+  };
+
+  proto.applyAbilitySuppression=function applyAbilitySuppression(state, turn, effect=''){
+    const label=this.abilitySuppressionEffect(effect);
+    if(!state||!label)return;
+    state.abilitySuppressed=true;
+    state.abilitySuppressionEffect=label;
+    this.addEvidence(state,turn||0,'reveal',`${state.species} had its ability suppressed by ${label}`,'Ability suppression active',2.5,{soft:true});
+    this.addClueObservation(state,{turn:turn||0,label:`${label} landed`});
+    this.addAbilityContradictionNote(state,this.abilitySuppressionNote(label));
+  };
+
+  proto.clearAbilitySuppression=function clearAbilitySuppression(state, effect=''){
+    const label=this.abilitySuppressionEffect(effect)||String(effect||'').trim();
+    if(!state)return;
+    if(label&&state.abilitySuppressionEffect&&label!==state.abilitySuppressionEffect)return;
+    state.abilitySuppressed=false;
+    state.abilitySuppressionEffect='';
+  };
+
+  const originalMoveBlockedAbilities=proto.moveBlockedAbilities;
+  proto.moveBlockedAbilities=function patchedMoveBlockedAbilities(state, move=''){
+    if(this.abilitySuppressionActive(state))return [];
+    return originalMoveBlockedAbilities.call(this,state,move);
+  };
+
   proto.majorStatusBlockingAbilities=function majorStatusBlockingAbilities(state, status=''){
     const statusId=String(status||'').trim();
     if(!statusId)return [];
+    if(this.abilitySuppressionActive(state))return [];
     return detectiveAbilities(state?.species).filter(ability=>{
       if(ability==='Purifying Salt')return true;
       if(statusId==='par'&&ability==='Limber')return true;
@@ -215,6 +255,9 @@
 
   const originalExtractEvidence=proto.extractEvidence;
   proto.extractEvidence=function patchedExtractEvidence(event, turn){
+    if((event?.type==='switch'||event?.type==='drag')&&event?.pokemon){
+      this.clearAbilitySuppression(this.ensureState(event.pokemon,event.details));
+    }
     if(event?.type==='-status'&&event.target&&!this.normalizedHazardName(event.from)){
       const state=this.ensureState(event.target);
       state.currentStatus=event.status||state.currentStatus||'';
@@ -327,8 +370,18 @@
             `${landedMove} landed`
           );
         }
+        this.applyAbilitySuppression(state,turn,effect);
       }
       return;
+    }
+    if(event?.type==='-end'){
+      const parts=String(event.raw||'').split('|').filter(Boolean);
+      const target=event.target||parts[1]||'';
+      const effect=event.effect||parts[2]||'';
+      if(target&&effect){
+        this.clearAbilitySuppression(this.ensureState(target),effect);
+      }
+      return originalExtractEvidence.call(this,event,turn);
     }
     return originalExtractEvidence.call(this,event,turn);
   };
