@@ -406,6 +406,30 @@ const moldBreakerThunderWaveRead = vm.runInContext('lastDetectiveRead', context,
 assert(moldBreakerThunderWaveRead.abilityRows[0][0] === 'Good as Gold', 'Mold Breaker status application should leave Good as Gold live in the detective pool');
 assert(moldBreakerThunderWaveRead.summary.notes.some(x => /Mold Breaker let Thunder Wave bypass Good as Gold/i.test(x)), 'Mold Breaker status application should carry the bypass note into detective output');
 
+const moldBreakerPurifyingSaltLog = '|turn|1\n|switch|p1a: Haxorus|Haxorus, L80\n|switch|p2a: Garganacl|Garganacl, L80\n|move|p1a: Haxorus|Thunder Wave|p2a: Garganacl\n|-ability|p1a: Haxorus|Mold Breaker\n|-status|p2a: Garganacl|par';
+const moldBreakerPurifyingSaltParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(moldBreakerPurifyingSaltLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const moldBreakerPurifyingSaltTarget = moldBreakerPurifyingSaltParser.targets.find(t => t.species === 'Garganacl');
+assert(!moldBreakerPurifyingSaltTarget?.ruledOutAbilities?.includes('Purifying Salt'), 'Mold Breaker status application should not fake a Purifying Salt contradiction');
+assert(moldBreakerPurifyingSaltTarget?.notes?.some(note => /Mold Breaker let Thunder Wave bypass Purifying Salt/i.test(note)), 'Mold Breaker status application should explain why Purifying Salt stayed live');
+
+vm.runInContext(
+  `team=[
+    preset("Garganacl","Leftovers","Careful",{hp:252,atk:4,def:0,spa:0,spd:252,spe:0},["Salt Cure","Recover","Stealth Rock","Protect"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: moldBreakerPurifyingSaltTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const moldBreakerPurifyingSaltRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(moldBreakerPurifyingSaltRead.abilityRows[0][0] === 'Purifying Salt', 'Mold Breaker status application should leave Purifying Salt live in the detective pool');
+assert(moldBreakerPurifyingSaltRead.summary.notes.some(x => /Mold Breaker let Thunder Wave bypass Purifying Salt/i.test(x)), 'Mold Breaker status application should carry the Purifying Salt bypass note into detective output');
+
 const turboblazeFlamethrowerLog = '|turn|1\n|switch|p1a: Reshiram|Reshiram, L80\n|switch|p2a: Heatran|Heatran, L80\n|move|p1a: Reshiram|Flamethrower|p2a: Heatran\n|-ability|p1a: Reshiram|Turboblaze\n|-damage|p2a: Heatran|61/100';
 const turboblazeFlamethrowerParser = vm.runInContext(`(() => {
   const parser = new ReplayParser();
@@ -415,6 +439,30 @@ const turboblazeFlamethrowerParser = vm.runInContext(`(() => {
 const turboblazeFlamethrowerTarget = turboblazeFlamethrowerParser.targets.find(t => t.species === 'Heatran');
 assert(!turboblazeFlamethrowerTarget?.ruledOutAbilities?.includes('Flash Fire'), 'Turboblaze Fire damage should not fake a Flash Fire contradiction');
 assert(turboblazeFlamethrowerTarget?.notes?.some(note => /Turboblaze let Flamethrower bypass Flash Fire/i.test(note)), 'Turboblaze Fire damage should explain why Flash Fire stayed live');
+
+const moldBreakerHeadlongRushLog = '|turn|1\n|switch|p1a: Haxorus|Haxorus, L80\n|switch|p2a: Hydreigon|Hydreigon, L80\n|move|p1a: Haxorus|Headlong Rush|p2a: Hydreigon\n|-ability|p1a: Haxorus|Mold Breaker\n|-damage|p2a: Hydreigon|36/100';
+const moldBreakerHeadlongRushParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(moldBreakerHeadlongRushLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const moldBreakerHeadlongRushTarget = moldBreakerHeadlongRushParser.targets.find(t => t.species === 'Hydreigon');
+assert(!moldBreakerHeadlongRushTarget?.ruledOutAbilities?.includes('Levitate'), 'Mold Breaker Ground damage should not fake a Levitate contradiction');
+assert(moldBreakerHeadlongRushTarget?.notes?.some(note => /Mold Breaker let Headlong Rush bypass Levitate/i.test(note)), 'Mold Breaker Ground damage should explain why Levitate stayed live');
+
+vm.runInContext(
+  `team=[
+    preset("Hydreigon","Leftovers","Timid",{hp:0,atk:0,def:4,spa:252,spd:0,spe:252},["Draco Meteor","Dark Pulse","Flamethrower","Roost"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: moldBreakerHeadlongRushTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const moldBreakerHeadlongRushRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(moldBreakerHeadlongRushRead.abilityRows[0][0] === 'Levitate', 'Mold Breaker Ground damage should leave Levitate live in the detective pool');
+assert(moldBreakerHeadlongRushRead.summary.notes.some(x => /Mold Breaker let Headlong Rush bypass Levitate/i.test(x)), 'Mold Breaker Ground damage should carry the Levitate bypass note into detective output');
 
 const delayedToxicSpikesStatusLog = '|turn|1\n|switch|p1a: Gliscor|Gliscor, L80\n|-sidestart|p2: Great Tusk|move: Toxic Spikes\n|switch|p2a: Great Tusk|Great Tusk, L80\n|-item|p2a: Great Tusk|Heavy-Duty Boots\n|move|p1a: Gliscor|Knock Off|p2a: Great Tusk\n|-enditem|p2a: Great Tusk|Heavy-Duty Boots|[from] move: Knock Off\n|turn|2\n|switch|p2a: Great Tusk|Great Tusk, L80\n|-ability|p1a: Gliscor|Poison Heal\n|-status|p2a: Great Tusk|psn|[from] move: Toxic Spikes';
 const delayedToxicSpikesStatusParser = vm.runInContext(`(() => {
