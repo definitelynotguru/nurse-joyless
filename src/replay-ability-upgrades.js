@@ -118,6 +118,11 @@
     return `${ability} revealed`;
   };
 
+  proto.stillPossibleProtectionAbilities=function stillPossibleProtectionAbilities(state, abilities=[]){
+    const ruledOut=new Set((state?.ruledOutAbilities||[]).map(ability=>String(ability||'').trim()).filter(Boolean));
+    return (abilities||[]).filter(ability=>ability&&!ruledOut.has(String(ability||'').trim()));
+  };
+
   proto.abilityBypassAbility=function abilityBypassAbility(ability=''){
     return ['Mold Breaker','Teravolt','Turboblaze'].includes(String(ability||'').trim());
   };
@@ -200,6 +205,31 @@
     return `Neutralizing Gas from ${source} suppressed the target's ability for part of the replay, so landed move, hazard, and status clues from that window do not rule out the base ability.`;
   };
 
+  proto.postItemLossSuppressedProtectionNote=function postItemLossSuppressedProtectionNote(state, hazard='', source=''){
+    const label=this.normalizedHazardName(hazard)||String(hazard||'hazards').trim()||'hazards';
+    const missedEffect=label==='Toxic Spikes'
+      ? 'without getting poisoned'
+      : label==='Sticky Web'
+        ? 'without getting slowed'
+        : 'without taking chip';
+    const itemText=this.joinWithOr(this.protectionRecoveryItemsForHazard(label))||'item-based protection';
+    const sourceText=String(source||'').trim()||'another source';
+    if(state?.removedItem==='Air Balloon'){
+      return `Later switched through ${label} after Air Balloon popped ${missedEffect}, but Neutralizing Gas from ${sourceText} was suppressing abilities then, so this only keeps ${itemText} live for the new current-state explanation.`;
+    }
+    if(state?.removedItem==='Heavy-Duty Boots'){
+      return `Later switched through ${label} after Heavy-Duty Boots were removed ${missedEffect}, but Neutralizing Gas from ${sourceText} was suppressing abilities then, so this only keeps ${itemText} live for the new current-state explanation.`;
+    }
+    return `Later switched through ${label} after ${state?.removedItem||'the old item'} left the slot ${missedEffect}, but Neutralizing Gas from ${sourceText} was suppressing abilities then, so this only keeps ${itemText} live for the new current-state explanation.`;
+  };
+
+  proto.markPostItemLossSuppressedProtection=function markPostItemLossSuppressedProtection(state, hazard='', source=''){
+    if(!state)return;
+    state.postItemLossProtectionRecovered=true;
+    this.addPostItemLossProtectionHints(state,hazard,{includeAbilities:false});
+    this.addPostItemLossNote(state,this.postItemLossSuppressedProtectionNote(state,hazard,source));
+  };
+
   proto.applyAbilitySuppression=function applyAbilitySuppression(state, turn, effect=''){
     const label=this.abilitySuppressionEffect(effect);
     if(!state||!label)return;
@@ -250,6 +280,25 @@
   proto.hazardAbilityContradictions=function patchedHazardAbilityContradictions(state, hazard=''){
     if(this.abilitySuppressionActive(state))return [];
     return originalHazardAbilityContradictions.call(this,state,hazard);
+  };
+
+  const originalProtectionRecoveryAbilitiesForHazard=proto.protectionRecoveryAbilitiesForHazard;
+  proto.protectionRecoveryAbilitiesForHazard=function patchedProtectionRecoveryAbilitiesForHazard(state, hazard=''){
+    return this.stillPossibleProtectionAbilities(state,originalProtectionRecoveryAbilitiesForHazard.call(this,state,hazard));
+  };
+
+  proto.addPostItemLossProtectionHints=function patchedAddPostItemLossProtectionHints(state, hazard='', options={}){
+    if(!state)return;
+    if(options.includeItems!==false){
+      state.postItemLossProtectionItems=unique([...(state.postItemLossProtectionItems||[]),...this.protectionRecoveryItemsForHazard(hazard)]);
+    }
+    if(options.includeAbilities===false)return;
+    state.postItemLossProtectionAbilities=unique([...(state.postItemLossProtectionAbilities||[]),...this.protectionRecoveryAbilitiesForHazard(state,hazard)]);
+  };
+
+  const originalGroundProtectionRecoveryAbilitiesForMove=proto.groundProtectionRecoveryAbilitiesForMove;
+  proto.groundProtectionRecoveryAbilitiesForMove=function patchedGroundProtectionRecoveryAbilitiesForMove(state, move=''){
+    return this.stillPossibleProtectionAbilities(state,originalGroundProtectionRecoveryAbilitiesForMove.call(this,state,move));
   };
 
   proto.majorStatusBlockingAbilities=function majorStatusBlockingAbilities(state, status='', move=''){
@@ -324,6 +373,17 @@
     return originalMarkPostItemLossProtection.call(this,state,hazard);
   };
 
+  const originalQueueEntryCheck=proto.queueEntryCheck;
+  proto.queueEntryCheck=function patchedQueueEntryCheck(state, turn){
+    originalQueueEntryCheck.call(this,state,turn);
+    if(!state?.slot||!state?.species)return;
+    const source=this.fieldAbilitySuppressionSource(state);
+    if(!source)return;
+    const key=this.stateKey(state.slot,state.species);
+    const check=(this.pendingEntryChecks||[]).find(entry=>entry.key===key&&entry.turn===turn);
+    if(check)check.abilitySuppressionSource=source;
+  };
+
   const originalResolvePendingEntryChecksForEvent=proto.resolvePendingEntryChecksForEvent;
   proto.resolvePendingEntryChecksForEvent=function patchedResolvePendingEntryChecksForEvent(turn, event){
     if(!this.pendingEntryChecks?.length)return originalResolvePendingEntryChecksForEvent.call(this,turn,event);
@@ -341,7 +401,13 @@
       }
       if((check.turn||0)<turn){
         const state=this.speciesState[check.key];
-        (check.hazards||[]).forEach(hazard=>this.markPostItemLossProtection(state,hazard));
+        (check.hazards||[]).forEach(hazard=>{
+          if(check.abilitySuppressionSource){
+            this.markPostItemLossSuppressedProtection(state,hazard,check.abilitySuppressionSource);
+            return;
+          }
+          this.markPostItemLossProtection(state,hazard);
+        });
         return;
       }
       if(eventSlot===check.slot&&eventHazard&&check.hazards.includes(eventHazard)){
@@ -352,6 +418,22 @@
       remaining.push(check);
     });
     this.pendingEntryChecks=remaining;
+  };
+
+  const originalFlushPendingEntryChecks=proto.flushPendingEntryChecks;
+  proto.flushPendingEntryChecks=function patchedFlushPendingEntryChecks(){
+    if(!this.pendingEntryChecks?.length)return originalFlushPendingEntryChecks.call(this);
+    this.pendingEntryChecks.forEach(check=>{
+      const state=this.speciesState[check.key];
+      (check.hazards||[]).forEach(hazard=>{
+        if(check.abilitySuppressionSource){
+          this.markPostItemLossSuppressedProtection(state,hazard,check.abilitySuppressionSource);
+          return;
+        }
+        this.markPostItemLossProtection(state,hazard);
+      });
+    });
+    this.pendingEntryChecks=[];
   };
 
   const originalExtractEvidence=proto.extractEvidence;
