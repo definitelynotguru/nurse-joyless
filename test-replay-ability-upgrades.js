@@ -286,6 +286,49 @@ const gastroAcidHeadlongRushParser = vm.runInContext(`(() => {
 const gastroAcidHeadlongRushTarget = gastroAcidHeadlongRushParser.targets.find(t => t.species === 'Hydreigon');
 assert(!gastroAcidHeadlongRushTarget?.ruledOutAbilities?.includes('Levitate'), 'Ground damage after Gastro Acid should not fake a Levitate contradiction while the ability was suppressed');
 
+const neutralizingGasThunderWaveLog = '|turn|1\n|switch|p1a: Weezing-Galar|Weezing-Galar, L80\n|-ability|p1a: Weezing-Galar|Neutralizing Gas\n|switch|p2a: Gholdengo|Gholdengo, L80\n|move|p1a: Weezing-Galar|Thunder Wave|p2a: Gholdengo\n|-status|p2a: Gholdengo|par';
+const neutralizingGasThunderWaveParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(neutralizingGasThunderWaveLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const neutralizingGasThunderWaveTarget = neutralizingGasThunderWaveParser.targets.find(t => t.species === 'Gholdengo');
+assert(!neutralizingGasThunderWaveTarget?.ruledOutAbilities?.includes('Good as Gold'), 'status landing under Neutralizing Gas should not fake a Good as Gold contradiction while abilities were suppressed field-wide');
+assert(neutralizingGasThunderWaveTarget?.notes?.some(note => /Neutralizing Gas from Weezing-Galar suppressed the target's ability/i.test(note)), 'status landing under Neutralizing Gas should explain why the contradiction was intentionally skipped');
+
+vm.runInContext(
+  `team=[
+    preset("Gholdengo","Air Balloon","Timid",{hp:0,atk:0,def:4,spa:252,spd:0,spe:252},["Make It Rain","Shadow Ball","Recover","Nasty Plot"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: neutralizingGasThunderWaveTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const neutralizingGasThunderWaveRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(neutralizingGasThunderWaveRead.abilityRows[0][0] === 'Good as Gold', 'status landing under Neutralizing Gas should leave Good as Gold live in the detective pool');
+assert(neutralizingGasThunderWaveRead.summary.notes.some(x => /Neutralizing Gas from Weezing-Galar suppressed the target's ability/i.test(x)), 'status landing under Neutralizing Gas should surface the field-suppression note in detective output');
+
+const neutralizingGasStealthRockLog = '|turn|1\n|switch|p1a: Weezing-Galar|Weezing-Galar, L80\n|-ability|p1a: Weezing-Galar|Neutralizing Gas\n|switch|p2a: Hatterene|Hatterene, L80\n|move|p1a: Weezing-Galar|Stealth Rock|p2a: Hatterene\n|-sidestart|p2: Hatterene|move: Stealth Rock';
+const neutralizingGasStealthRockParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(neutralizingGasStealthRockLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const neutralizingGasStealthRockTarget = neutralizingGasStealthRockParser.targets.find(t => t.species === 'Hatterene');
+assert(!neutralizingGasStealthRockTarget?.ruledOutAbilities?.includes('Magic Bounce'), 'hazards landing under Neutralizing Gas should not fake a Magic Bounce contradiction while abilities were suppressed field-wide');
+assert(neutralizingGasStealthRockTarget?.notes?.some(note => /Neutralizing Gas from Weezing-Galar suppressed the target's ability/i.test(note)), 'hazards landing under Neutralizing Gas should explain why the contradiction was intentionally skipped');
+
+const neutralizingGasEndsThunderWaveLog = '|turn|1\n|switch|p1a: Weezing-Galar|Weezing-Galar, L80\n|-ability|p1a: Weezing-Galar|Neutralizing Gas\n|switch|p2a: Gholdengo|Gholdengo, L80\n|turn|2\n|switch|p1a: Dragapult|Dragapult, L80\n|move|p1a: Dragapult|Thunder Wave|p2a: Gholdengo\n|-status|p2a: Gholdengo|par';
+const neutralizingGasEndsThunderWaveParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(neutralizingGasEndsThunderWaveLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const neutralizingGasEndsThunderWaveTarget = neutralizingGasEndsThunderWaveParser.targets.find(t => t.species === 'Gholdengo');
+assert(neutralizingGasEndsThunderWaveTarget?.ruledOutAbilities?.includes('Good as Gold'), 'once the Neutralizing Gas source leaves, later landed status should rule out Good as Gold again');
+
 const moldBreakerThunderWaveLog = '|turn|1\n|switch|p1a: Haxorus|Haxorus, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|move|p1a: Haxorus|Thunder Wave|p2a: Gholdengo\n|-ability|p1a: Haxorus|Mold Breaker\n|-status|p2a: Gholdengo|par';
 const moldBreakerThunderWaveParser = vm.runInContext(`(() => {
   const parser = new ReplayParser();
