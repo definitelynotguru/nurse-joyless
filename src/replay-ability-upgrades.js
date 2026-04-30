@@ -118,6 +118,44 @@
     return `${ability} revealed`;
   };
 
+  proto.abilityBypassAbility=function abilityBypassAbility(ability=''){
+    return ['Mold Breaker','Teravolt','Turboblaze'].includes(String(ability||'').trim());
+  };
+
+  proto.findRecentOpponentMoveEvent=function findRecentOpponentMoveEvent(state, move=''){
+    const moveName=String(move||'').trim();
+    if(!moveName||!state?.slot||!Array.isArray(this.turnMoves))return null;
+    return [...this.turnMoves].reverse().find(entry=>{
+      if(!entry?.move||DexAdapter.id(entry.move)!==DexAdapter.id(moveName))return false;
+      return entry.slot&&entry.slot!==state.slot;
+    })||null;
+  };
+
+  proto.moveAbilityBypass=function moveAbilityBypass(state, move=''){
+    const moveEvent=this.findRecentOpponentMoveEvent(state, move);
+    const ability=String(moveEvent?.abilityBypass||'').trim();
+    return this.abilityBypassAbility(ability)?ability:'';
+  };
+
+  proto.moveAbilityBypassNote=function moveAbilityBypassNote(state, move=''){
+    const ability=this.moveAbilityBypass(state, move);
+    const moveName=String(move||'').trim();
+    const abilities=this.abilitySuppressionActive(state)?[]:detectiveAbilities(state?.species).filter(candidate=>this.abilityTriggeredByMove(candidate,moveName));
+    if(!ability||!moveName||!abilities.length)return '';
+    return `${ability} let ${moveName} bypass ${this.joinWithOr(abilities)}, so that landed move does not rule out the base ability.`;
+  };
+
+  proto.recordMoveAbilityBypass=function recordMoveAbilityBypass(state, turn, move=''){
+    const note=this.moveAbilityBypassNote(state, move);
+    const ability=this.moveAbilityBypass(state, move);
+    const moveName=String(move||'').trim();
+    if(!state||!note||!ability||!moveName)return;
+    if((state.abilityContradictionNotes||[]).includes(note))return;
+    this.addAbilityContradictionNote(state,note);
+    this.addEvidence(state,turn||0,'reveal',`${ability} bypassed the target ability checks for ${moveName}`,'Ability bypass window active',2,{soft:true});
+    this.addClueObservation(state,{turn:turn||0,move:moveName,label:`${ability} bypassed ${moveName}`});
+  };
+
   const originalAbilityTriggeredByMove=proto.abilityTriggeredByMove;
   proto.abilityTriggeredByMove=function patchedAbilityTriggeredByMove(ability, move=''){
     const category=this.replaySafeMoveCategory(move);
@@ -161,13 +199,15 @@
   const originalMoveBlockedAbilities=proto.moveBlockedAbilities;
   proto.moveBlockedAbilities=function patchedMoveBlockedAbilities(state, move=''){
     if(this.abilitySuppressionActive(state))return [];
+    if(this.moveAbilityBypass(state,move))return [];
     return originalMoveBlockedAbilities.call(this,state,move);
   };
 
-  proto.majorStatusBlockingAbilities=function majorStatusBlockingAbilities(state, status=''){
+  proto.majorStatusBlockingAbilities=function majorStatusBlockingAbilities(state, status='', move=''){
     const statusId=String(status||'').trim();
     if(!statusId)return [];
     if(this.abilitySuppressionActive(state))return [];
+    if(this.moveAbilityBypass(state,move))return [];
     return detectiveAbilities(state?.species).filter(ability=>{
       if(ability==='Purifying Salt')return true;
       if(statusId==='par'&&ability==='Limber')return true;
@@ -270,6 +310,11 @@
     if((event?.type==='switch'||event?.type==='drag')&&event?.pokemon){
       this.clearAbilitySuppression(this.ensureState(event.pokemon,event.details));
     }
+    if(event?.type==='-ability'&&event.target&&this.abilityBypassAbility(event.ability)){
+      const state=this.ensureState(event.target);
+      const moveEvent=[...this.turnMoves].reverse().find(x=>x.slot===state?.slot);
+      if(moveEvent)moveEvent.abilityBypass=event.ability;
+    }
     if(event?.type==='-status'&&event.target&&!this.normalizedHazardName(event.from)){
       const state=this.ensureState(event.target);
       state.currentStatus=event.status||state.currentStatus||'';
@@ -286,6 +331,7 @@
       const moveEvent=[...this.turnMoves].reverse().find(x=>x.species&&this.slotSide(x.slot)!==event.side);
       const landedMove=this.sideConditionLandedMove(event,moveEvent);
       if(state&&landedMove){
+        this.recordMoveAbilityBypass(state,turn,landedMove);
         this.ruleOutAbilities(
           state,
           turn,
@@ -296,12 +342,19 @@
       }
       return originalExtractEvidence.call(this,event,turn);
     }
+    if(event?.type==='-damage'&&event.target&&!this.normalizedHazardName(event.from)){
+      const state=this.ensureState(event.target);
+      const moveEvent=[...this.turnMoves].reverse().find(x=>x.species&&state.slot!==x.slot);
+      this.recordMoveAbilityBypass(state,turn,moveEvent?.move);
+      return originalExtractEvidence.call(this,event,turn);
+    }
     if(event?.type==='-status'&&event.target){
       const hazard=this.normalizedHazardName(event.from);
       const state=this.ensureState(event.target);
       const moveEvent=[...this.turnMoves].reverse().find(x=>x.species&&state.slot!==x.slot);
       const duplicateHazardAbilities=hazard==='Toxic Spikes'?this.hazardAbilityContradictions(state,hazard):[];
-      const statusAbilities=this.majorStatusBlockingAbilities(state,event.status).filter(ability=>!duplicateHazardAbilities.includes(ability));
+      const statusAbilities=this.majorStatusBlockingAbilities(state,event.status,moveEvent?.move).filter(ability=>!duplicateHazardAbilities.includes(ability));
+      this.recordMoveAbilityBypass(state,turn,moveEvent?.move);
       if(statusAbilities.length){
         this.ruleOutAbilities(
           state,
