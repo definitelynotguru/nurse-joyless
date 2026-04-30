@@ -98,15 +98,37 @@
     })[value]||'status';
   };
 
-  proto.toxicSpikesBlockedByExistingStatus=function toxicSpikesBlockedByExistingStatus(state){
-    return !!String(state?.currentStatus||'').trim();
+  proto.toxicSpikesBlockedByExistingStatus=function toxicSpikesBlockedByExistingStatus(state, statusOverride=''){
+    return !!String(statusOverride||state?.currentStatus||'').trim();
   };
 
-  proto.postItemLossStatusBlockNote=function postItemLossStatusBlockNote(state, hazard=''){
+  proto.postItemLossStatusBlockNote=function postItemLossStatusBlockNote(state, hazard='', statusOverride=''){
     const label=this.normalizedHazardName(hazard)||String(hazard||'hazards').trim()||'hazards';
-    if(label!=='Toxic Spikes'||!this.toxicSpikesBlockedByExistingStatus(state))return '';
-    const status=this.statusLabel(state.currentStatus);
+    if(label!=='Toxic Spikes'||!this.toxicSpikesBlockedByExistingStatus(state,statusOverride))return '';
+    const status=this.statusLabel(statusOverride||state?.currentStatus||'');
     return `Later switched through ${label} after ${state?.removedItem||'the old item'} left the slot without getting poisoned, but the standing ${status} already explains that outcome without implying fresh protection.`;
+  };
+
+  proto.entryStatusForCheck=function entryStatusForCheck(check={}){
+    return String(check?.entryStatus||'').trim();
+  };
+
+  proto.markPostItemLossProtectionFromCheck=function markPostItemLossProtectionFromCheck(state, hazard='', check={}){
+    const entryStatus=this.entryStatusForCheck(check);
+    if(this.normalizedHazardName(hazard)==='Toxic Spikes'&&entryStatus){
+      this.addPostItemLossNote(state,this.postItemLossStatusBlockNote(state,hazard,entryStatus));
+      return;
+    }
+    this.markPostItemLossProtection(state,hazard);
+  };
+
+  proto.markPostItemLossSuppressedProtectionFromCheck=function markPostItemLossSuppressedProtectionFromCheck(state, hazard='', source='', check={}){
+    const entryStatus=this.entryStatusForCheck(check);
+    if(this.normalizedHazardName(hazard)==='Toxic Spikes'&&entryStatus){
+      this.addPostItemLossNote(state,this.postItemLossStatusBlockNote(state,hazard,entryStatus));
+      return;
+    }
+    this.markPostItemLossSuppressedProtection(state,hazard,source);
   };
 
   proto.abilityClueLabelWithProof=function abilityClueLabelWithProof(ability, move='', assumeTriggered=false){
@@ -406,11 +428,12 @@
   proto.queueEntryCheck=function patchedQueueEntryCheck(state, turn){
     originalQueueEntryCheck.call(this,state,turn);
     if(!state?.slot||!state?.species)return;
-    const source=this.fieldAbilitySuppressionSource(state);
-    if(!source)return;
     const key=this.stateKey(state.slot,state.species);
     const check=(this.pendingEntryChecks||[]).find(entry=>entry.key===key&&entry.turn===turn);
-    if(check)check.abilitySuppressionSource=source;
+    if(!check)return;
+    if(!check.entryStatus)check.entryStatus=String(state.currentStatus||'').trim();
+    const source=this.fieldAbilitySuppressionSource(state);
+    if(source)check.abilitySuppressionSource=source;
   };
 
   const originalResolvePendingEntryChecksForEvent=proto.resolvePendingEntryChecksForEvent;
@@ -432,10 +455,10 @@
         const state=this.speciesState[check.key];
         (check.hazards||[]).forEach(hazard=>{
           if(check.abilitySuppressionSource){
-            this.markPostItemLossSuppressedProtection(state,hazard,check.abilitySuppressionSource);
+            this.markPostItemLossSuppressedProtectionFromCheck(state,hazard,check.abilitySuppressionSource,check);
             return;
           }
-          this.markPostItemLossProtection(state,hazard);
+          this.markPostItemLossProtectionFromCheck(state,hazard,check);
         });
         return;
       }
@@ -456,10 +479,10 @@
       const state=this.speciesState[check.key];
       (check.hazards||[]).forEach(hazard=>{
         if(check.abilitySuppressionSource){
-          this.markPostItemLossSuppressedProtection(state,hazard,check.abilitySuppressionSource);
+          this.markPostItemLossSuppressedProtectionFromCheck(state,hazard,check.abilitySuppressionSource,check);
           return;
         }
-        this.markPostItemLossProtection(state,hazard);
+        this.markPostItemLossProtectionFromCheck(state,hazard,check);
       });
     });
     this.pendingEntryChecks=[];
