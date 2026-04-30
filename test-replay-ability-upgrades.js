@@ -464,6 +464,26 @@ const moldBreakerHeadlongRushRead = vm.runInContext('lastDetectiveRead', context
 assert(moldBreakerHeadlongRushRead.abilityRows[0][0] === 'Levitate', 'Mold Breaker Ground damage should leave Levitate live in the detective pool');
 assert(moldBreakerHeadlongRushRead.summary.notes.some(x => /Mold Breaker let Headlong Rush bypass Levitate/i.test(x)), 'Mold Breaker Ground damage should carry the Levitate bypass note into detective output');
 
+const ruledOutThenMoldBreakerHeadlongRushLog = '|turn|1\n|-sidestart|p2: Hydreigon|move: Spikes\n|switch|p2a: Hydreigon|Hydreigon, L80\n|-damage|p2a: Hydreigon|88/100|[from] Spikes\n|turn|2\n|switch|p1a: Haxorus|Haxorus, L80\n|move|p1a: Haxorus|Headlong Rush|p2a: Hydreigon\n|-ability|p1a: Haxorus|Mold Breaker\n|-damage|p2a: Hydreigon|36/100';
+const ruledOutThenMoldBreakerHeadlongRushParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(ruledOutThenMoldBreakerHeadlongRushLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const ruledOutThenMoldBreakerHeadlongRushTarget = ruledOutThenMoldBreakerHeadlongRushParser.targets.find(t => t.species === 'Hydreigon');
+assert(ruledOutThenMoldBreakerHeadlongRushTarget?.ruledOutAbilities?.includes('Levitate'), 'earlier grounded hazard chip should still rule out Levitate before the Mold Breaker follow-up');
+assert(!ruledOutThenMoldBreakerHeadlongRushTarget?.notes?.some(note => /Mold Breaker let Headlong Rush bypass Levitate/i.test(note)), 'Mold Breaker follow-up notes should not revive Levitate once earlier replay evidence already ruled it out');
+
+const ruledOutThenMoldBreakerThunderWaveLog = '|turn|1\n|switch|p1a: Dragapult|Dragapult, L80\n|switch|p2a: Garganacl|Garganacl, L80\n|move|p1a: Dragapult|Thunder Wave|p2a: Garganacl\n|-status|p2a: Garganacl|par\n|turn|2\n|switch|p1a: Haxorus|Haxorus, L80\n|move|p1a: Haxorus|Thunder Wave|p2a: Garganacl\n|-ability|p1a: Haxorus|Mold Breaker\n|-status|p2a: Garganacl|par';
+const ruledOutThenMoldBreakerThunderWaveParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(ruledOutThenMoldBreakerThunderWaveLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const ruledOutThenMoldBreakerThunderWaveTarget = ruledOutThenMoldBreakerThunderWaveParser.targets.find(t => t.species === 'Garganacl');
+assert(ruledOutThenMoldBreakerThunderWaveTarget?.ruledOutAbilities?.includes('Purifying Salt'), 'earlier successful status application should still rule out Purifying Salt before the Mold Breaker follow-up');
+assert(!ruledOutThenMoldBreakerThunderWaveTarget?.notes?.some(note => /Mold Breaker let Thunder Wave bypass Purifying Salt/i.test(note)), 'Mold Breaker follow-up notes should not revive Purifying Salt once earlier replay evidence already ruled it out');
+
 const delayedToxicSpikesStatusLog = '|turn|1\n|switch|p1a: Gliscor|Gliscor, L80\n|-sidestart|p2: Great Tusk|move: Toxic Spikes\n|switch|p2a: Great Tusk|Great Tusk, L80\n|-item|p2a: Great Tusk|Heavy-Duty Boots\n|move|p1a: Gliscor|Knock Off|p2a: Great Tusk\n|-enditem|p2a: Great Tusk|Heavy-Duty Boots|[from] move: Knock Off\n|turn|2\n|switch|p2a: Great Tusk|Great Tusk, L80\n|-ability|p1a: Gliscor|Poison Heal\n|-status|p2a: Great Tusk|psn|[from] move: Toxic Spikes';
 const delayedToxicSpikesStatusParser = vm.runInContext(`(() => {
   const parser = new ReplayParser();
