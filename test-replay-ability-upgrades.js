@@ -382,6 +382,30 @@ const neutralizingGasEndsThunderWaveParser = vm.runInContext(`(() => {
 const neutralizingGasEndsThunderWaveTarget = neutralizingGasEndsThunderWaveParser.targets.find(t => t.species === 'Gholdengo');
 assert(neutralizingGasEndsThunderWaveTarget?.ruledOutAbilities?.includes('Good as Gold'), 'once the Neutralizing Gas source leaves, later landed status should rule out Good as Gold again');
 
+const stealthRockGoodAsGoldLog = '|turn|1\n|switch|p1a: Gliscor|Gliscor, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|move|p1a: Gliscor|Stealth Rock|p2a: Gholdengo\n|-sidestart|p2: Gholdengo|move: Stealth Rock';
+const stealthRockGoodAsGoldParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(stealthRockGoodAsGoldLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const stealthRockGoodAsGoldTarget = stealthRockGoodAsGoldParser.targets.find(t => t.species === 'Gholdengo');
+assert(!stealthRockGoodAsGoldTarget?.ruledOutAbilities?.includes('Good as Gold'), 'Stealth Rock landing on Gholdengo\'s side should not fake a Good as Gold contradiction');
+assert(!stealthRockGoodAsGoldTarget?.notes?.some(note => /ruling out Good as Gold/i.test(note)), 'Stealth Rock landing on Gholdengo\'s side should not claim that Good as Gold was disproved');
+
+vm.runInContext(
+  `lastDetectiveRead=null;
+  team=[
+    preset("Gholdengo","Air Balloon","Timid",{hp:0,atk:0,def:4,spa:252,spd:0,spe:252},["Make It Rain","Shadow Ball","Recover","Nasty Plot"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: stealthRockGoodAsGoldTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const stealthRockGoodAsGoldRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(!stealthRockGoodAsGoldRead, 'Stealth Rock landing on Gholdengo\'s side should not fabricate a replay detective handoff just to contradict Good as Gold');
+
 const moldBreakerThunderWaveLog = '|turn|1\n|switch|p1a: Haxorus|Haxorus, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|move|p1a: Haxorus|Thunder Wave|p2a: Gholdengo\n|-ability|p1a: Haxorus|Mold Breaker\n|-status|p2a: Gholdengo|par';
 const moldBreakerThunderWaveParser = vm.runInContext(`(() => {
   const parser = new ReplayParser();
