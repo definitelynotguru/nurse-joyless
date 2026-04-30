@@ -228,6 +228,39 @@ const strayBurnStatusParser = vm.runInContext(`(() => {
 const strayBurnStatusTarget = strayBurnStatusParser.strongest;
 assert(!strayBurnStatusTarget?.ruledOutAbilities?.length, 'status lines without a linked move should not fabricate landed-status contradictions');
 
+const gastroAcidPurifyingSaltLog = '|turn|1\n|switch|p1a: Dragapult|Dragapult, L80\n|switch|p2a: Garganacl|Garganacl, L80\n|move|p1a: Dragapult|Gastro Acid|p2a: Garganacl\n|-start|p2a: Garganacl|Gastro Acid\n|move|p1a: Dragapult|Thunder Wave|p2a: Garganacl\n|-status|p2a: Garganacl|par';
+const gastroAcidPurifyingSaltParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(gastroAcidPurifyingSaltLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const gastroAcidPurifyingSaltTarget = gastroAcidPurifyingSaltParser.targets.find(t => t.species === 'Garganacl');
+assert(!gastroAcidPurifyingSaltTarget?.ruledOutAbilities?.includes('Purifying Salt'), 'status landing after Gastro Acid should not fake a Purifying Salt contradiction once the ability was suppressed');
+assert(gastroAcidPurifyingSaltTarget?.notes?.some(note => /Gastro Acid suppressed the target's ability/i.test(note)), 'status landing after Gastro Acid should explain why later contradictions from that window were intentionally skipped');
+
+vm.runInContext(
+  `team=[
+    preset("Garganacl","Leftovers","Careful",{hp:252,atk:4,def:0,spa:0,spd:252,spe:0},["Salt Cure","Recover","Stealth Rock","Protect"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: gastroAcidPurifyingSaltTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const gastroAcidPurifyingSaltRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(gastroAcidPurifyingSaltRead.abilityRows[0][0] === 'Purifying Salt', 'status landing after Gastro Acid should leave Purifying Salt live in the detective pool instead of spending a fake hard rule-out');
+assert(gastroAcidPurifyingSaltRead.summary.notes.some(x => /Gastro Acid suppressed the target's ability/i.test(x)), 'status landing after Gastro Acid should surface the suppression-window note in detective output');
+
+const gastroAcidHeadlongRushLog = '|turn|1\n|switch|p1a: Great Tusk|Great Tusk, L80\n|switch|p2a: Hydreigon|Hydreigon, L80\n|move|p1a: Great Tusk|Gastro Acid|p2a: Hydreigon\n|-start|p2a: Hydreigon|Gastro Acid\n|move|p1a: Great Tusk|Headlong Rush|p2a: Hydreigon\n|-damage|p2a: Hydreigon|38/100';
+const gastroAcidHeadlongRushParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(gastroAcidHeadlongRushLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const gastroAcidHeadlongRushTarget = gastroAcidHeadlongRushParser.targets.find(t => t.species === 'Hydreigon');
+assert(!gastroAcidHeadlongRushTarget?.ruledOutAbilities?.includes('Levitate'), 'Ground damage after Gastro Acid should not fake a Levitate contradiction while the ability was suppressed');
+
 const delayedToxicSpikesStatusLog = '|turn|1\n|switch|p1a: Gliscor|Gliscor, L80\n|-sidestart|p2: Great Tusk|move: Toxic Spikes\n|switch|p2a: Great Tusk|Great Tusk, L80\n|-item|p2a: Great Tusk|Heavy-Duty Boots\n|move|p1a: Gliscor|Knock Off|p2a: Great Tusk\n|-enditem|p2a: Great Tusk|Heavy-Duty Boots|[from] move: Knock Off\n|turn|2\n|switch|p2a: Great Tusk|Great Tusk, L80\n|-ability|p1a: Gliscor|Poison Heal\n|-status|p2a: Great Tusk|psn|[from] move: Toxic Spikes';
 const delayedToxicSpikesStatusParser = vm.runInContext(`(() => {
   const parser = new ReplayParser();
