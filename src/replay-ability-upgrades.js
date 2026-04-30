@@ -7,6 +7,13 @@
 
   if(typeof REPLAY_MOVE_HINTS!=='undefined'){
     REPLAY_MOVE_HINTS.Nuzzle=['Electric','Physical',0];
+    REPLAY_MOVE_HINTS.Glare=['Normal','Status',0];
+    REPLAY_MOVE_HINTS['Stun Spore']=['Grass','Status',0];
+    REPLAY_MOVE_HINTS['Poison Powder']=['Poison','Status',0];
+    REPLAY_MOVE_HINTS['Sleep Powder']=['Grass','Status',0];
+    REPLAY_MOVE_HINTS.Hypnosis=['Psychic','Status',0];
+    REPLAY_MOVE_HINTS['Lovely Kiss']=['Normal','Status',0];
+    REPLAY_MOVE_HINTS.Sing=['Normal','Status',0];
   }
 
   proto.reactiveAbilityProof=function reactiveAbilityProof(ability){
@@ -39,6 +46,25 @@
     ].includes(String(move||'').trim());
   };
 
+  proto.knownPureStatusMove=function knownPureStatusMove(move=''){
+    return [
+      'Glare',
+      'Hypnosis',
+      'Lovely Kiss',
+      'Poison Powder',
+      'Sing',
+      'Sleep Powder',
+      'Stun Spore'
+    ].includes(String(move||'').trim());
+  };
+
+  proto.replaySafeMoveCategory=function replaySafeMoveCategory(move=''){
+    const meta=moveMeta(move);
+    if(meta?.[1])return meta[1];
+    if(this.knownStatusStartMove(move)||this.knownPureStatusMove(move))return 'Status';
+    return '';
+  };
+
   proto.startEffectMove=function startEffectMove(event={}, moveEvent=null){
     const raw=String(event?.raw||'');
     const parts=raw?raw.split('|').filter(Boolean):[];
@@ -48,7 +74,7 @@
     const fromMove=from.match(/^move: (.+)$/)?.[1]||'';
     if(effect&&fromMove&&DexAdapter.id(effect)===DexAdapter.id(fromMove))return fromMove;
     if(effect&&moveEvent?.move&&DexAdapter.id(effect)===DexAdapter.id(moveEvent.move))return moveEvent.move;
-    const moveCategory=moveMeta(moveEvent?.move)?.[1]||'';
+    const moveCategory=this.replaySafeMoveCategory(moveEvent?.move);
     if(moveEvent?.move&&(moveCategory==='Status'||this.knownStatusStartMove(moveEvent.move)))return moveEvent.move;
     return '';
   };
@@ -94,9 +120,8 @@
 
   const originalAbilityTriggeredByMove=proto.abilityTriggeredByMove;
   proto.abilityTriggeredByMove=function patchedAbilityTriggeredByMove(ability, move=''){
-    const meta=moveMeta(move);
-    const category=meta?.[1]||'Status';
-    if(ability==='Magic Bounce')return category==='Status';
+    const category=this.replaySafeMoveCategory(move);
+    if(ability==='Magic Bounce'||ability==='Good as Gold')return category==='Status';
     return originalAbilityTriggeredByMove.call(this,ability,move);
   };
 
@@ -217,7 +242,7 @@
         );
       }
       if(hazard!=='Toxic Spikes'&&!this.abilitySource(event.from)&&!this.itemSource(event.from)){
-        const landedMove=moveEvent?.move&&moveCategory(moveEvent.move)==='Status'?moveEvent.move:'';
+        const landedMove=moveEvent?.move&&this.replaySafeMoveCategory(moveEvent.move)==='Status'?moveEvent.move:'';
         if(landedMove){
           this.ruleOutAbilities(
             state,
