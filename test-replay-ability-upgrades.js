@@ -118,6 +118,31 @@ const magicBounceTauntStartTarget = magicBounceTauntStartParser.strongest;
 assert(magicBounceTauntStartTarget?.ruledOutAbilities?.includes('Magic Bounce'), 'landed reflected-status effects should rule out Magic Bounce when the move actually connected');
 assert(magicBounceTauntStartTarget?.notes?.some(note => /Taunt successfully landed/i.test(note)), 'landed reflected-status effects should explain the Magic Bounce contradiction in replay notes');
 
+const magicBounceStealthRockLog = '|turn|1\n|switch|p1a: Ting-Lu|Ting-Lu, L80\n|switch|p2a: Hatterene|Hatterene, L80\n|move|p1a: Ting-Lu|Stealth Rock|p2a: Hatterene\n|-sidestart|p2: Hatterene|move: Stealth Rock';
+const magicBounceStealthRockParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(magicBounceStealthRockLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const magicBounceStealthRockTarget = magicBounceStealthRockParser.strongest;
+assert(magicBounceStealthRockTarget?.ruledOutAbilities?.includes('Magic Bounce'), 'hazards successfully landing on the target side should rule out Magic Bounce');
+assert(magicBounceStealthRockTarget?.notes?.some(note => /Stealth Rock successfully landed/i.test(note)), 'hazards successfully landing on the target side should explain the Magic Bounce contradiction in replay notes');
+assert(magicBounceStealthRockTarget?.detectiveInputs?.[0]?.label === 'Stealth Rock landed', 'hazard side-condition contradictions should stay detective-loadable with the move name');
+
+vm.runInContext(
+  `team=[
+    preset("Hatterene","Leftovers","Bold",{hp:252,atk:0,def:252,spa:4,spd:0,spe:0},["Psychic Noise","Dazzling Gleam","Healing Wish","Mystical Fire"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: magicBounceStealthRockTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const magicBounceStealthRockRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(!magicBounceStealthRockRead.abilityRows.some(([name]) => name === 'Magic Bounce'), 'hazards successfully landing on the target side should remove Magic Bounce from the live detective pool');
+assert(magicBounceStealthRockRead.summary.notes.some(x => /Magic Bounce impossible/i.test(x)), 'hazard side-condition contradictions should carry the Magic Bounce rule-out into detective notes');
+
 const leechSeedStartLog = '|turn|1\n|switch|p1a: Ferrothorn|Ferrothorn, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|move|p1a: Ferrothorn|Leech Seed|p2a: Gholdengo\n|-start|p2a: Gholdengo|move: Leech Seed';
 const leechSeedStartParser = vm.runInContext(`(() => {
   const parser = new ReplayParser();
