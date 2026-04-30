@@ -164,11 +164,11 @@
   proto.moveAbilityBypassProtectedAbilities=function moveAbilityBypassProtectedAbilities(state, move='', status=''){
     if(this.abilitySuppressionActive(state))return [];
     const moveName=String(move||'').trim();
-    return unique([
+    return this.stillPossibleProtectionAbilities(state,unique([
       ...detectiveAbilities(state?.species).filter(candidate=>this.abilityTriggeredByMove(candidate,moveName)),
       ...this.majorStatusBlockingAbilitiesWithoutBypass(state,status),
       ...this.groundMoveProtectedAbilities(state,moveName)
-    ]);
+    ]));
   };
 
   proto.moveAbilityBypassNote=function moveAbilityBypassNote(state, move='', status=''){
