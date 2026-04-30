@@ -277,7 +277,7 @@ function teamReasoner(t,a){let s=teamSignals(t,a),scores=[];let add=(name,score,
   let synergy=synergyScores(t,a,s),matchups=matchupScores(t,a,s,primary),suggestions=suggestAdditions(t,a,s,primary,matchups);
   return{signals:s,identity:{primary,secondary,scores},synergy,matchups,suggestions,risks:riskList(t,a,s),verdict:verdict(primary,synergy,matchups)}}
 function synergyScores(t,a,s){let worst=a.rows[0]||{},coverage=typeCoverageCount(s),typeStack=Math.max(0,...Object.values(s.typeCounts));let typeSynergy=clamp(82-worst.score*5-Math.max(0,typeStack-2)*12+resistCount(t,worst.tp||'Normal')*4);let roleBalance=clamp(20+s.hazards*10+s.removal*14+s.recovery*8+s.pivot*8+s.wallbreakers*8+s.walls*8+s.speed*6);let offensiveCoverage=clamp(20+coverage*6+s.wallbreakers*8+s.setup*6+s.priority*5);let defensiveBackbone=clamp(20+s.walls*14+s.recovery*8+s.removal*6-worst.weak*6);let hazardPlan=clamp(25+s.hazards*20+s.removal*20+s.boots*4+s.magicBounce*18);let speedControl=clamp(20+s.highSpeed*12+s.priority*10+s.trickRoom*14+(s.items['Choice Scarf']||0)*10);let winConditions=clamp(25+s.setup*13+s.wallbreakers*8+s.weather.sun*8+s.trickRoom*6);return{typeSynergy,roleBalance,offensiveCoverage,defensiveBackbone,hazardPlan,speedControl,winConditions}}
-function matchupScores(t,a,s,primary){let w=tp=>weakCount(t,tp),r=tp=>resistCount(t,tp),hasRemoval=s.removal>0,hasBoots=s.boots>=2,magic=s.magicBounce;let rain=clamp(62-r('Water')*8-w('Water')*9-w('Ice')*4+(s.weather.sun?8:0)+(s.typeCounts.Grass||0)*5);let sun=clamp(55-r('Fire')*7-w('Fire')*7-r('Grass')*3+(s.weather.sun?12:0));let hazard=clamp(35+hasRemoval*18+hasBoots*10+magic*22+s.hazards*4-s.typeCounts.Flying*2);let ho=clamp(45+s.highSpeed*7+s.priority*10+s.trickRoom*12+s.walls*5-w('Ice')*2-w('Fairy')*2);let stall=clamp(38+s.wallbreakers*12+s.status*4+s.setup*5+s.magicBounce*10-s.choiceItems*3);let balance=clamp(45+s.wallbreakers*7+s.pivot*6+s.walls*6+s.removal*4-Math.max(0,(Math.max(...Object.values(s.typeCounts))-3))*5);let trick=clamp(55+s.trickRoom*10+s.priority*4+s.highSpeed*2-(s.slowAbusers?0:10));let dragon=clamp(55+r('Dragon')*8-w('Dragon')*8+(s.typeCounts.Fairy||0)*10+(s.typeCounts.Steel||0)*8);return[
+function matchupScores(t,a,s,primary){let w=tp=>weakCount(t,tp),r=tp=>resistCount(t,tp),hasRemoval=s.removal>0,hasBoots=s.boots>=2,magic=s.magicBounce;let rainRaw=62-r('Water')*8-w('Water')*9-w('Ice')*4+(s.weather.sun?8:0)+(s.typeCounts.Grass||0)*5,rain=clamp(Math.max(12,rainRaw));let sun=clamp(55-r('Fire')*7-w('Fire')*7-r('Grass')*3+(s.weather.sun?12:0));let hazard=clamp(35+hasRemoval*18+hasBoots*10+magic*22+s.hazards*4-s.typeCounts.Flying*2);let ho=clamp(45+s.highSpeed*7+s.priority*10+s.trickRoom*12+s.walls*5-w('Ice')*2-w('Fairy')*2);let stall=clamp(38+s.wallbreakers*12+s.status*4+s.setup*5+s.magicBounce*10-s.choiceItems*3);let balance=clamp(45+s.wallbreakers*7+s.pivot*6+s.walls*6+s.removal*4-Math.max(0,(Math.max(...Object.values(s.typeCounts))-3))*5);let trick=clamp(55+s.trickRoom*10+s.priority*4+s.highSpeed*2-(s.slowAbusers?0:10));let dragon=clamp(55+r('Dragon')*8-w('Dragon')*8+(s.typeCounts.Fairy||0)*10+(s.typeCounts.Steel||0)*8);return[
 {name:'Rain',score:rain,reason:rain<50?'Water pressure plus Ice coverage can overwhelm the structure.':'Has enough Water counterplay or weather disruption to contest rain.'},
 {name:'Sun',score:sun,reason:sun<50?'Fire pressure or opposing weather sweepers can stress the team.':'Can exploit or resist sun well enough to trade.'},
 {name:'Hazard Stack',score:hazard,reason:hazard<50?'Field control is fragile; hazards may snowball.':'Removal, Boots, or Magic Bounce give real counterplay.'},
@@ -1388,10 +1388,19 @@ class ReplayParser{
 function replayEvidenceIcon(source){
   return source==='hazard'?'!':source==='status'?'X':source==='damage'?'*':'+';
 }
+function uniqueDetectiveInputs(inputs=[]){
+  const seen=new Set();
+  return inputs.filter(input=>{
+    const key=[input.label||'',input.species||'',input.move||'',input.evidence||'',input.observedDamage??'',input.clueLabel||''].join('|');
+    if(seen.has(key))return false;
+    seen.add(key);
+    return true;
+  });
+}
 function replayTargetHtml(target,targetIndex,{headline='Replay target',strongest=false,includeCopy=false}={}){
   if(!target)return '';
   const noteBadges=(target.notes||[]).map(note=>reasonBadge(note,/confirmed|revealed/i.test(note)?'good':'warn')).join('');
-  const detectiveInputs=target.detectiveInputs||[];
+  const detectiveInputs=uniqueDetectiveInputs(target.detectiveInputs||[]);
   const detectiveButtons=detectiveInputs.length
     ? detectiveInputs.map((input,index)=>`<button class="${index===0?'primary':'ghost'} small" onclick="loadReplayDetective(${targetIndex},${index})">${html(index===0?(strongest?`Load primary read: ${input.label}`:`Load read: ${input.label}`):`Load alternate read: ${input.label}`)}</button>`).join('')
     : '';
@@ -1446,7 +1455,7 @@ function loadReplayDetective(targetIndex=0,branchIndex){
     }
   }
   const target=targets[targetIndex]||lastReplayRead?.strongest;
-  const inputs=target?.detectiveInputs||[];
+  const inputs=uniqueDetectiveInputs(target?.detectiveInputs||[]);
   const input=inputs[branchIndex]||target?.detectiveInput;
   if(!target||!input)return;
   const opp=$('oppSpecies'), move=$('obsMove');
@@ -1540,7 +1549,17 @@ function getAgentFacts(agent){
   return facts;
 }
 async function streamKimi(prompt,onChunk,onDone,onError){const apiKey=localStorage.getItem('nursejoyless_kimiKey');if(!apiKey){onError('No Kimi API key. Add key in settings.');return}try{const res=await fetch('https://api.moonshot.ai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},body:JSON.stringify({model:'kimi-k2-0711-preview',messages:[{role:'system',content:'You are a competitive Pokemon analyst. ONLY explain provided facts. Never invent mechanics.'},{role:'user',content:prompt}],stream:true,temperature:.7,max_tokens:300})});if(!res.ok){onError(`Kimi error: ${res.status}`);return}const reader=res.body?.getReader?.();if(!reader){onError('Kimi response body is not streamable.');return}const decoder=new TextDecoder();let buffer='';while(true){const {done,value}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});let lines=buffer.split('\n');buffer=lines.pop()||'';for(const line of lines){if(!line.startsWith('data: '))continue;let data=line.slice(6).trim();if(data==='[DONE]'){onDone();return}try{let json=JSON.parse(data),chunk=json.choices?.[0]?.delta?.content||'';if(chunk)onChunk(chunk)}catch(e){}}}onDone()}catch(err){onError(err.message||String(err))}}async function streamOllama(prompt,onChunk,onDone,onError){const baseUrl=localStorage.getItem('nursejoyless_ollamaUrl')||'http://localhost:11434';try{const res=await fetch(`${baseUrl}/api/generate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'llama3',prompt,stream:true})});if(!res.ok){onError(`Ollama error: ${res.status}`);return}const reader=res.body.getReader(),decoder=new TextDecoder();while(true){const{done,value}=await reader.read();if(done)break;decoder.decode(value).split('\n').filter(Boolean).forEach(line=>{try{let j=JSON.parse(line);onChunk(j.response||'')}catch(e){}})}onDone()}catch(err){onError(err.message)}}function buildAgentPrompt(agent,facts){return`Agent: ${agent}\nRules: only explain facts, never invent mechanics.\nFACTS:\n${JSON.stringify(facts,null,2)}\nRespond in 2-3 sharp sentences.`}async function runAgent(agent){currentAgent=agent;document.querySelectorAll('.agent-tab').forEach(t=>t.classList.toggle('active',t.dataset.agent===agent));const facts=getAgentFacts(agent),output=$('agentOutput');if(currentAgentMode==='local'){output.innerHTML='<div class="agent-loading">Analyzing...</div>';setTimeout(()=>{output.innerHTML=`<pre class="agent-response">${html(LocalAgents[agent](facts))}</pre>`},120);return}const prompt=buildAgentPrompt(agent,facts);output.innerHTML='<pre class="agent-response"></pre>';const pre=output.querySelector('pre');let full='';const onChunk=c=>{full+=c;pre.textContent=full;output.scrollTop=output.scrollHeight};const onDone=()=>pre.classList.add('done');const onError=e=>output.innerHTML=`<div class="agent-error">${html(e)}</div>`;if(currentAgentMode==='kimi')await streamKimi(prompt,onChunk,onDone,onError);else await streamOllama(prompt,onChunk,onDone,onError)}function initAgentConsole(){$('openAgent').onclick=()=>$('agentConsole').classList.add('open');$('closeAgent').onclick=()=>$('agentConsole').classList.remove('open');document.querySelectorAll('.agent-tab').forEach(t=>t.onclick=()=>runAgent(t.dataset.agent));document.querySelectorAll('.mode-btn').forEach(b=>b.onclick=()=>{document.querySelectorAll('.mode-btn').forEach(x=>x.classList.remove('active'));b.classList.add('active');currentAgentMode=b.dataset.mode;$('apiSettings').classList.toggle('hidden',currentAgentMode==='local')});$('saveApi').onclick=()=>{localStorage.setItem('nursejoyless_kimiKey',$('kimiKey').value);localStorage.setItem('nursejoyless_ollamaUrl',$('ollamaUrl').value);alert('Settings saved')}}
-function runAnalyze(){team=parseTeam($('teamInput').value);lastDetectiveRead=null;renderTeam();if(!team.length){$('diagnosis').className='empty';$('diagnosis').textContent='No valid team blocks found.';return}analysis=analyze(team);renderAnalysis();populate();scoreArchetypes()}function setDemo(){let ai=[...$('attacker').options].find(o=>o.textContent.includes('Great Tusk'));if(ai)$('attacker').value=ai.value;updateMoves();let mi=[...$('move').options].find(o=>o.textContent==='Close Combat');if(mi)$('move').value='Close Combat';let di=[...$('defender').options].find(o=>o.textContent.includes('Kingambit'));if(di)$('defender').value=di.value;$('hp').value=71;renderKo();let oi=[...$('oppSpecies').options].find(o=>o.textContent==='Dragapult');if(oi)$('oppSpecies').value=oi.value;let sm=[...$('obsMove').options].find(o=>o.textContent==='Shadow Ball');if(sm)$('obsMove').value=sm.value;detect()}function init(){$('teamInput').value=SAMPLE;$('loadDemo').onclick=()=>{$('teamInput').value=SAMPLE;runAnalyze();setDemo()};$('reset').onclick=()=>{team=[];analysis=null;reasoner=null;lastReplayRead=null;lastDetectiveRead=null;$('teamInput').value='';['teamCards','diagnosis','archetypeResults','identityResults','synergyResults','assistantResults','validationResults','exportsResults'].forEach(id=>{let e=$(id);if(e){e.className='empty';e.textContent='Analyze a team first.'}});$('status').textContent='No patient loaded';$('statusText').textContent='Paste a team before I start judging you.'};$('analyze').onclick=runAnalyze;$('attacker').onchange=updateMoves;$('calcKo').onclick=renderKo;$('detect').onclick=detect;$('rebuild').onclick=rebuild;$('calcArchetypes').onclick=scoreArchetypes;if($('suggestPokemon'))$('suggestPokemon').onclick=()=>{runReasoner();renderAssistant()};if($('validateMoves'))$('validateMoves').onclick=validateTeamSets;if($('copyMarkdown'))$('copyMarkdown').onclick=copyMarkdown;if($('exportJson'))$('exportJson').onclick=exportJson;$('analyzeReplay').onclick=analyzeReplay;
+function resetTeamDependentTools(){
+  lastDetectiveRead=null;
+  reasoner=null;
+  lastReasoning=null;
+  ['ko','detective'].forEach(id=>{const e=$(id);if(e){e.className='empty';e.textContent='Analyze a team first.'}});
+  if($('hp'))$('hp').value=100;
+  if($('hazards'))$('hazards').value='none';
+  if($('field'))$('field').value='none';
+  ['attackerTera','defenderTera','attTera','defTera','statusMove','hazardTell','repeatTell','speedTell'].forEach(id=>{const e=$(id);if(e)e.checked=false});
+}
+function runAnalyze(){team=parseTeam($('teamInput').value);resetTeamDependentTools();renderTeam();if(!team.length){$('diagnosis').className='empty';$('diagnosis').textContent='No valid team blocks found.';return}analysis=analyze(team);renderAnalysis();populate();['attacker','defender','oppSpecies','obsMove'].forEach(id=>{const e=$(id);if(e)e.value='0'});updateMoves();scoreArchetypes()}function setDemo(){let ai=[...$('attacker').options].find(o=>o.textContent.includes('Great Tusk'));if(ai)$('attacker').value=ai.value;updateMoves();let mi=[...$('move').options].find(o=>o.textContent==='Close Combat');if(mi)$('move').value='Close Combat';let di=[...$('defender').options].find(o=>o.textContent.includes('Kingambit'));if(di)$('defender').value=di.value;$('hp').value=71;renderKo();let oi=[...$('oppSpecies').options].find(o=>o.textContent==='Dragapult');if(oi)$('oppSpecies').value=oi.value;let sm=[...$('obsMove').options].find(o=>o.textContent==='Shadow Ball');if(sm)$('obsMove').value=sm.value;detect()}function init(){$('teamInput').value=SAMPLE;$('loadDemo').onclick=()=>{$('teamInput').value=SAMPLE;runAnalyze();setDemo()};$('reset').onclick=()=>{team=[];analysis=null;reasoner=null;lastReplayRead=null;lastDetectiveRead=null;$('teamInput').value='';['teamCards','diagnosis','archetypeResults','identityResults','synergyResults','assistantResults','validationResults','exportsResults'].forEach(id=>{let e=$(id);if(e){e.className='empty';e.textContent='Analyze a team first.'}});$('status').textContent='No patient loaded';$('statusText').textContent='Paste a team before I start judging you.'};$('analyze').onclick=runAnalyze;$('attacker').onchange=updateMoves;$('calcKo').onclick=renderKo;$('detect').onclick=detect;$('rebuild').onclick=rebuild;$('calcArchetypes').onclick=scoreArchetypes;if($('suggestPokemon'))$('suggestPokemon').onclick=()=>{runReasoner();renderAssistant()};if($('validateMoves'))$('validateMoves').onclick=validateTeamSets;if($('copyMarkdown'))$('copyMarkdown').onclick=copyMarkdown;if($('exportJson'))$('exportJson').onclick=exportJson;$('analyzeReplay').onclick=analyzeReplay;
   // Regression test team buttons
   if($('testDragonSpam'))$('testDragonSpam').onclick=()=>{$('teamInput').value=REGRESSION_TEAMS.dragonSpam;runAnalyze();setDemo()};
   if($('testHazardStack'))$('testHazardStack').onclick=()=>{$('teamInput').value=REGRESSION_TEAMS.hazardStack;runAnalyze();setDemo()};
@@ -2026,7 +2045,7 @@ function evaluateSynergy(t=team,a=analysis,p=profileTeam(t,a)){
 function evaluateMatchups(t=team,a=analysis,p=profileTeam(t,a),identity=detectIdentities(t,a,p)){
   const row=tp=>(a?.rows||[]).find(r=>r.tp===tp)||{weak:0,res:0,imm:0,score:0,sev:'good'};const waterChecks=row('Water').res+row('Water').imm,iceWeak=row('Ice').weak,fairyWeak=row('Fairy').weak,fc=fieldControlBreakdown(p);
   const hasFreezeDry=t.some(x=>x.moves.includes('Freeze-Dry')), hasElectric=t.some(x=>x.species==='Raging Bolt'||x.moves.includes('Thunderclap')||x.moves.includes('Thunderbolt')||x.moves.includes('Volt Switch'));
-  const intoRain=njCap(40+waterChecks*8+(hasFreezeDry?12:0)+(hasElectric?9:0)+(p.attackingTypes.includes('Grass')?5:0)-row('Water').weak*9-iceWeak*4-(waterChecks===0?15:0),94);
+  const intoRain=njCap(Math.max(12,40+waterChecks*8+(hasFreezeDry?12:0)+(hasElectric?9:0)+(p.attackingTypes.includes('Grass')?5:0)-row('Water').weak*9-iceWeak*4-(waterChecks===0?15:0)),94);
   const intoSun=njCap(48+(row('Fire').res+row('Fire').imm)*8+(p.attackingTypes.includes('Water')?10:0)+(p.drizzle.length?12:0)-row('Fire').weak*7-row('Rock').weak*3,94);
   const intoHO=njCap(42+p.priority.length*10+p.fast.length*5+p.scarf.length*14+p.trickRoom.length*12+p.defensiveAnchors.length*5-p.recovery.length*2,94);
   const intoStall=njCap(34+p.wallbreakers.length*7+p.choice.length*6+p.status.length*4+p.hazards.length*4+p.setup.length*3+(p.attackingTypes.length>=7?6:0),90);
@@ -2248,6 +2267,9 @@ function detectiveSummary(top,input,notes){
 }
 function aggregateDetective(top,key){return Object.entries(top.reduce((o,c)=>(o[c[key]]=(o[c[key]]||0)+c.prob,o),{})).sort((a,b)=>b[1]-a[1])}
 function buildDetectiveRead(input){
+  if(input.move&&moveCategory(input.move)==='Status'){
+    input={...input,observedDamage:null,clueLabel:input.clueLabel||`${input.move} is a status/healing move, not damage-roll evidence`};
+  }
   const forcedItems=unique([input.revealedItem,...(input.postItemLossProtectionItems||[]),...(input.postItemLossGroundProtectionItems||[])].filter(Boolean));
   const cs=candidates(input.species,input.revealedAbility,{allowItemless:!!input.itemGone,forceItems:forcedItems}).map(c=>({...c,reasons:[],eliminated:false,fitQuality:'unknown'}));
   const notes=detectiveEvidenceNotes(input);
@@ -2305,7 +2327,7 @@ function buildDetectiveRead(input){
 function renderDetectiveRead(read){
   const top=read.top||[], noteBadges=(read.summary.notes||[]).map(x=>reasonBadge(x,/impossible/i.test(x)?'bad':'warn')).join('');
   const abilityBox=read.abilityRows?.length?`<div class="box"><h3>Likely abilities</h3>${bars(read.abilityRows)}</div>`:'';
-  const clueText=read.input.observedDamage!=null&&read.input.move
+  const clueText=read.input.observedDamage!=null&&read.input.move&&moveCategory(read.input.move)!=='Status'
     ? `Observed ${read.input.observedDamage}% from ${html(read.input.move)}.`
     : read.input.clueLabel
       ? `Replay clue: ${html(read.input.clueLabel)}.`
