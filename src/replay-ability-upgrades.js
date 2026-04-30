@@ -197,8 +197,10 @@
   proto.moveAbilityBypassProtectedAbilities=function moveAbilityBypassProtectedAbilities(state, move='', status=''){
     if(this.abilitySuppressionActive(state))return [];
     const moveName=String(move||'').trim();
+    const sideConditionAbility=this.normalizedHazardName(moveName)?['Magic Bounce']:[];
     return this.stillPossibleProtectionAbilities(state,unique([
-      ...detectiveAbilities(state?.species).filter(candidate=>this.abilityTriggeredByMove(candidate,moveName)),
+      ...sideConditionAbility,
+      ...detectiveAbilities(state?.species).filter(candidate=>!sideConditionAbility.length&&this.abilityTriggeredByMove(candidate,moveName)),
       ...this.majorStatusBlockingAbilitiesWithoutBypass(state,status),
       ...this.groundMoveProtectedAbilities(state,moveName)
     ]));
@@ -226,7 +228,8 @@
   const originalAbilityTriggeredByMove=proto.abilityTriggeredByMove;
   proto.abilityTriggeredByMove=function patchedAbilityTriggeredByMove(ability, move=''){
     const category=this.replaySafeMoveCategory(move);
-    if(ability==='Magic Bounce'||ability==='Good as Gold')return category==='Status';
+    if(ability==='Magic Bounce')return category==='Status';
+    if(ability==='Good as Gold')return category==='Status'&&!this.normalizedHazardName(move);
     return originalAbilityTriggeredByMove.call(this,ability,move);
   };
 
