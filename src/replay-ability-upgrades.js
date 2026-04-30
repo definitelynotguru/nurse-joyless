@@ -168,14 +168,36 @@
     return label==='Gastro Acid'?label:'';
   };
 
+  proto.ensureFieldSuppressionState=function ensureFieldSuppressionState(){
+    if(!this.fieldAbilitySuppressionSlots)this.fieldAbilitySuppressionSlots={};
+    return this.fieldAbilitySuppressionSlots;
+  };
+
+  proto.fieldAbilitySuppressionSource=function fieldAbilitySuppressionSource(state){
+    const slots=this.ensureFieldSuppressionState();
+    const suppressedSlot=String(state?.slot||'').trim();
+    const sourceSlot=Object.keys(slots).find(slot=>slot&&slot!==suppressedSlot);
+    return sourceSlot?String(slots[sourceSlot]||'').trim():'';
+  };
+
+  proto.fieldAbilitySuppressionActive=function fieldAbilitySuppressionActive(state){
+    return !!this.fieldAbilitySuppressionSource(state);
+  };
+
   proto.abilitySuppressionActive=function abilitySuppressionActive(state){
-    return !!state?.abilitySuppressed;
+    return !!state?.abilitySuppressed||this.fieldAbilitySuppressionActive(state);
   };
 
   proto.abilitySuppressionNote=function abilitySuppressionNote(effect=''){
     const label=this.abilitySuppressionEffect(effect);
     if(!label)return '';
     return `${label} suppressed the target's ability for part of the replay, so landed move and status clues from that window do not rule out the base ability.`;
+  };
+
+  proto.fieldAbilitySuppressionNote=function fieldAbilitySuppressionNote(state){
+    const source=this.fieldAbilitySuppressionSource(state);
+    if(!source)return '';
+    return `Neutralizing Gas from ${source} suppressed the target's ability for part of the replay, so landed move, hazard, and status clues from that window do not rule out the base ability.`;
   };
 
   proto.applyAbilitySuppression=function applyAbilitySuppression(state, turn, effect=''){
@@ -188,6 +210,21 @@
     this.addAbilityContradictionNote(state,this.abilitySuppressionNote(label));
   };
 
+  proto.applyFieldAbilitySuppression=function applyFieldAbilitySuppression(state, turn, ability=''){
+    const label=String(ability||'').trim();
+    if(!state?.slot||label!=='Neutralizing Gas')return;
+    this.ensureFieldSuppressionState()[state.slot]=state.species||label;
+  };
+
+  proto.recordFieldAbilitySuppression=function recordFieldAbilitySuppression(state, turn){
+    const note=this.fieldAbilitySuppressionNote(state);
+    if(!state||!note)return;
+    if((state.abilityContradictionNotes||[]).includes(note))return;
+    this.addAbilityContradictionNote(state,note);
+    this.addEvidence(state,turn||0,'reveal',`Neutralizing Gas was active while ${state.species} took this interaction`,'Field-wide ability suppression active',2.5,{soft:true});
+    this.addClueObservation(state,{turn:turn||0,label:'Neutralizing Gas active'});
+  };
+
   proto.clearAbilitySuppression=function clearAbilitySuppression(state, effect=''){
     const label=this.abilitySuppressionEffect(effect)||String(effect||'').trim();
     if(!state)return;
@@ -196,11 +233,23 @@
     state.abilitySuppressionEffect='';
   };
 
+  proto.clearFieldAbilitySuppression=function clearFieldAbilitySuppression(slot=''){
+    const key=String(slot||'').trim();
+    if(!key)return;
+    delete this.ensureFieldSuppressionState()[key];
+  };
+
   const originalMoveBlockedAbilities=proto.moveBlockedAbilities;
   proto.moveBlockedAbilities=function patchedMoveBlockedAbilities(state, move=''){
     if(this.abilitySuppressionActive(state))return [];
     if(this.moveAbilityBypass(state,move))return [];
     return originalMoveBlockedAbilities.call(this,state,move);
+  };
+
+  const originalHazardAbilityContradictions=proto.hazardAbilityContradictions;
+  proto.hazardAbilityContradictions=function patchedHazardAbilityContradictions(state, hazard=''){
+    if(this.abilitySuppressionActive(state))return [];
+    return originalHazardAbilityContradictions.call(this,state,hazard);
   };
 
   proto.majorStatusBlockingAbilities=function majorStatusBlockingAbilities(state, status='', move=''){
@@ -308,12 +357,21 @@
   const originalExtractEvidence=proto.extractEvidence;
   proto.extractEvidence=function patchedExtractEvidence(event, turn){
     if((event?.type==='switch'||event?.type==='drag')&&event?.pokemon){
+      const slot=this.slotId(event.pokemon);
+      if(slot)this.clearFieldAbilitySuppression(slot);
       this.clearAbilitySuppression(this.ensureState(event.pokemon,event.details));
+    }
+    if(event?.type==='faint'&&(event?.target||event?.pokemon)){
+      const slot=this.slotId(event.target||event.pokemon);
+      if(slot)this.clearFieldAbilitySuppression(slot);
     }
     if(event?.type==='-ability'&&event.target&&this.abilityBypassAbility(event.ability)){
       const state=this.ensureState(event.target);
       const moveEvent=[...this.turnMoves].reverse().find(x=>x.slot===state?.slot);
       if(moveEvent)moveEvent.abilityBypass=event.ability;
+    }
+    if(event?.type==='-ability'&&event.target&&String(event.ability||'').trim()==='Neutralizing Gas'){
+      this.applyFieldAbilitySuppression(this.ensureState(event.target),turn,event.ability);
     }
     if(event?.type==='-status'&&event.target&&!this.normalizedHazardName(event.from)){
       const state=this.ensureState(event.target);
@@ -331,6 +389,7 @@
       const moveEvent=[...this.turnMoves].reverse().find(x=>x.species&&this.slotSide(x.slot)!==event.side);
       const landedMove=this.sideConditionLandedMove(event,moveEvent);
       if(state&&landedMove){
+        this.recordFieldAbilitySuppression(state,turn);
         this.recordMoveAbilityBypass(state,turn,landedMove);
         this.ruleOutAbilities(
           state,
@@ -342,15 +401,25 @@
       }
       return originalExtractEvidence.call(this,event,turn);
     }
+    if(event?.type==='-activate'&&event.target&&this.normalizedHazardName(event.effect)){
+      this.recordFieldAbilitySuppression(this.ensureState(event.target),turn);
+      return originalExtractEvidence.call(this,event,turn);
+    }
     if(event?.type==='-damage'&&event.target&&!this.normalizedHazardName(event.from)){
       const state=this.ensureState(event.target);
+      this.recordFieldAbilitySuppression(state,turn);
       const moveEvent=[...this.turnMoves].reverse().find(x=>x.species&&state.slot!==x.slot);
       this.recordMoveAbilityBypass(state,turn,moveEvent?.move);
+      return originalExtractEvidence.call(this,event,turn);
+    }
+    if(event?.type==='-damage'&&event.target&&this.normalizedHazardName(event.from)){
+      this.recordFieldAbilitySuppression(this.ensureState(event.target),turn);
       return originalExtractEvidence.call(this,event,turn);
     }
     if(event?.type==='-status'&&event.target){
       const hazard=this.normalizedHazardName(event.from);
       const state=this.ensureState(event.target);
+      this.recordFieldAbilitySuppression(state,turn);
       const moveEvent=[...this.turnMoves].reverse().find(x=>x.species&&state.slot!==x.slot);
       const duplicateHazardAbilities=hazard==='Toxic Spikes'?this.hazardAbilityContradictions(state,hazard):[];
       const statusAbilities=this.majorStatusBlockingAbilities(state,event.status,moveEvent?.move).filter(ability=>!duplicateHazardAbilities.includes(ability));
@@ -442,6 +511,7 @@
         const moveEvent=[...this.turnMoves].reverse().find(x=>x.species&&state.slot!==x.slot);
         const landedMove=this.startEffectMove({...event,target,effect},moveEvent);
         if(landedMove){
+          this.recordFieldAbilitySuppression(state,turn);
           this.ruleOutAbilities(
             state,
             turn,
@@ -459,7 +529,9 @@
       const target=event.target||parts[1]||'';
       const effect=event.effect||parts[2]||'';
       if(target&&effect){
-        this.clearAbilitySuppression(this.ensureState(target),effect);
+        const state=this.ensureState(target);
+        this.clearAbilitySuppression(state,effect);
+        if(this.startEffectName(effect)==='Neutralizing Gas')this.clearFieldAbilitySuppression(state?.slot);
       }
       return originalExtractEvidence.call(this,event,turn);
     }
