@@ -231,12 +231,15 @@
       <div class="mode-toggle">
         <button class="mode-btn active" data-mode="local">● Local</button>
         <button class="mode-btn" data-mode="kimi">○ Kimi</button>
-        <button class="mode-btn" data-mode="ollama">○ Ollama</button>
+        <button class="mode-btn" data-mode="ollama">○ Ollama Cloud</button>
       </div>
       <div id="apiSettings" class="api-settings hidden">
         <label>Kimi API Key<input type="password" id="kimiKey" placeholder="sk-..." /></label>
-        <label>Ollama URL<input type="text" id="ollamaUrl" value="http://localhost:11434" /></label>
+        <label>Ollama Cloud API Key<input type="password" id="ollamaKey" placeholder="ollama_..." /></label>
+        <label>Ollama Cloud Model<input type="text" id="ollamaModel" placeholder="gpt-oss:20b" /></label>
         <button id="saveApi" class="primary small">Save</button>
+        <button id="testOllama" class="primary small" type="button">Test Ollama Cloud</button>
+        <div id="ollamaStatus" class="api-status"></div>
       </div>
     </div>
   </aside>
