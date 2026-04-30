@@ -36,7 +36,7 @@ vm.createContext(ctx);
 vm.runInContext(fs.readFileSync('src/app.js', 'utf8'), ctx, { filename: 'app.js' });
 vm.runInContext(fs.readFileSync('src/replay-ability-upgrades.js', 'utf8'), ctx, { filename: 'replay-ability-upgrades.js' });
 setTimeout(() => {
-  const required = ['loadDemo','analyze','calcKo','detect','calcArchetypes','openAgent','testDragonSpam','testHazardStack','testSunRoom','suggestPokemon','loadOnlineDex','validateMoves','exportMarkdown','exportJson','testOllama','ollamaProxyUrl'];
+  const required = ['loadDemo','analyze','calcKo','detect','calcArchetypes','openAgent','testDragonSpam','testHazardStack','testSunRoom','suggestPokemon','loadOnlineDex','validateMoves','exportMarkdown','exportJson','testOllama','copyOllamaWorker','ollamaProxyUrl'];
   for (const id of required) {
     if (!els[id]) throw new Error(`${id} missing`);
     if (id !== 'ollamaProxyUrl' && typeof els[id]?.onclick !== 'function') throw new Error(`${id} not bound`);

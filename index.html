@@ -237,7 +237,8 @@
         <label>Kimi API Key<input type="password" id="kimiKey" placeholder="sk-..." /></label>
         <label>Ollama Cloud API Key<input type="password" id="ollamaKey" placeholder="ollama_..." /></label>
         <label>Ollama Cloud Model<input type="text" id="ollamaModel" placeholder="gpt-oss:20b" /></label>
-        <label>Ollama Proxy URL<input type="text" id="ollamaProxyUrl" placeholder="Auto, or Cloudflare Worker URL" /></label>
+        <label>Ollama Proxy URL<input type="text" id="ollamaProxyUrl" placeholder="https://your-worker.your-subdomain.workers.dev" /></label>
+        <button id="copyOllamaWorker" class="primary small" type="button">Copy Worker Code</button>
         <button id="saveApi" class="primary small">Save</button>
         <button id="testOllama" class="primary small" type="button">Test Ollama Cloud</button>
         <div id="ollamaStatus" class="api-status"></div>
