@@ -142,16 +142,45 @@
     return this.abilityBypassAbility(ability)?ability:'';
   };
 
-  proto.moveAbilityBypassNote=function moveAbilityBypassNote(state, move=''){
+  proto.majorStatusBlockingAbilitiesWithoutBypass=function majorStatusBlockingAbilitiesWithoutBypass(state, status=''){
+    const statusId=String(status||'').trim();
+    if(!statusId)return [];
+    return detectiveAbilities(state?.species).filter(ability=>{
+      if(ability==='Purifying Salt')return true;
+      if(statusId==='par'&&ability==='Limber')return true;
+      if((statusId==='psn'||statusId==='tox')&&['Immunity','Pastel Veil'].includes(ability))return true;
+      if(statusId==='brn'&&['Water Veil','Water Bubble'].includes(ability))return true;
+      if(statusId==='slp'&&['Insomnia','Vital Spirit','Sweet Veil'].includes(ability))return true;
+      if(statusId==='frz'&&ability==='Magma Armor')return true;
+      return false;
+    });
+  };
+
+  proto.groundMoveProtectedAbilities=function groundMoveProtectedAbilities(state, move=''){
+    if(!this.isGroundProtectionMove(move))return [];
+    return detectiveAbilities(state?.species).filter(ability=>['Levitate','Earth Eater'].includes(ability));
+  };
+
+  proto.moveAbilityBypassProtectedAbilities=function moveAbilityBypassProtectedAbilities(state, move='', status=''){
+    if(this.abilitySuppressionActive(state))return [];
+    const moveName=String(move||'').trim();
+    return unique([
+      ...detectiveAbilities(state?.species).filter(candidate=>this.abilityTriggeredByMove(candidate,moveName)),
+      ...this.majorStatusBlockingAbilitiesWithoutBypass(state,status),
+      ...this.groundMoveProtectedAbilities(state,moveName)
+    ]);
+  };
+
+  proto.moveAbilityBypassNote=function moveAbilityBypassNote(state, move='', status=''){
     const ability=this.moveAbilityBypass(state, move);
     const moveName=String(move||'').trim();
-    const abilities=this.abilitySuppressionActive(state)?[]:detectiveAbilities(state?.species).filter(candidate=>this.abilityTriggeredByMove(candidate,moveName));
+    const abilities=this.moveAbilityBypassProtectedAbilities(state,moveName,status);
     if(!ability||!moveName||!abilities.length)return '';
     return `${ability} let ${moveName} bypass ${this.joinWithOr(abilities)}, so that landed move does not rule out the base ability.`;
   };
 
-  proto.recordMoveAbilityBypass=function recordMoveAbilityBypass(state, turn, move=''){
-    const note=this.moveAbilityBypassNote(state, move);
+  proto.recordMoveAbilityBypass=function recordMoveAbilityBypass(state, turn, move='', status=''){
+    const note=this.moveAbilityBypassNote(state, move, status);
     const ability=this.moveAbilityBypass(state, move);
     const moveName=String(move||'').trim();
     if(!state||!note||!ability||!moveName)return;
@@ -505,7 +534,7 @@
       const moveEvent=[...this.turnMoves].reverse().find(x=>x.species&&state.slot!==x.slot);
       const duplicateHazardAbilities=hazard==='Toxic Spikes'?this.hazardAbilityContradictions(state,hazard):[];
       const statusAbilities=this.majorStatusBlockingAbilities(state,event.status,moveEvent?.move).filter(ability=>!duplicateHazardAbilities.includes(ability));
-      this.recordMoveAbilityBypass(state,turn,moveEvent?.move);
+      this.recordMoveAbilityBypass(state,turn,moveEvent?.move,event.status);
       if(statusAbilities.length){
         this.ruleOutAbilities(
           state,
