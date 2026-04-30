@@ -139,7 +139,7 @@ A local server is recommended for online enrichment and browser-origin consisten
 
 `npm run serve` also provides the same-origin `/api/ollama/chat` proxy required for Ollama Cloud API keys. The pure static fallback (`npm run serve:static`) cannot test or call Ollama Cloud because `https://ollama.com/api/chat` does not allow browser CORS preflight requests with `Authorization`.
 
-On GitHub Pages, deploy `deploy/ollama-cloud-worker.js` as a Cloudflare Worker and paste its `/api/ollama/chat` URL into the app's Ollama Proxy URL field. GitHub Pages cannot run runtime API routes, so a worker or other serverless proxy is required for Ollama Cloud.
+On GitHub Pages, deploy `deploy/ollama-cloud-worker.js` as a plain Cloudflare Worker and paste the Worker URL into the app's Ollama Proxy URL field. GitHub Pages cannot run runtime API routes, so a worker or other serverless proxy is required for Ollama Cloud. The Worker file is classic `addEventListener` syntax and does not need any Cloudflare bindings.
 
 ## Test suite
 

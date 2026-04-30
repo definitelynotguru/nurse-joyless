@@ -16,38 +16,40 @@ function text(body, status, origin) {
   });
 }
 
-export default {
-  async fetch(request) {
-    const origin = request.headers.get('Origin') || '*';
-    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders(origin) });
-    if (request.method !== 'POST') return text('method not allowed', 405, origin);
+async function handleRequest(request) {
+  const origin = request.headers.get('Origin') || '*';
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders(origin) });
+  if (request.method !== 'POST') return text('method not allowed', 405, origin);
 
-    let body;
-    try {
-      body = await request.json();
-    } catch (_) {
-      return text('invalid json', 400, origin);
-    }
+  let body;
+  try {
+    body = await request.json();
+  } catch (_) {
+    return text('invalid json', 400, origin);
+  }
 
-    const { apiKey, model, messages, stream = false, options = {} } = body || {};
-    if (!apiKey) return text('missing apiKey', 400, origin);
-    if (!model) return text('missing model', 400, origin);
+  const { apiKey, model, messages, stream = false, options = {} } = body || {};
+  if (!apiKey) return text('missing apiKey', 400, origin);
+  if (!model) return text('missing model', 400, origin);
 
-    const upstream = await fetch(OLLAMA_CHAT_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({ model, messages, stream, options }),
-    });
+  const upstream = await fetch(OLLAMA_CHAT_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({ model, messages, stream, options }),
+  });
 
-    return new Response(upstream.body, {
-      status: upstream.status,
-      headers: {
-        'Content-Type': upstream.headers.get('Content-Type') || 'application/x-ndjson; charset=utf-8',
-        ...corsHeaders(origin),
-      },
-    });
-  },
-};
+  return new Response(upstream.body, {
+    status: upstream.status,
+    headers: {
+      'Content-Type': upstream.headers.get('Content-Type') || 'application/x-ndjson; charset=utf-8',
+      ...corsHeaders(origin),
+    },
+  });
+}
+
+addEventListener('fetch', event => {
+  event.respondWith(handleRequest(event.request));
+});
