@@ -320,6 +320,59 @@ const neutralizingGasStealthRockTarget = neutralizingGasStealthRockParser.target
 assert(!neutralizingGasStealthRockTarget?.ruledOutAbilities?.includes('Magic Bounce'), 'hazards landing under Neutralizing Gas should not fake a Magic Bounce contradiction while abilities were suppressed field-wide');
 assert(neutralizingGasStealthRockTarget?.notes?.some(note => /Neutralizing Gas from Weezing-Galar suppressed the target's ability/i.test(note)), 'hazards landing under Neutralizing Gas should explain why the contradiction was intentionally skipped');
 
+const neutralizingGasBootsRecoveryLog = '|turn|1\n|switch|p1a: Ting-Lu|Ting-Lu, L80\n|-sidestart|p2: Clefable|move: Stealth Rock\n|switch|p2a: Clefable|Clefable, L80\n|-item|p2a: Clefable|Leftovers\n|move|p1a: Ting-Lu|Knock Off|p2a: Clefable\n|-enditem|p2a: Clefable|Leftovers|[from] move: Knock Off\n|turn|2\n|switch|p1a: Weezing-Galar|Weezing-Galar, L80\n|-ability|p1a: Weezing-Galar|Neutralizing Gas\n|switch|p2a: Clefable|Clefable, L80';
+const neutralizingGasBootsRecoveryParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(neutralizingGasBootsRecoveryLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const neutralizingGasBootsRecoveryTarget = neutralizingGasBootsRecoveryParser.targets.find(t => t.species === 'Clefable');
+assert(neutralizingGasBootsRecoveryTarget?.postItemLossProtectionRecovered, 'missing hazard chip under Neutralizing Gas should still mark that some post-loss protection returned');
+assert(neutralizingGasBootsRecoveryTarget?.postItemLossProtectionItems?.includes('Heavy-Duty Boots'), 'missing hazard chip under Neutralizing Gas should keep Heavy-Duty Boots live as the current-state explanation');
+assert((neutralizingGasBootsRecoveryTarget?.postItemLossProtectionAbilities || []).length === 0, 'missing hazard chip under Neutralizing Gas should not treat ability-based protection as live while abilities were suppressed');
+assert(neutralizingGasBootsRecoveryTarget?.notes?.some(note => /Neutralizing Gas from Weezing-Galar was suppressing abilities then, so this only keeps Heavy-Duty Boots live/i.test(note)), 'missing hazard chip under Neutralizing Gas should explain why only item-based protection stayed live');
+
+vm.runInContext(
+  `team=[
+    preset("Clefable","Leftovers","Bold",{hp:252,atk:0,def:252,spa:4,spd:0,spe:0},["Moonblast","Soft-Boiled","Thunder Wave","Stealth Rock"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: neutralizingGasBootsRecoveryTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const neutralizingGasBootsRecoveryRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(neutralizingGasBootsRecoveryRead.itemRows[0][0] === 'Heavy-Duty Boots', 'missing hazard chip under Neutralizing Gas should reopen Heavy-Duty Boots as the top item read');
+assert(neutralizingGasBootsRecoveryRead.summary.notes.some(x => /Neutralizing Gas from Weezing-Galar was suppressing abilities then, so this only keeps Heavy-Duty Boots live/i.test(x)), 'missing hazard chip under Neutralizing Gas should carry the item-only protection note into detective output');
+assert(!neutralizingGasBootsRecoveryRead.summary.notes.some(x => /Later entry protection keeps Magic Guard live/i.test(x)), 'missing hazard chip under Neutralizing Gas should not claim that suppressed abilities stayed live for the current-state explanation');
+
+const ruledOutMagicGuardRecoveryLog = '|turn|1\n|-sidestart|p2: foe|move: Stealth Rock\n|switch|p2a: Clefable|Clefable, L80\n|-damage|p2a: Clefable|88/100|[from] Stealth Rock\n|-item|p2a: Clefable|Leftovers\n|turn|2\n|-enditem|p2a: Clefable|Leftovers|[from] move: Knock Off\n|turn|3\n|switch|p2a: Clefable|Clefable, L80';
+const ruledOutMagicGuardRecoveryParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(ruledOutMagicGuardRecoveryLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const ruledOutMagicGuardRecoveryTarget = ruledOutMagicGuardRecoveryParser.targets.find(t => t.species === 'Clefable');
+assert(ruledOutMagicGuardRecoveryTarget?.postItemLossProtectionRecovered, 'once Stealth Rock already ruled out Magic Guard, later missing hazard chip should be treated as fresh protection returning');
+assert(ruledOutMagicGuardRecoveryTarget?.postItemLossProtectionItems?.includes('Heavy-Duty Boots'), 'once Stealth Rock already ruled out Magic Guard, later missing hazard chip should keep Heavy-Duty Boots live');
+assert(!(ruledOutMagicGuardRecoveryTarget?.postItemLossProtectionAbilities || []).includes('Magic Guard'), 'once Stealth Rock already ruled out Magic Guard, later missing hazard chip should not revive it inside protection hints');
+assert(!ruledOutMagicGuardRecoveryTarget?.notes?.some(note => /Magic Guard still cleanly explains/i.test(note)), 'once Stealth Rock already ruled out Magic Guard, later missing hazard chip should stop claiming that Magic Guard still explains the protection');
+
+vm.runInContext(
+  `team=[
+    preset("Clefable","Leftovers","Bold",{hp:252,atk:0,def:252,spa:4,spd:0,spe:0},["Moonblast","Soft-Boiled","Thunder Wave","Stealth Rock"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: ruledOutMagicGuardRecoveryTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const ruledOutMagicGuardRecoveryRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(ruledOutMagicGuardRecoveryRead.itemRows.some(([name]) => name === 'Heavy-Duty Boots'), 'once Stealth Rock already ruled out Magic Guard, later missing hazard chip should keep Heavy-Duty Boots in the live item pool');
+assert(!ruledOutMagicGuardRecoveryRead.summary.notes.some(x => /Later entry protection keeps Magic Guard live/i.test(x)), 'once Stealth Rock already ruled out Magic Guard, detective output should not claim that Magic Guard stayed live');
+
 const neutralizingGasEndsThunderWaveLog = '|turn|1\n|switch|p1a: Weezing-Galar|Weezing-Galar, L80\n|-ability|p1a: Weezing-Galar|Neutralizing Gas\n|switch|p2a: Gholdengo|Gholdengo, L80\n|turn|2\n|switch|p1a: Dragapult|Dragapult, L80\n|move|p1a: Dragapult|Thunder Wave|p2a: Gholdengo\n|-status|p2a: Gholdengo|par';
 const neutralizingGasEndsThunderWaveParser = vm.runInContext(`(() => {
   const parser = new ReplayParser();
