@@ -140,7 +140,7 @@ vm.runInContext(
 );
 
 const magicBounceStealthRockRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
-assert(!magicBounceStealthRockRead.abilityRows.some(([name]) => name === 'Magic Bounce'), 'hazards successfully landing on the target side should remove Magic Bounce from the live detective pool');
+assert(!magicBounceStealthRockRead.abilityRows.some(([name]) => name === 'Magic Bounce'), 'hazard side-condition contradictions should remove Magic Bounce from the live detective pool');
 assert(magicBounceStealthRockRead.summary.notes.some(x => /Magic Bounce impossible/i.test(x)), 'hazard side-condition contradictions should carry the Magic Bounce rule-out into detective notes');
 
 const leechSeedStartLog = '|turn|1\n|switch|p1a: Ferrothorn|Ferrothorn, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|move|p1a: Ferrothorn|Leech Seed|p2a: Gholdengo\n|-start|p2a: Gholdengo|move: Leech Seed';
@@ -285,6 +285,40 @@ const gastroAcidHeadlongRushParser = vm.runInContext(`(() => {
 })()`, context, { timeout: 10000 });
 const gastroAcidHeadlongRushTarget = gastroAcidHeadlongRushParser.targets.find(t => t.species === 'Hydreigon');
 assert(!gastroAcidHeadlongRushTarget?.ruledOutAbilities?.includes('Levitate'), 'Ground damage after Gastro Acid should not fake a Levitate contradiction while the ability was suppressed');
+
+const moldBreakerThunderWaveLog = '|turn|1\n|switch|p1a: Haxorus|Haxorus, L80\n|switch|p2a: Gholdengo|Gholdengo, L80\n|move|p1a: Haxorus|Thunder Wave|p2a: Gholdengo\n|-ability|p1a: Haxorus|Mold Breaker\n|-status|p2a: Gholdengo|par';
+const moldBreakerThunderWaveParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(moldBreakerThunderWaveLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const moldBreakerThunderWaveTarget = moldBreakerThunderWaveParser.targets.find(t => t.species === 'Gholdengo');
+assert(!moldBreakerThunderWaveTarget?.ruledOutAbilities?.includes('Good as Gold'), 'Mold Breaker status application should not fake a Good as Gold contradiction');
+assert(moldBreakerThunderWaveTarget?.notes?.some(note => /Mold Breaker let Thunder Wave bypass Good as Gold/i.test(note)), 'Mold Breaker status application should explain why Good as Gold stayed live');
+
+vm.runInContext(
+  `team=[
+    preset("Gholdengo","Air Balloon","Timid",{hp:0,atk:0,def:4,spa:252,spd:0,spe:252},["Make It Rain","Shadow Ball","Recover","Nasty Plot"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: moldBreakerThunderWaveTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const moldBreakerThunderWaveRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(moldBreakerThunderWaveRead.abilityRows[0][0] === 'Good as Gold', 'Mold Breaker status application should leave Good as Gold live in the detective pool');
+assert(moldBreakerThunderWaveRead.summary.notes.some(x => /Mold Breaker let Thunder Wave bypass Good as Gold/i.test(x)), 'Mold Breaker status application should carry the bypass note into detective output');
+
+const turboblazeFlamethrowerLog = '|turn|1\n|switch|p1a: Reshiram|Reshiram, L80\n|switch|p2a: Heatran|Heatran, L80\n|move|p1a: Reshiram|Flamethrower|p2a: Heatran\n|-ability|p1a: Reshiram|Turboblaze\n|-damage|p2a: Heatran|61/100';
+const turboblazeFlamethrowerParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(turboblazeFlamethrowerLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const turboblazeFlamethrowerTarget = turboblazeFlamethrowerParser.targets.find(t => t.species === 'Heatran');
+assert(!turboblazeFlamethrowerTarget?.ruledOutAbilities?.includes('Flash Fire'), 'Turboblaze Fire damage should not fake a Flash Fire contradiction');
+assert(turboblazeFlamethrowerTarget?.notes?.some(note => /Turboblaze let Flamethrower bypass Flash Fire/i.test(note)), 'Turboblaze Fire damage should explain why Flash Fire stayed live');
 
 const delayedToxicSpikesStatusLog = '|turn|1\n|switch|p1a: Gliscor|Gliscor, L80\n|-sidestart|p2: Great Tusk|move: Toxic Spikes\n|switch|p2a: Great Tusk|Great Tusk, L80\n|-item|p2a: Great Tusk|Heavy-Duty Boots\n|move|p1a: Gliscor|Knock Off|p2a: Great Tusk\n|-enditem|p2a: Great Tusk|Heavy-Duty Boots|[from] move: Knock Off\n|turn|2\n|switch|p2a: Great Tusk|Great Tusk, L80\n|-ability|p1a: Gliscor|Poison Heal\n|-status|p2a: Great Tusk|psn|[from] move: Toxic Spikes';
 const delayedToxicSpikesStatusParser = vm.runInContext(`(() => {
