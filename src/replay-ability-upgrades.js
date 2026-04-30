@@ -145,8 +145,15 @@
     return (abilities||[]).filter(ability=>ability&&!ruledOut.has(String(ability||'').trim()));
   };
 
+  proto.abilityBypassMode=function abilityBypassMode(ability=''){
+    const name=String(ability||'').trim();
+    if(['Mold Breaker','Teravolt','Turboblaze'].includes(name))return 'all';
+    if(name==='Mycelium Might')return 'status';
+    return '';
+  };
+
   proto.abilityBypassAbility=function abilityBypassAbility(ability=''){
-    return ['Mold Breaker','Teravolt','Turboblaze'].includes(String(ability||'').trim());
+    return !!this.abilityBypassMode(ability);
   };
 
   proto.findRecentOpponentMoveEvent=function findRecentOpponentMoveEvent(state, move=''){
@@ -161,7 +168,11 @@
   proto.moveAbilityBypass=function moveAbilityBypass(state, move=''){
     const moveEvent=this.findRecentOpponentMoveEvent(state, move);
     const ability=String(moveEvent?.abilityBypass||'').trim();
-    return this.abilityBypassAbility(ability)?ability:'';
+    const mode=this.abilityBypassMode(ability);
+    if(!mode)return '';
+    if(mode==='all')return ability;
+    if(mode==='status'&&this.replaySafeMoveCategory(move)==='Status')return ability;
+    return '';
   };
 
   proto.majorStatusBlockingAbilitiesWithoutBypass=function majorStatusBlockingAbilitiesWithoutBypass(state, status=''){
