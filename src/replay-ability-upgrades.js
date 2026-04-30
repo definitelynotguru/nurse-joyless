@@ -205,6 +205,18 @@
     return this.abilityClueLabelWithProof(ability, move, false);
   };
 
+  proto.activeStateForSide=function activeStateForSide(side=''){
+    const slot=`${this.slotSide(side)}a`;
+    const key=this.slotState?.[slot];
+    return key?this.speciesState?.[key]||null:null;
+  };
+
+  proto.sideConditionLandedMove=function sideConditionLandedMove(event={}, moveEvent=null){
+    const hazard=this.normalizedHazardName(event?.condition||'');
+    if(!hazard||!moveEvent?.move)return '';
+    return DexAdapter.id(moveEvent.move)===DexAdapter.id(hazard)?moveEvent.move:'';
+  };
+
   proto.recordAbilityReveal=function patchedRecordAbilityReveal(state, turn, ability, moveEvent, text, clueLabel='', options={}){
     if(!state||!ability)return;
     if(!state.abilityHints.includes(ability))state.abilityHints.push(ability);
@@ -268,6 +280,21 @@
         const state=this.ensureState(target);
         state.currentStatus='';
       }
+    }
+    if(event?.type==='-sidestart'&&event.side&&event.condition){
+      const state=this.activeStateForSide(event.side);
+      const moveEvent=[...this.turnMoves].reverse().find(x=>x.species&&this.slotSide(x.slot)!==event.side);
+      const landedMove=this.sideConditionLandedMove(event,moveEvent);
+      if(state&&landedMove){
+        this.ruleOutAbilities(
+          state,
+          turn,
+          this.moveBlockedAbilities(state,landedMove),
+          this.landedMoveContradictionNote(state,landedMove),
+          `${landedMove} landed`
+        );
+      }
+      return originalExtractEvidence.call(this,event,turn);
     }
     if(event?.type==='-status'&&event.target){
       const hazard=this.normalizedHazardName(event.from);
