@@ -509,4 +509,43 @@ const delayedToxicSpikesStatusRead = vm.runInContext('lastDetectiveRead', contex
 assert(!delayedToxicSpikesStatusRead.summary.notes.some(x => /empty slot is no longer the only live current-item story/i.test(x)), 'delayed Toxic Spikes aftermath should not falsely reopen the current item story in detective notes');
 assert(delayedToxicSpikesStatusRead.itemRows[0][0] === 'No Item', 'delayed Toxic Spikes aftermath should leave the empty-slot read anchored once the poison line proves Boots stayed gone');
 
+const curedStatusAfterEntryLog = '|turn|1\n|-sidestart|p2: Sandaconda|move: Toxic Spikes\n|switch|p2a: Sandaconda|Sandaconda, L80\n|-status|p2a: Sandaconda|brn\n|-item|p2a: Sandaconda|Heavy-Duty Boots\n|move|p1a: Dragapult|Knock Off|p2a: Sandaconda\n|-enditem|p2a: Sandaconda|Heavy-Duty Boots|[from] move: Knock Off\n|turn|2\n|switch|p2a: Sandaconda|Sandaconda, L80\n|-curestatus|p2a: Sandaconda|brn|[from] ability: Shed Skin';
+const curedStatusAfterEntryParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(curedStatusAfterEntryLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const curedStatusAfterEntryTarget = curedStatusAfterEntryParser.targets.find(t => t.species === 'Sandaconda');
+assert(!curedStatusAfterEntryTarget?.postItemLossProtectionRecovered, 'later curing an old status should not retroactively turn a Toxic Spikes no-poison entry into fresh protection returning');
+assert(!(curedStatusAfterEntryTarget?.postItemLossProtectionItems || []).includes('Heavy-Duty Boots'), 'later curing an old status should not reopen Heavy-Duty Boots when the switch-in poison was already blocked by the standing status');
+assert(curedStatusAfterEntryTarget?.notes?.some(note => /standing burn already explains/i.test(note)), 'later curing an old status should preserve the switch-time standing-status explanation in replay notes');
+assert(!curedStatusAfterEntryTarget?.notes?.some(note => /regained hazard protection/i.test(note)), 'later curing an old status should not add a fake protection-return note');
+
+vm.runInContext(
+  `team=[
+    preset("Sandaconda","Heavy-Duty Boots","Impish",{hp:252,atk:4,def:252,spa:0,spd:0,spe:0},["Earthquake","Glare","Rest","Stealth Rock"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: curedStatusAfterEntryTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const curedStatusAfterEntryRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(curedStatusAfterEntryRead.itemRows[0][0] === 'No Item', 'later curing an old status should leave the empty-slot current-item read anchored');
+assert(!curedStatusAfterEntryRead.summary.notes.some(x => /Heavy-Duty Boots live/i.test(x)), 'later curing an old status should not claim that Heavy-Duty Boots became live again');
+assert(curedStatusAfterEntryRead.summary.notes.some(x => /standing burn already explains/i.test(x)), 'later curing an old status should carry the switch-time standing-status explanation into detective output');
+
+const neutralizingGasCuredStatusAfterEntryLog = '|turn|1\n|-sidestart|p2: Sandaconda|move: Toxic Spikes\n|switch|p2a: Sandaconda|Sandaconda, L80\n|-status|p2a: Sandaconda|brn\n|-item|p2a: Sandaconda|Heavy-Duty Boots\n|move|p1a: Dragapult|Knock Off|p2a: Sandaconda\n|-enditem|p2a: Sandaconda|Heavy-Duty Boots|[from] move: Knock Off\n|turn|2\n|switch|p1a: Weezing-Galar|Weezing-Galar, L80\n|-ability|p1a: Weezing-Galar|Neutralizing Gas\n|switch|p2a: Sandaconda|Sandaconda, L80\n|-curestatus|p2a: Sandaconda|brn|[from] ability: Shed Skin';
+const neutralizingGasCuredStatusAfterEntryParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(neutralizingGasCuredStatusAfterEntryLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const neutralizingGasCuredStatusAfterEntryTarget = neutralizingGasCuredStatusAfterEntryParser.targets.find(t => t.species === 'Sandaconda');
+assert(!neutralizingGasCuredStatusAfterEntryTarget?.postItemLossProtectionRecovered, 'later curing an old status under Neutralizing Gas should not fabricate item-only protection returning');
+assert(!(neutralizingGasCuredStatusAfterEntryTarget?.postItemLossProtectionItems || []).includes('Heavy-Duty Boots'), 'later curing an old status under Neutralizing Gas should not reopen Heavy-Duty Boots');
+assert(neutralizingGasCuredStatusAfterEntryTarget?.notes?.some(note => /standing burn already explains/i.test(note)), 'later curing an old status under Neutralizing Gas should still preserve the switch-time standing-status explanation');
+assert(!neutralizingGasCuredStatusAfterEntryTarget?.notes?.some(note => /only keeps Heavy-Duty Boots live/i.test(note)), 'later curing an old status under Neutralizing Gas should not add a fake item-only protection note');
+
 console.log('[OK] replay ability upgrades passed');
