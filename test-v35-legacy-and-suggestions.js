@@ -185,6 +185,65 @@ Bold Nature
 - Surf
 - U-turn
 - Roost`;
+const shallowRainShell = `Charizard @ Heavy-Duty Boots
+Ability: Blaze
+Tera Type: Fire
+EVs: 4 Def / 252 SpA / 252 Spe
+Timid Nature
+- Flamethrower
+- Hurricane
+- Defog
+- Roost
+
+Volcarona @ Life Orb
+Ability: Flame Body
+Tera Type: Grass
+EVs: 252 SpA / 4 SpD / 252 Spe
+Timid Nature
+- Fiery Dance
+- Bug Buzz
+- Giga Drain
+- Quiver Dance
+
+Moltres @ Leftovers
+Ability: Pressure
+Tera Type: Fairy
+EVs: 252 HP / 252 Def / 4 SpD
+Bold Nature
+- Hurricane
+- Roost
+- Will-O-Wisp
+- Flamethrower
+
+Arcanine @ Choice Band
+Ability: Intimidate
+Tera Type: Normal
+EVs: 252 Atk / 4 SpD / 252 Spe
+Jolly Nature
+- Fire Punch
+- Crunch
+- Extreme Speed
+- Close Combat
+
+Dragonite @ Heavy-Duty Boots
+Ability: Multiscale
+Tera Type: Normal
+EVs: 252 Atk / 4 SpD / 252 Spe
+Adamant Nature
+- Dragon Dance
+- Extreme Speed
+- Earthquake
+- Fire Punch
+
+Pelipper @ Damp Rock
+Ability: Drizzle
+Tera Type: Steel
+EVs: 248 HP / 252 Def / 8 SpD
+Bold Nature
+- Hurricane
+- Surf
+- U-turn
+- Roost`;
 function report(text){ return vm.runInContext(`team=parseTeam(${JSON.stringify(text)}); analysis=analyze(team); teamReasoner(team, analysis);`, ctx, {timeout:10000}); }
 const a = report(hazard);
 if(!a || !a.identity || !a.synergy || !a.matchups || !Array.isArray(a.suggestions)) throw new Error('teamReasoner wrapper did not return full report');
@@ -201,4 +260,9 @@ if(c.identity.primary.name === 'Rain Offense') throw new Error('mixed-weather Fi
 if(!c.synergy.issues.some(issue => /Conflicting weather plan/.test(issue.title))) throw new Error('mixed-weather teams should surface a weather-conflict issue when rain and sun plans fight each other');
 const rainRow = (c.identity.all||[]).find(x => x.name === 'Rain Offense');
 if(!rainRow || rainRow.score >= c.identity.primary.score) throw new Error('mixed-weather teams should demote Rain Offense below the more coherent structural read');
+const d = report(shallowRainShell);
+if(d.identity.primary.name === 'Rain Offense') throw new Error('a fire-heavy Pelipper shell without real rain payoffs should not flatten into pure Rain Offense');
+if(!d.synergy.issues.some(issue => /Rain plan clashes with Fire core/.test(issue.title))) throw new Error('a shallow rain shell should surface that the Fire core fights its own rain slot');
+const shallowRainRow = (d.identity.all||[]).find(x => x.name === 'Rain Offense');
+if(!shallowRainRow || shallowRainRow.score >= d.identity.primary.score) throw new Error('a shallow rain shell should demote Rain Offense below the more coherent structural read');
 console.log('[OK] V3.5 legacy wrapper and suggestion diversity passed');
