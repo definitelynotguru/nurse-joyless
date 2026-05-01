@@ -13,22 +13,34 @@ function makeContext(){
     njCap:clampScore,
     offensiveMoveTypes(mon){return mon.offensiveTypes||[];},
     types(mon){return mon.types||[];},
-    profileTeam(){return {drought:[],drizzle:[]};},
+    profileTeam(team=[]){
+      return {
+        drought:team.filter(mon=>mon.ability==='Drought').map(mon=>mon.species),
+        drizzle:team.filter(mon=>mon.ability==='Drizzle').map(mon=>mon.species),
+        hazards:team.filter(mon=>mon.moves.some(move=>['Stealth Rock','Spikes','Toxic Spikes','Sticky Web'].includes(move))).map(mon=>mon.species),
+        layers:team.filter(mon=>mon.moves.some(move=>['Spikes','Toxic Spikes','Sticky Web'].includes(move))).map(mon=>mon.species),
+        removalDenial:team.filter(mon=>mon.isRemovalDenial).map(mon=>mon.species),
+        pivot:team.filter(mon=>mon.moves.some(move=>['U-turn','Volt Switch','Flip Turn','Parting Shot','Teleport'].includes(move))).map(mon=>mon.species),
+        defensiveAnchors:team.filter(mon=>mon.isDefensiveAnchor).map(mon=>mon.species),
+      };
+    },
     detectIdentities(){
       return {
-        primary:{name:'Trick Room Offense',score:84,evidence:['base read']},
+        primary:{name:'Hazard Stack Fat Balance',score:88,evidence:['base read']},
         secondary:[],
         all:[
+          {name:'Hazard Stack Fat Balance',score:88,evidence:['base read']},
           {name:'Trick Room Offense',score:84,evidence:['base read']},
           {name:'Sun Room',score:80,evidence:['base read']},
           {name:'Balance',score:73,evidence:['base read']},
+          {name:'Stall',score:70,evidence:['base read']},
           {name:'Hyper Offense',score:68,evidence:['base read']},
         ],
       };
     },
     evaluateSynergy(){
       return {
-        scores:{winReliability:81,speedControl:79,roleCompression:76},
+        scores:{winReliability:81,speedControl:79,roleCompression:76,offensiveCoverage:78,fieldControl:79},
         issues:[],
       };
     },
@@ -48,6 +60,8 @@ function mon(species,{
   baseSpeed=80,
   atk=95,
   spa=95,
+  isDefensiveAnchor=false,
+  isRemovalDenial=false,
 }={}){
   return {
     species,
@@ -57,6 +71,8 @@ function mon(species,{
     offensiveTypes,
     types,
     baseStats:{spe:baseSpeed,atk,spa},
+    isDefensiveAnchor,
+    isRemovalDenial,
   };
 }
 
@@ -84,6 +100,24 @@ const goodRoomTeam=[
   mon('Sunflora',{ability:'Solar Power',moves:['Weather Ball','Earth Power','Giga Drain','Dazzling Gleam'],types:['Grass'],offensiveTypes:['Grass','Ground','Normal','Fairy'],baseSpeed:30,atk:75,spa:105}),
 ];
 
+const passiveHazardTeam=[
+  mon('Gholdengo',{ability:'Good as Gold',moves:['Shadow Ball','Make It Rain','Recover','Nasty Plot'],types:['Steel','Ghost'],offensiveTypes:['Steel','Ghost'],baseSpeed:84,atk:60,spa:133,isRemovalDenial:true}),
+  mon('Skarmory',{moves:['Spikes','Roost','Whirlwind','Body Press'],types:['Steel','Flying'],offensiveTypes:['Fighting'],baseSpeed:70,atk:80,spa:40,isDefensiveAnchor:true}),
+  mon('Ting-Lu',{moves:['Stealth Rock','Ruination','Whirlwind','Earthquake'],types:['Dark','Ground'],offensiveTypes:['Ground'],baseSpeed:45,atk:110,spa:55,isDefensiveAnchor:true}),
+  mon('Alomomola',{moves:['Wish','Protect','Flip Turn','Scald'],types:['Water'],offensiveTypes:['Water'],baseSpeed:65,atk:75,spa:40,isDefensiveAnchor:true}),
+  mon('Blissey',{moves:['Soft-Boiled','Seismic Toss','Thunder Wave','Teleport'],types:['Normal'],offensiveTypes:['Normal'],baseSpeed:55,atk:10,spa:75,isDefensiveAnchor:true}),
+  mon('Clodsire',{moves:['Toxic','Recover','Earthquake','Haze'],types:['Poison','Ground'],offensiveTypes:['Ground'],baseSpeed:20,atk:75,spa:45,isDefensiveAnchor:true}),
+];
+
+const activeHazardTeam=[
+  mon('Gholdengo',{ability:'Good as Gold',moves:['Shadow Ball','Make It Rain','Recover','Nasty Plot'],types:['Steel','Ghost'],offensiveTypes:['Steel','Ghost'],baseSpeed:84,atk:60,spa:133,isRemovalDenial:true}),
+  mon('Tornadus-Therian',{moves:['Bleakwind Storm','U-turn','Knock Off','Heat Wave'],types:['Flying'],offensiveTypes:['Flying','Dark','Fire'],baseSpeed:121,atk:100,spa:110}),
+  mon('Gliscor',{moves:['Spikes','Knock Off','Toxic','Protect'],types:['Ground','Flying'],offensiveTypes:['Ground','Dark'],baseSpeed:95,atk:95,spa:45,isDefensiveAnchor:true}),
+  mon('Pecharunt',{moves:['Malignant Chain','Foul Play','Parting Shot','Recover'],types:['Poison','Ghost'],offensiveTypes:['Poison','Dark'],baseSpeed:60,atk:88,spa:88,isDefensiveAnchor:true}),
+  mon('Garganacl',{moves:['Stealth Rock','Salt Cure','Recover','Protect'],types:['Rock'],offensiveTypes:['Rock'],baseSpeed:35,atk:100,spa:45,isDefensiveAnchor:true}),
+  mon('Hatterene',{moves:['Trick Room','Psychic Noise','Dazzling Gleam','Healing Wish'],types:['Psychic','Fairy'],offensiveTypes:['Psychic','Fairy'],baseSpeed:29,atk:90,spa:136}),
+];
+
 const shallowProfile=ctx.profileTeam(shallowRoomTeam,{});
 assert(shallowProfile.trickRoomSetters.length===2,'expected two Trick Room setters in shallow shell');
 assert(shallowProfile.trickRoomPayoffs.length===1,'expected only one real Trick Room payoff in shallow shell');
@@ -103,8 +137,28 @@ assert(shallowSynergy.issues.some(issue=>issue.title==='Trick Room plan lacks sl
 const goodProfile=ctx.profileTeam(goodRoomTeam,{});
 assert(goodProfile.trickRoomPayoffs.length>=2,'expected the good Room team to have multiple payoffs');
 const goodIdentity=ctx.detectIdentities(goodRoomTeam,{},goodProfile);
-assert(goodIdentity.primary.name==='Trick Room Offense','real Room team should keep Trick Room Offense as the primary identity');
+const goodTrickRoomRow=goodIdentity.all.find(row=>row.name==='Trick Room Offense');
+assert(goodTrickRoomRow&&goodTrickRoomRow.score===84,'real Room team should keep the base Trick Room confidence when the payoff is real');
 const goodSynergy=ctx.evaluateSynergy(goodRoomTeam,{},goodProfile,goodIdentity);
 assert(!goodSynergy.issues.some(issue=>issue.title==='Trick Room plan lacks slow closers'),'real Room team should not get the shallow Trick Room issue');
 
-console.log('[OK] weather identity upgrades Trick Room coherence checks passed');
+const passiveHazardProfile=ctx.profileTeam(passiveHazardTeam,{});
+assert(passiveHazardProfile.hazardPayoffAttackers.length===1,'expected the passive hazard shell to have only one payoff attacker');
+const passiveHazardIdentity=ctx.detectIdentities(passiveHazardTeam,{},passiveHazardProfile);
+const passiveHazardRow=passiveHazardIdentity.all.find(row=>row.name==='Hazard Stack Fat Balance');
+assert(passiveHazardRow.score<=62,'passive hazard shell should lose most of its hazard-stack confidence');
+assert(passiveHazardRow.evidence.some(line=>/lacks enough payoff attackers/.test(line)),'expected hazard row to explain the missing payoff attackers');
+const passiveHazardSynergy=ctx.evaluateSynergy(passiveHazardTeam,{},passiveHazardProfile,passiveHazardIdentity);
+assert(passiveHazardSynergy.scores.fieldControl<79,'expected passive hazard shell to lose field-control score');
+assert(passiveHazardSynergy.scores.offensiveCoverage<78,'expected passive hazard shell to lose offensive-coverage score');
+assert(passiveHazardSynergy.issues.some(issue=>issue.title==='Hazard plan lacks payoff attackers'),'expected passive hazard issue to surface');
+
+const activeHazardProfile=ctx.profileTeam(activeHazardTeam,{});
+assert(activeHazardProfile.hazardPayoffAttackers.length>=3,'expected the active hazard shell to keep multiple payoff attackers');
+const activeHazardIdentity=ctx.detectIdentities(activeHazardTeam,{},activeHazardProfile);
+const activeHazardRow=activeHazardIdentity.all.find(row=>row.name==='Hazard Stack Fat Balance');
+assert(activeHazardRow.score===88,'active hazard shell should keep its base hazard-stack confidence');
+const activeHazardSynergy=ctx.evaluateSynergy(activeHazardTeam,{},activeHazardProfile,activeHazardIdentity);
+assert(!activeHazardSynergy.issues.some(issue=>issue.title==='Hazard plan lacks payoff attackers'),'active hazard shell should not get the passive hazard issue');
+
+console.log('[OK] weather identity upgrades Trick Room and hazard coherence checks passed');
