@@ -142,6 +142,14 @@ const windRiderControlRoll = vm.runInContext(
 assert(windRiderControlRoll.blockedBy === '', 'Wind Rider should not block unrelated non-wind moves');
 assert(windRiderControlRoll.maxd > 0, 'non-wind moves should still deal damage through Wind Rider');
 
+const overcoatReplayLog = '|turn|1\n|switch|p1a: Amoonguss|Amoonguss, L80\n|switch|p2a: Kommo-o|Kommo-o, L80\n|move|p1a: Amoonguss|Sleep Powder|p2a: Kommo-o\n|-immune|p2a: Kommo-o|[from] ability: Overcoat';
+const overcoatReplayRead = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(overcoatReplayLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+assert(overcoatReplayRead.strongest?.detectiveInputs?.[0]?.label === 'Overcoat blocked Sleep Powder', 'replay clues should keep the actual powder move name for Overcoat');
+
 const soundproofReplayLog = '|turn|1\n|switch|p1a: Volcarona|Volcarona, L80\n|switch|p2a: Kommo-o|Kommo-o, L80\n|move|p1a: Volcarona|Bug Buzz|p2a: Kommo-o\n|-immune|p2a: Kommo-o|[from] ability: Soundproof';
 const soundproofReplayRead = vm.runInContext(`(() => {
   const parser = new ReplayParser();
@@ -165,5 +173,38 @@ const windRiderReplayRead = vm.runInContext(`(() => {
   return parser.replayRead;
 })()`, context, { timeout: 10000 });
 assert(windRiderReplayRead.strongest?.detectiveInputs?.[0]?.label === 'Wind Rider activated on Bleakwind Storm', 'replay clues should keep the actual wind move name for Wind Rider');
+
+const overcoatSleepPowderStatusLog = '|turn|1\n|switch|p1a: Amoonguss|Amoonguss, L80\n|switch|p2a: Kommo-o|Kommo-o, L80\n|move|p1a: Amoonguss|Sleep Powder|p2a: Kommo-o\n|-status|p2a: Kommo-o|slp';
+const overcoatSleepPowderStatusRead = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(overcoatSleepPowderStatusLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const overcoatSleepPowderStatusTarget = overcoatSleepPowderStatusRead.strongest;
+assert(overcoatSleepPowderStatusTarget?.ruledOutAbilities?.includes('Overcoat'), 'successful powder status should rule out Overcoat when the move actually connected');
+assert(overcoatSleepPowderStatusTarget?.notes?.some(note => /Sleep Powder successfully landed/i.test(note)), 'successful powder status should explain the Overcoat contradiction through the landed move note');
+
+vm.runInContext(
+  `team=[
+    preset("Kommo-o","Leftovers","Careful",{hp:252,atk:4,def:0,spa:0,spd:252,spe:0},["Body Press","Stealth Rock","Protect","Dragon Dance"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: overcoatSleepPowderStatusTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const overcoatSleepPowderRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(!overcoatSleepPowderRead.abilityRows.some(([name]) => name === 'Overcoat'), 'successful powder status should remove Overcoat from the live detective pool');
+assert(overcoatSleepPowderRead.summary.notes.some(x => /Overcoat impossible/i.test(x)), 'successful powder status should carry the Overcoat contradiction into detective notes');
+
+const overcoatThunderWaveStatusLog = '|turn|1\n|switch|p1a: Dragapult|Dragapult, L80\n|switch|p2a: Kommo-o|Kommo-o, L80\n|move|p1a: Dragapult|Thunder Wave|p2a: Kommo-o\n|-status|p2a: Kommo-o|par';
+const overcoatThunderWaveStatusRead = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(overcoatThunderWaveStatusLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+assert(!overcoatThunderWaveStatusRead.strongest?.ruledOutAbilities?.includes('Overcoat'), 'non-powder status should not fake an Overcoat contradiction');
+assert(!overcoatThunderWaveStatusRead.strongest?.notes?.some(note => /Overcoat/i.test(note)), 'non-powder status should stay silent about Overcoat');
 
 console.log('[OK] move immunity reasoning passed');
