@@ -419,6 +419,59 @@ Bold Nature
 - Rapid Spin
 - Yawn
 - Stealth Rock`;
+const passiveHazardShell=`Gholdengo @ Air Balloon
+Ability: Good as Gold
+EVs: 252 HP / 196 Def / 60 Spe
+Bold Nature
+- Shadow Ball
+- Recover
+- Make It Rain
+- Nasty Plot
+
+Skarmory @ Rocky Helmet
+Ability: Sturdy
+EVs: 252 HP / 252 Def / 4 SpD
+Impish Nature
+- Spikes
+- Roost
+- Whirlwind
+- Body Press
+
+Ting-Lu @ Leftovers
+Ability: Vessel of Ruin
+EVs: 252 HP / 4 Atk / 252 SpD
+Careful Nature
+- Stealth Rock
+- Ruination
+- Whirlwind
+- Earthquake
+
+Alomomola @ Heavy-Duty Boots
+Ability: Regenerator
+EVs: 252 HP / 252 Def / 4 SpD
+Bold Nature
+- Wish
+- Protect
+- Flip Turn
+- Scald
+
+Blissey @ Leftovers
+Ability: Natural Cure
+EVs: 252 HP / 252 Def / 4 SpD
+Bold Nature
+- Soft-Boiled
+- Seismic Toss
+- Thunder Wave
+- Teleport
+
+Clodsire @ Leftovers
+Ability: Water Absorb
+EVs: 252 HP / 4 Def / 252 SpD
+Careful Nature
+- Toxic
+- Recover
+- Earthquake
+- Haze`;
 const badPassive=`Dondozo @ Leftovers
 Ability: Unaware
 EVs: 252 HP / 252 Def
@@ -587,7 +640,11 @@ check('flawed jack balance', jackBalance, r=>/Balance|Bulky|Hyper/.test(r.identi
 check('bad fire stack', badNoRemoval, r=>r.synergy.scores.typeSynergy<50&&r.diagnosis.topWeaknesses.some(w=>w.tp==='Rock'));
 check('shallow rain shell', shallowRainShell, r=>!/Rain Offense/.test(r.identity.primary.name)&&r.synergy.issues.some(issue=>/Rain plan clashes with Fire core/.test(issue.title)));
 check('shallow sun shell', shallowSunShell, r=>!/Sun Offense/.test(r.identity.primary.name)&&r.synergy.issues.some(issue=>/Sun plan clashes with Water core/.test(issue.title)));
+check('passive hazard shell', passiveHazardShell, r=>{
+  const hazardRow=r.identity.all.find(x=>x.name==='Hazard Stack Fat Balance');
+  return hazardRow&&hazardRow.score<60&&r.synergy.issues.some(issue=>/Hazard plan lacks payoff attackers/.test(issue.title));
+});
 check('fat passive stall', badPassive, r=>/Stall|Balance/.test(r.identity.primary.name)&&r.synergy.scores.offensiveCoverage<85);
 check('bad six sweepers', badSixSweepers, r=>/Hyper Offense|Dragon Spam/.test(r.identity.primary.name)&&r.synergy.scores.defensiveBackbone<45);
 check('bad no win field spam', badNoWin, r=>r.synergy.scores.winReliability<70&&r.synergy.scores.fieldControl<45);
-console.log('\n[OK] V3.3 reasoner 11-team audit passed');
+console.log('\n[OK] V3.3 reasoner 12-team audit passed');
