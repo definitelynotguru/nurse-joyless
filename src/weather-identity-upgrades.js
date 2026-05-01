@@ -8,6 +8,8 @@
   const priority={'Sun Room':30,'Trick Room Offense':24,'Hazard Stack Fat Balance':22,'Dragon Spam Offense':20,'Rain Offense':18,'Sun Offense':16,'Balance':12,'Bulky Offense':10,'Hyper Offense':8,'Stall':4};
   const SUN_MOVES=['Weather Ball','Solar Beam','Solar Blade'];
   const ROOM_SERVICE_ITEM='Room Service';
+  const SETUP_MOVES=['Dragon Dance','Swords Dance','Nasty Plot','Calm Mind','Bulk Up','Quiver Dance','Curse'];
+  const OFFENSIVE_ITEMS=['Choice Specs','Choice Band','Choice Scarf','Life Orb','Expert Belt','Booster Energy','Black Glasses','Charcoal','Flame Orb'];
 
   function offensiveTypes(mon){
     if(typeof root.offensiveMoveTypes==='function')return root.offensiveMoveTypes(mon)||[];
@@ -47,6 +49,14 @@
     const speed=baseSpeed(mon);
     if(speed===null)return false;
     return speed>=85&&isOffensiveMon(mon);
+  }
+
+  function isHazardPayoffAttacker(mon){
+    if(!isOffensiveMon(mon))return false;
+    const item=String(mon?.item||'').trim();
+    if(OFFENSIVE_ITEMS.includes(item))return true;
+    if(hasAnyMove(mon,SETUP_MOVES))return true;
+    return offensiveTypes(mon).length>=2;
   }
 
   function weatherTension(profile){
@@ -105,6 +115,22 @@
     return 20+Math.max(0,setters-2)*4+Math.max(0,fastAttackers-2)*5+Math.max(0,1-slowPayoffs)*6;
   }
 
+  function stagnantHazardShell(profile){
+    const hazards=(profile?.hazards||[]).length;
+    const layers=(profile?.layers||[]).length;
+    const denial=(profile?.removalDenial||[]).length;
+    const anchors=(profile?.defensiveAnchors||[]).length;
+    const payoffs=(profile?.hazardPayoffAttackers||[]).length;
+    return hazards>=2&&(layers>=1||denial>=1)&&anchors>=4&&payoffs<=1;
+  }
+
+  function stagnantHazardPenalty(profile){
+    if(!stagnantHazardShell(profile))return 0;
+    const anchors=(profile?.defensiveAnchors||[]).length;
+    const payoffs=(profile?.hazardPayoffAttackers||[]).length;
+    return 22+Math.max(0,anchors-4)*4+Math.max(0,1-payoffs)*8;
+  }
+
   function cloneIdentityRow(row={}){
     return {...row,evidence:[...(row.evidence||[])]};
   }
@@ -134,23 +160,27 @@
     profile.fastAttackers=teamList.filter(isFastAttacker).map(mon=>mon.species);
     profile.trickRoomPayoffs=teamList.filter(mon=>isSlowRoomPayoff(mon)&&!hasAnyMove(mon,['Trick Room'])).map(mon=>mon.species);
     profile.trickRoomPayoffMoves=teamList.filter(mon=>moveCount(mon,['Trick Room'])===0&&isSlowRoomPayoff(mon)).map(mon=>mon.species);
+    profile.hazardPayoffAttackers=teamList.filter(isHazardPayoffAttacker).map(mon=>mon.species);
     return profile;
   };
 
   root.detectIdentities=function patchedDetectIdentities(t=root.team,a=root.analysis,p=root.profileTeam(t,a)){
     const profile=p||root.profileTeam(t,a);
     const result=originalDetectIdentities.call(this,t,a,profile);
-    if(!profile?.weatherConflict&&!shallowRainShell(profile)&&!shallowSunShell(profile)&&!shallowTrickRoomShell(profile))return result;
+    if(!profile?.weatherConflict&&!shallowRainShell(profile)&&!shallowSunShell(profile)&&!shallowTrickRoomShell(profile)&&!stagnantHazardShell(profile))return result;
 
     const rows=(result?.all||[]).map(cloneIdentityRow);
     const {mixedWeatherPenalty,rainFirePenalty,sunWaterPenalty}=weatherTension(profile);
     const shallowRainShellPenalty=shallowRainPenalty(profile);
     const shallowSunShellPenalty=shallowSunPenalty(profile);
     const shallowRoomShellPenalty=shallowTrickRoomPenalty(profile);
+    const stagnantHazardShellPenalty=stagnantHazardPenalty(profile);
+    const hazardStack=row=>row?.name==='Hazard Stack Fat Balance';
     const rain=rows.find(row=>row.name==='Rain Offense');
     const sun=rows.find(row=>row.name==='Sun Offense');
     const sunRoom=rows.find(row=>row.name==='Sun Room');
     const trickRoom=rows.find(row=>row.name==='Trick Room Offense');
+    const hazard=rows.find(hazardStack);
 
     if(rain){
       rain.score=root.njCap((rain.score||0)-mixedWeatherPenalty-rainFirePenalty-shallowRainShellPenalty,96);
@@ -190,6 +220,13 @@
           addEvidence(trickRoom,'too few dedicated slow breakers to justify Room support');
         }
         addEvidence(trickRoom,'fast attackers waste most Room turns');
+      }
+    }
+    if(hazard){
+      hazard.score=root.njCap((hazard.score||0)-stagnantHazardShellPenalty,94);
+      if(stagnantHazardShell(profile)){
+        addEvidence(hazard,'hazard shell lacks enough payoff attackers');
+        addEvidence(hazard,'passive anchors make it hard to punish removal attempts');
       }
     }
 
@@ -250,6 +287,18 @@
           severity:'bad',
           title:'Trick Room plan lacks slow closers',
           detail:'The team spends slots on Trick Room support, but most of the attackers are still too fast to exploit those turns, so the Room plan rarely converts into a real closing sequence.'
+        });
+      }
+    }
+    if(stagnantHazardShell(profile)){
+      next.scores.winReliability=root.njCap((next.scores.winReliability||0)-8,92);
+      next.scores.offensiveCoverage=root.njCap((next.scores.offensiveCoverage||0)-10,92);
+      next.scores.fieldControl=root.njCap((next.scores.fieldControl||0)-6,92);
+      if(!next.issues.some(issue=>issue?.title==='Hazard plan lacks payoff attackers')){
+        next.issues.push({
+          severity:'bad',
+          title:'Hazard plan lacks payoff attackers',
+          detail:'The team can set hazards and sometimes deny removal, but too few attackers actually convert that chip into forced progress or a closing sequence.'
         });
       }
     }
