@@ -2,7 +2,7 @@ const fs=require('fs'),vm=require('vm');
 const source=fs.readFileSync('src/app.js','utf8');
 function makeEl(){return {value:'',checked:false,innerHTML:'',textContent:'',className:'',_items:[],options:[],style:{},dataset:{},classList:{add(){},remove(){},toggle(){}},querySelector(){return makeEl()},scrollIntoView(){},appendChild(){},click(){},getBoundingClientRect(){return{top:999}}}}
 const els={};const ctx={console,setTimeout(fn){fn()},alert(){},localStorage:{getItem(){return null},setItem(){}},navigator:{clipboard:{writeText(){}}},URL:{createObjectURL(){return 'blob:'},revokeObjectURL(){}},Blob:function(){},fetch:async()=>{throw Error('offline')}};
-ctx.document={addEventListener(){},getElementById(id){return els[id]||(els[id]=makeEl())},querySelectorAll(){return[]},createElement(){return makeEl()}};ctx.window=ctx;ctx.addEventListener=function(){};vm.createContext(ctx);vm.runInContext(source,ctx,{timeout:5000});
+ctx.document={addEventListener(){},getElementById(id){return els[id]||(els[id]=makeEl())},querySelectorAll(){return[]},createElement(){return makeEl()}};ctx.window=ctx;ctx.addEventListener=function(){};vm.createContext(ctx);vm.runInContext(source,ctx,{timeout:5000});vm.runInContext(fs.readFileSync('src/weather-identity-upgrades.js','utf8'),ctx,{filename:'weather-identity-upgrades.js',timeout:5000});
 function check(name, teamText, judge){
   const code = `team=parseTeam(${JSON.stringify(teamText)}); analysis=analyze(team); lastReasoning=buildReasoningReport(); lastReasoning`;
   const r = vm.runInContext(code, ctx);
