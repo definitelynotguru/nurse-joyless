@@ -12,6 +12,12 @@
     return [];
   }
 
+  function hasAnyMove(mon,names=[]){
+    const wanted=new Set((Array.isArray(names)?names:[]).map(name=>String(name||'').trim()).filter(Boolean));
+    if(!wanted.size)return false;
+    return (Array.isArray(mon?.moves)?mon.moves:[]).some(move=>wanted.has(String(move||'').trim()));
+  }
+
   function weatherTension(profile){
     return {
       mixedWeatherPenalty:profile?.weatherConflict?30:0,
@@ -36,6 +42,23 @@
     return 22+Math.max(0,fireTypes-3)*5+Math.max(0,fireAttackers-waterAttackers)*4;
   }
 
+  function shallowSunShell(profile){
+    if(!profile?.drought?.length||profile?.weatherConflict)return false;
+    const waterAttackers=(profile.waterAttackers||[]).length;
+    const waterTypes=(profile.waterTypes||[]).length;
+    const fireAttackers=(profile.fireAttackers||[]).length;
+    const sunPayoffs=(profile.sunPayoffAttackers||[]).length;
+    return waterAttackers>=3&&waterTypes>=2&&fireAttackers<=2&&sunPayoffs<=1;
+  }
+
+  function shallowSunPenalty(profile){
+    if(!shallowSunShell(profile))return 0;
+    const waterTypes=(profile.waterTypes||[]).length;
+    const waterAttackers=(profile.waterAttackers||[]).length;
+    const fireAttackers=(profile.fireAttackers||[]).length;
+    return 18+Math.max(0,waterTypes-3)*5+Math.max(0,waterAttackers-fireAttackers)*4;
+  }
+
   function cloneIdentityRow(row={}){
     return {...row,evidence:[...(row.evidence||[])]};
   }
@@ -55,17 +78,24 @@
     profile.fireAttackers=teamList.filter(mon=>offensiveTypes(mon).includes('Fire')).map(mon=>mon.species);
     profile.waterAttackers=teamList.filter(mon=>offensiveTypes(mon).includes('Water')).map(mon=>mon.species);
     profile.rainSpeedAbusers=teamList.filter(mon=>String(mon?.ability||'').trim()==='Swift Swim').map(mon=>mon.species);
+    profile.sunPayoffAttackers=teamList.filter(mon=>{
+      const ability=String(mon?.ability||'').trim();
+      if(['Chlorophyll','Solar Power'].includes(ability))return true;
+      if(hasAnyMove(mon,['Weather Ball','Solar Beam','Solar Blade']))return true;
+      return ability==='Protosynthesis'&&(offensiveTypes(mon).includes('Fire')||hasAnyMove(mon,['Hydro Steam']));
+    }).map(mon=>mon.species);
     return profile;
   };
 
   root.detectIdentities=function patchedDetectIdentities(t=root.team,a=root.analysis,p=root.profileTeam(t,a)){
     const profile=p||root.profileTeam(t,a);
     const result=originalDetectIdentities.call(this,t,a,profile);
-    if(!profile?.weatherConflict&&!shallowRainShell(profile))return result;
+    if(!profile?.weatherConflict&&!shallowRainShell(profile)&&!shallowSunShell(profile))return result;
 
     const rows=(result?.all||[]).map(cloneIdentityRow);
     const {mixedWeatherPenalty,rainFirePenalty,sunWaterPenalty}=weatherTension(profile);
     const shallowRainShellPenalty=shallowRainPenalty(profile);
+    const shallowSunShellPenalty=shallowSunPenalty(profile);
     const rain=rows.find(row=>row.name==='Rain Offense');
     const sun=rows.find(row=>row.name==='Sun Offense');
     const sunRoom=rows.find(row=>row.name==='Sun Room');
@@ -82,12 +112,19 @@
       }
     }
     if(sun){
-      sun.score=root.njCap((sun.score||0)-mixedWeatherPenalty-sunWaterPenalty,92);
+      sun.score=root.njCap((sun.score||0)-mixedWeatherPenalty-sunWaterPenalty-shallowSunShellPenalty,92);
       if(profile.weatherConflict)addEvidence(sun,'conflicting rain and sun setters');
+      if(shallowSunShell(profile)){
+        addEvidence(sun,'water-heavy shell undercuts sun turns');
+        if((profile.sunPayoffAttackers||[]).length<=1){
+          addEvidence(sun,'too few dedicated sun payoffs to justify Drought');
+        }
+      }
     }
     if(sunRoom){
-      sunRoom.score=root.njCap((sunRoom.score||0)-mixedWeatherPenalty-sunWaterPenalty,96);
+      sunRoom.score=root.njCap((sunRoom.score||0)-mixedWeatherPenalty-sunWaterPenalty-shallowSunShellPenalty,96);
       if(profile.weatherConflict)addEvidence(sunRoom,'conflicting rain and sun setters');
+      if(shallowSunShell(profile))addEvidence(sunRoom,'water-heavy shell undercuts sun turns');
     }
 
     rows.sort((left,right)=>(right.score-left.score)||((priority[right.name]||0)-(priority[left.name]||0)));
@@ -126,6 +163,16 @@
           severity:'bad',
           title:'Rain plan clashes with Fire core',
           detail:'Pelipper is creating rain turns for a roster that is still mostly trying to click Fire attacks, so the weather slot is not producing a coherent closing plan.'
+        });
+      }
+    }
+    if(shallowSunShell(profile)){
+      next.scores.winReliability=root.njCap((next.scores.winReliability||0)-8,92);
+      if(!next.issues.some(issue=>issue?.title==='Sun plan clashes with Water core')){
+        next.issues.push({
+          severity:'bad',
+          title:'Sun plan clashes with Water core',
+          detail:'Drought is supporting a roster that is still mostly trying to click Water attacks, so the weather slot is not producing a coherent closing plan.'
         });
       }
     }
