@@ -313,6 +313,59 @@ Quiet Nature
 - Lava Plume
 - Stealth Rock
 - Earth Power`;
+const shallowRainShell=`Charizard @ Heavy-Duty Boots
+Ability: Blaze
+EVs: 252 SpA / 252 Spe
+Timid Nature
+- Flamethrower
+- Hurricane
+- Defog
+- Roost
+
+Volcarona @ Life Orb
+Ability: Flame Body
+EVs: 252 SpA / 252 Spe
+Timid Nature
+- Fiery Dance
+- Bug Buzz
+- Giga Drain
+- Quiver Dance
+
+Moltres @ Leftovers
+Ability: Pressure
+EVs: 252 HP / 252 Def
+Bold Nature
+- Hurricane
+- Roost
+- Will-O-Wisp
+- Flamethrower
+
+Arcanine @ Choice Band
+Ability: Intimidate
+EVs: 252 Atk / 252 Spe
+Jolly Nature
+- Fire Punch
+- Crunch
+- Extreme Speed
+- Close Combat
+
+Dragonite @ Heavy-Duty Boots
+Ability: Multiscale
+EVs: 252 Atk / 252 Spe
+Adamant Nature
+- Dragon Dance
+- Extreme Speed
+- Earthquake
+- Fire Punch
+
+Pelipper @ Damp Rock
+Ability: Drizzle
+EVs: 248 HP / 252 Def
+Bold Nature
+- Hurricane
+- Surf
+- U-turn
+- Roost`;
 const badPassive=`Dondozo @ Leftovers
 Ability: Unaware
 EVs: 252 HP / 252 Def
@@ -479,6 +532,7 @@ check('good rain', rain, r=>/Rain/.test(r.identity.primary.name)&&r.matchups.fin
 check('good offensive balance', balance, r=>/Balance|Bulky/.test(r.identity.primary.name)&&!r.identity.primary.name.includes('Stall'));
 check('flawed jack balance', jackBalance, r=>/Balance|Bulky|Hyper/.test(r.identity.primary.name)&&r.synergy.scores.winReliability<75&&r.synergy.scores.fieldControl<75);
 check('bad fire stack', badNoRemoval, r=>r.synergy.scores.typeSynergy<50&&r.diagnosis.topWeaknesses.some(w=>w.tp==='Rock'));
+check('shallow rain shell', shallowRainShell, r=>!/Rain Offense/.test(r.identity.primary.name)&&r.synergy.issues.some(issue=>/Rain plan clashes with Fire core/.test(issue.title)));
 check('fat passive stall', badPassive, r=>/Stall|Balance/.test(r.identity.primary.name)&&r.synergy.scores.offensiveCoverage<85);
 check('bad six sweepers', badSixSweepers, r=>/Hyper Offense|Dragon Spam/.test(r.identity.primary.name)&&r.synergy.scores.defensiveBackbone<45);
 check('bad no win field spam', badNoWin, r=>r.synergy.scores.winReliability<70&&r.synergy.scores.fieldControl<45);
