@@ -8,9 +8,45 @@
   if(typeof P!=='undefined'&&!P.Leafeon){
     P.Leafeon=[['Grass'],[65,110,130,60,65,95]];
   }
+  if(typeof P!=='undefined'&&!P.Slurpuff){
+    P.Slurpuff=[['Fairy'],[82,80,86,85,75,72]];
+  }
+  if(typeof P!=='undefined'&&!P['Rapidash-Galar']){
+    P['Rapidash-Galar']=[['Psychic','Fairy'],[65,100,70,80,80,105]];
+  }
+  if(typeof P!=='undefined'&&!P.Wailord){
+    P.Wailord=[['Water'],[170,90,45,90,45,60]];
+  }
+  if(typeof P!=='undefined'&&!P.Magmar){
+    P.Magmar=[['Fire'],[65,95,57,100,85,93]];
+  }
+  if(typeof P!=='undefined'&&!P.Camerupt){
+    P.Camerupt=[['Fire','Ground'],[70,100,70,105,75,40]];
+  }
+  if(typeof P!=='undefined'&&!P.Banette){
+    P.Banette=[['Ghost'],[64,115,65,83,63,65]];
+  }
 
   if(typeof FALLBACK_ABILITIES!=='undefined'&&!FALLBACK_ABILITIES.Leafeon){
     FALLBACK_ABILITIES.Leafeon={0:'Leaf Guard',H:'Chlorophyll'};
+  }
+  if(typeof FALLBACK_ABILITIES!=='undefined'&&!FALLBACK_ABILITIES.Slurpuff){
+    FALLBACK_ABILITIES.Slurpuff={0:'Sweet Veil',1:'Unburden'};
+  }
+  if(typeof FALLBACK_ABILITIES!=='undefined'&&!FALLBACK_ABILITIES['Rapidash-Galar']){
+    FALLBACK_ABILITIES['Rapidash-Galar']={0:'Run Away',1:'Pastel Veil',H:'Anticipation'};
+  }
+  if(typeof FALLBACK_ABILITIES!=='undefined'&&!FALLBACK_ABILITIES.Wailord){
+    FALLBACK_ABILITIES.Wailord={0:'Water Veil',1:'Oblivious',H:'Pressure'};
+  }
+  if(typeof FALLBACK_ABILITIES!=='undefined'&&!FALLBACK_ABILITIES.Magmar){
+    FALLBACK_ABILITIES.Magmar={0:'Flame Body',1:'Vital Spirit',H:'Vital Spirit'};
+  }
+  if(typeof FALLBACK_ABILITIES!=='undefined'&&!FALLBACK_ABILITIES.Camerupt){
+    FALLBACK_ABILITIES.Camerupt={0:'Magma Armor',1:'Solid Rock',H:'Anger Point'};
+  }
+  if(typeof FALLBACK_ABILITIES!=='undefined'&&!FALLBACK_ABILITIES.Banette){
+    FALLBACK_ABILITIES.Banette={0:'Insomnia',1:'Frisk',H:'Cursed Body'};
   }
 
   if(typeof REPLAY_MOVE_HINTS!=='undefined'){
