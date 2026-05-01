@@ -5,6 +5,14 @@
   const proto=ReplayParserRef?.prototype;
   if(!proto)return;
 
+  if(typeof P!=='undefined'&&!P.Leafeon){
+    P.Leafeon=[['Grass'],[65,110,130,60,65,95]];
+  }
+
+  if(typeof FALLBACK_ABILITIES!=='undefined'&&!FALLBACK_ABILITIES.Leafeon){
+    FALLBACK_ABILITIES.Leafeon={0:'Leaf Guard',H:'Chlorophyll'};
+  }
+
   if(typeof REPLAY_MOVE_HINTS!=='undefined'){
     REPLAY_MOVE_HINTS.Nuzzle=['Electric','Physical',0];
     REPLAY_MOVE_HINTS.Glare=['Normal','Status',0];
@@ -193,6 +201,7 @@
     if(!statusId)return [];
     return detectiveAbilities(state?.species).filter(ability=>{
       if(ability==='Purifying Salt')return true;
+      if(ability==='Leaf Guard'&&this.sunWeatherActive())return true;
       if(statusId==='par'&&ability==='Limber')return true;
       if((statusId==='psn'||statusId==='tox')&&['Immunity','Pastel Veil'].includes(ability))return true;
       if(statusId==='brn'&&['Water Veil','Water Bubble'].includes(ability))return true;
@@ -386,6 +395,7 @@
     if(this.moveAbilityBypass(state,move))return [];
     return detectiveAbilities(state?.species).filter(ability=>{
       if(ability==='Purifying Salt')return true;
+      if(ability==='Leaf Guard'&&this.sunWeatherActive())return true;
       if(statusId==='par'&&ability==='Limber')return true;
       if((statusId==='psn'||statusId==='tox')&&['Immunity','Pastel Veil'].includes(ability))return true;
       if(statusId==='brn'&&['Water Veil','Water Bubble'].includes(ability))return true;
@@ -393,6 +403,33 @@
       if(statusId==='frz'&&ability==='Magma Armor')return true;
       return false;
     });
+  };
+
+  proto.ensureReplayWeatherState=function ensureReplayWeatherState(){
+    if(!this.replayWeatherState)this.replayWeatherState={current:''};
+    return this.replayWeatherState;
+  };
+
+  proto.normalizedReplayWeather=function normalizedReplayWeather(weather=''){
+    const label=String(weather||'').trim().toLowerCase();
+    if(!label||label==='none')return '';
+    if(label.includes('sun'))return 'sun';
+    if(label.includes('rain'))return 'rain';
+    if(label.includes('sand'))return 'sand';
+    if(label.includes('snow')||label.includes('hail'))return 'snow';
+    return '';
+  };
+
+  proto.recordReplayWeather=function recordReplayWeather(weather=''){
+    this.ensureReplayWeatherState().current=this.normalizedReplayWeather(weather);
+  };
+
+  proto.currentReplayWeather=function currentReplayWeather(){
+    return this.ensureReplayWeatherState().current||'';
+  };
+
+  proto.sunWeatherActive=function sunWeatherActive(){
+    return this.currentReplayWeather()==='sun';
   };
 
   proto.statusImmunityContradictionLabel=function statusImmunityContradictionLabel(status='', move=''){
@@ -517,6 +554,10 @@
 
   const originalExtractEvidence=proto.extractEvidence;
   proto.extractEvidence=function patchedExtractEvidence(event, turn){
+    if(event?.type==='-weather'){
+      this.recordReplayWeather(event.weather);
+      return originalExtractEvidence.call(this,event,turn);
+    }
     if((event?.type==='switch'||event?.type==='drag')&&event?.pokemon){
       const slot=this.slotId(event.pokemon);
       if(slot)this.clearFieldAbilitySuppression(slot);
