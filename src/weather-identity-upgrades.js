@@ -59,6 +59,13 @@
     return offensiveTypes(mon).length>=2;
   }
 
+  function isHazardCloser(mon){
+    if(!isHazardPayoffAttacker(mon))return false;
+    const attackStat=Math.max(Number(mon?.baseStats?.atk)||0,Number(mon?.baseStats?.spa)||0);
+    const item=String(mon?.item||'').trim();
+    return hasAnyMove(mon,SETUP_MOVES)||OFFENSIVE_ITEMS.includes(item)||attackStat>=120;
+  }
+
   function weatherTension(profile){
     return {
       mixedWeatherPenalty:profile?.weatherConflict?30:0,
@@ -124,11 +131,29 @@
     return hazards>=2&&(layers>=1||denial>=1)&&anchors>=4&&payoffs<=1;
   }
 
+  function thinHazardConversionShell(profile){
+    const hazards=(profile?.hazards||[]).length;
+    const layers=(profile?.layers||[]).length;
+    const denial=(profile?.removalDenial||[]).length;
+    const anchors=(profile?.defensiveAnchors||[]).length;
+    const payoffs=(profile?.hazardPayoffAttackers||[]).length;
+    const closers=(profile?.hazardClosers||[]).length;
+    return hazards>=2&&(layers>=1||denial>=1)&&anchors>=4&&payoffs<=2&&closers<=1;
+  }
+
   function stagnantHazardPenalty(profile){
     if(!stagnantHazardShell(profile))return 0;
     const anchors=(profile?.defensiveAnchors||[]).length;
     const payoffs=(profile?.hazardPayoffAttackers||[]).length;
     return 22+Math.max(0,anchors-4)*4+Math.max(0,1-payoffs)*8;
+  }
+
+  function thinHazardConversionPenalty(profile){
+    if(!thinHazardConversionShell(profile)||stagnantHazardShell(profile))return 0;
+    const anchors=(profile?.defensiveAnchors||[]).length;
+    const payoffs=(profile?.hazardPayoffAttackers||[]).length;
+    const closers=(profile?.hazardClosers||[]).length;
+    return 16+Math.max(0,anchors-4)*3+Math.max(0,2-payoffs)*4+Math.max(0,1-closers)*6;
   }
 
   function cloneIdentityRow(row={}){
@@ -161,13 +186,14 @@
     profile.trickRoomPayoffs=teamList.filter(mon=>isSlowRoomPayoff(mon)&&!hasAnyMove(mon,['Trick Room'])).map(mon=>mon.species);
     profile.trickRoomPayoffMoves=teamList.filter(mon=>moveCount(mon,['Trick Room'])===0&&isSlowRoomPayoff(mon)).map(mon=>mon.species);
     profile.hazardPayoffAttackers=teamList.filter(isHazardPayoffAttacker).map(mon=>mon.species);
+    profile.hazardClosers=teamList.filter(isHazardCloser).map(mon=>mon.species);
     return profile;
   };
 
   root.detectIdentities=function patchedDetectIdentities(t=root.team,a=root.analysis,p=root.profileTeam(t,a)){
     const profile=p||root.profileTeam(t,a);
     const result=originalDetectIdentities.call(this,t,a,profile);
-    if(!profile?.weatherConflict&&!shallowRainShell(profile)&&!shallowSunShell(profile)&&!shallowTrickRoomShell(profile)&&!stagnantHazardShell(profile))return result;
+    if(!profile?.weatherConflict&&!shallowRainShell(profile)&&!shallowSunShell(profile)&&!shallowTrickRoomShell(profile)&&!stagnantHazardShell(profile)&&!thinHazardConversionShell(profile))return result;
 
     const rows=(result?.all||[]).map(cloneIdentityRow);
     const {mixedWeatherPenalty,rainFirePenalty,sunWaterPenalty}=weatherTension(profile);
@@ -175,6 +201,7 @@
     const shallowSunShellPenalty=shallowSunPenalty(profile);
     const shallowRoomShellPenalty=shallowTrickRoomPenalty(profile);
     const stagnantHazardShellPenalty=stagnantHazardPenalty(profile);
+    const thinHazardShellPenalty=thinHazardConversionPenalty(profile);
     const hazardStack=row=>row?.name==='Hazard Stack Fat Balance';
     const rain=rows.find(row=>row.name==='Rain Offense');
     const sun=rows.find(row=>row.name==='Sun Offense');
@@ -223,10 +250,13 @@
       }
     }
     if(hazard){
-      hazard.score=root.njCap((hazard.score||0)-stagnantHazardShellPenalty,94);
+      hazard.score=root.njCap((hazard.score||0)-stagnantHazardShellPenalty-thinHazardShellPenalty,94);
       if(stagnantHazardShell(profile)){
         addEvidence(hazard,'hazard shell lacks enough payoff attackers');
         addEvidence(hazard,'passive anchors make it hard to punish removal attempts');
+      }else if(thinHazardConversionShell(profile)){
+        addEvidence(hazard,'hazard shell leans on too few real closers');
+        addEvidence(hazard,'chip plan is too thin to convert long games into a finish');
       }
     }
 
@@ -299,6 +329,17 @@
           severity:'bad',
           title:'Hazard plan lacks payoff attackers',
           detail:'The team can set hazards and sometimes deny removal, but too few attackers actually convert that chip into forced progress or a closing sequence.'
+        });
+      }
+    }else if(thinHazardConversionShell(profile)){
+      next.scores.winReliability=root.njCap((next.scores.winReliability||0)-7,92);
+      next.scores.offensiveCoverage=root.njCap((next.scores.offensiveCoverage||0)-8,92);
+      next.scores.fieldControl=root.njCap((next.scores.fieldControl||0)-5,92);
+      if(!next.issues.some(issue=>issue?.title==='Hazard plan leans on too few closers')){
+        next.issues.push({
+          severity:'bad',
+          title:'Hazard plan leans on too few closers',
+          detail:'The team has hazard support and one serious closer, but the rest of the shell is too passive to keep forcing progress once that single payoff line gets checked.'
         });
       }
     }
