@@ -244,6 +244,65 @@ Bold Nature
 - Surf
 - U-turn
 - Roost`;
+const shallowSunShell = `Walking Wake @ Choice Specs
+Ability: Protosynthesis
+Tera Type: Water
+EVs: 252 SpA / 4 SpD / 252 Spe
+Timid Nature
+- Hydro Steam
+- Draco Meteor
+- Flamethrower
+- Flip Turn
+
+Primarina @ Assault Vest
+Ability: Torrent
+Tera Type: Water
+EVs: 248 HP / 252 SpA / 8 SpD
+Modest Nature
+- Hydro Pump
+- Moonblast
+- Psychic Noise
+- Flip Turn
+
+Azumarill @ Choice Band
+Ability: Huge Power
+Tera Type: Water
+EVs: 252 Atk / 4 Def / 252 Spe
+Adamant Nature
+- Aqua Jet
+- Liquidation
+- Play Rough
+- Knock Off
+
+Zapdos @ Heavy-Duty Boots
+Ability: Static
+Tera Type: Steel
+EVs: 248 HP / 252 Def / 8 SpA
+Bold Nature
+- Hurricane
+- Volt Switch
+- Thunder Wave
+- Roost
+
+Great Tusk @ Heavy-Duty Boots
+Ability: Protosynthesis
+Tera Type: Water
+EVs: 252 HP / 4 Atk / 252 Def
+Impish Nature
+- Rapid Spin
+- Stealth Rock
+- Headlong Rush
+- Knock Off
+
+Torkoal @ Heat Rock
+Ability: Drought
+Tera Type: Fire
+EVs: 252 HP / 252 Def / 4 SpA
+Bold Nature
+- Lava Plume
+- Rapid Spin
+- Yawn
+- Stealth Rock`;
 function report(text){ return vm.runInContext(`team=parseTeam(${JSON.stringify(text)}); analysis=analyze(team); teamReasoner(team, analysis);`, ctx, {timeout:10000}); }
 const a = report(hazard);
 if(!a || !a.identity || !a.synergy || !a.matchups || !Array.isArray(a.suggestions)) throw new Error('teamReasoner wrapper did not return full report');
@@ -265,4 +324,9 @@ if(d.identity.primary.name === 'Rain Offense') throw new Error('a fire-heavy Pel
 if(!d.synergy.issues.some(issue => /Rain plan clashes with Fire core/.test(issue.title))) throw new Error('a shallow rain shell should surface that the Fire core fights its own rain slot');
 const shallowRainRow = (d.identity.all||[]).find(x => x.name === 'Rain Offense');
 if(!shallowRainRow || shallowRainRow.score >= d.identity.primary.score) throw new Error('a shallow rain shell should demote Rain Offense below the more coherent structural read');
+const e = report(shallowSunShell);
+if(e.identity.primary.name === 'Sun Offense') throw new Error('a water-heavy Torkoal shell without real sun payoffs should not flatten into pure Sun Offense');
+if(!e.synergy.issues.some(issue => /Sun plan clashes with Water core/.test(issue.title))) throw new Error('a shallow sun shell should surface that the Water core fights its own sun slot');
+const shallowSunRow = (e.identity.all||[]).find(x => x.name === 'Sun Offense');
+if(!shallowSunRow || shallowSunRow.score >= e.identity.primary.score) throw new Error('a shallow sun shell should demote Sun Offense below the more coherent structural read');
 console.log('[OK] V3.5 legacy wrapper and suggestion diversity passed');
