@@ -366,6 +366,59 @@ Bold Nature
 - Surf
 - U-turn
 - Roost`;
+const shallowSunShell=`Walking Wake @ Choice Specs
+Ability: Protosynthesis
+EVs: 252 SpA / 4 SpD / 252 Spe
+Timid Nature
+- Hydro Steam
+- Draco Meteor
+- Flamethrower
+- Flip Turn
+
+Primarina @ Assault Vest
+Ability: Torrent
+EVs: 248 HP / 252 SpA / 8 SpD
+Modest Nature
+- Hydro Pump
+- Moonblast
+- Psychic Noise
+- Flip Turn
+
+Azumarill @ Choice Band
+Ability: Huge Power
+EVs: 252 Atk / 4 Def / 252 Spe
+Adamant Nature
+- Aqua Jet
+- Liquidation
+- Play Rough
+- Knock Off
+
+Zapdos @ Heavy-Duty Boots
+Ability: Static
+EVs: 248 HP / 252 Def / 8 SpA
+Bold Nature
+- Hurricane
+- Volt Switch
+- Thunder Wave
+- Roost
+
+Great Tusk @ Heavy-Duty Boots
+Ability: Protosynthesis
+EVs: 252 HP / 4 Atk / 252 Def
+Impish Nature
+- Rapid Spin
+- Stealth Rock
+- Headlong Rush
+- Knock Off
+
+Torkoal @ Heat Rock
+Ability: Drought
+EVs: 252 HP / 252 Def / 4 SpA
+Bold Nature
+- Lava Plume
+- Rapid Spin
+- Yawn
+- Stealth Rock`;
 const badPassive=`Dondozo @ Leftovers
 Ability: Unaware
 EVs: 252 HP / 252 Def
@@ -533,7 +586,8 @@ check('good offensive balance', balance, r=>/Balance|Bulky/.test(r.identity.prim
 check('flawed jack balance', jackBalance, r=>/Balance|Bulky|Hyper/.test(r.identity.primary.name)&&r.synergy.scores.winReliability<75&&r.synergy.scores.fieldControl<75);
 check('bad fire stack', badNoRemoval, r=>r.synergy.scores.typeSynergy<50&&r.diagnosis.topWeaknesses.some(w=>w.tp==='Rock'));
 check('shallow rain shell', shallowRainShell, r=>!/Rain Offense/.test(r.identity.primary.name)&&r.synergy.issues.some(issue=>/Rain plan clashes with Fire core/.test(issue.title)));
+check('shallow sun shell', shallowSunShell, r=>!/Sun Offense/.test(r.identity.primary.name)&&r.synergy.issues.some(issue=>/Sun plan clashes with Water core/.test(issue.title)));
 check('fat passive stall', badPassive, r=>/Stall|Balance/.test(r.identity.primary.name)&&r.synergy.scores.offensiveCoverage<85);
 check('bad six sweepers', badSixSweepers, r=>/Hyper Offense|Dragon Spam/.test(r.identity.primary.name)&&r.synergy.scores.defensiveBackbone<45);
 check('bad no win field spam', badNoWin, r=>r.synergy.scores.winReliability<70&&r.synergy.scores.fieldControl<45);
-console.log('\n[OK] V3.3 reasoner 10-team audit passed');
+console.log('\n[OK] V3.3 reasoner 11-team audit passed');
