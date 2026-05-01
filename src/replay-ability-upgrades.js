@@ -22,7 +22,7 @@
   };
 
   proto.startEffectName=function startEffectName(effect=''){
-    return String(effect||'').replace(/^move: /,'').trim();
+    return String(effect||'').replace(/^(move|ability): /,'').trim();
   };
 
   proto.knownStatusStartMove=function knownStatusStartMove(move=''){
