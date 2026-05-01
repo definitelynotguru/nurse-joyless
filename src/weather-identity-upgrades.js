@@ -6,6 +6,8 @@
   const originalDetectIdentities=root.detectIdentities;
   const originalEvaluateSynergy=root.evaluateSynergy;
   const priority={'Sun Room':30,'Trick Room Offense':24,'Hazard Stack Fat Balance':22,'Dragon Spam Offense':20,'Rain Offense':18,'Sun Offense':16,'Balance':12,'Bulky Offense':10,'Hyper Offense':8,'Stall':4};
+  const SUN_MOVES=['Weather Ball','Solar Beam','Solar Blade'];
+  const ROOM_SERVICE_ITEM='Room Service';
 
   function offensiveTypes(mon){
     if(typeof root.offensiveMoveTypes==='function')return root.offensiveMoveTypes(mon)||[];
@@ -16,6 +18,35 @@
     const wanted=new Set((Array.isArray(names)?names:[]).map(name=>String(name||'').trim()).filter(Boolean));
     if(!wanted.size)return false;
     return (Array.isArray(mon?.moves)?mon.moves:[]).some(move=>wanted.has(String(move||'').trim()));
+  }
+
+  function moveCount(mon,names=[]){
+    const wanted=new Set((Array.isArray(names)?names:[]).map(name=>String(name||'').trim()).filter(Boolean));
+    if(!wanted.size)return 0;
+    return (Array.isArray(mon?.moves)?mon.moves:[]).filter(move=>wanted.has(String(move||'').trim())).length;
+  }
+
+  function baseSpeed(mon){
+    const raw=Number(mon?.baseStats?.spe);
+    return Number.isFinite(raw)?raw:null;
+  }
+
+  function isOffensiveMon(mon){
+    const attackStat=Math.max(Number(mon?.baseStats?.atk)||0,Number(mon?.baseStats?.spa)||0);
+    return offensiveTypes(mon).length>=2||attackStat>=105;
+  }
+
+  function isSlowRoomPayoff(mon){
+    const speed=baseSpeed(mon);
+    if(speed===null)return false;
+    if(String(mon?.item||'').trim()===ROOM_SERVICE_ITEM)return true;
+    return speed<=70&&isOffensiveMon(mon);
+  }
+
+  function isFastAttacker(mon){
+    const speed=baseSpeed(mon);
+    if(speed===null)return false;
+    return speed>=85&&isOffensiveMon(mon);
   }
 
   function weatherTension(profile){
@@ -59,6 +90,21 @@
     return 18+Math.max(0,waterTypes-3)*5+Math.max(0,waterAttackers-fireAttackers)*4;
   }
 
+  function shallowTrickRoomShell(profile){
+    const setters=(profile?.trickRoomSetters||[]).length;
+    const slowPayoffs=(profile?.trickRoomPayoffs||[]).length;
+    const fastAttackers=(profile?.fastAttackers||[]).length;
+    return setters>=2&&slowPayoffs<=1&&fastAttackers>=3;
+  }
+
+  function shallowTrickRoomPenalty(profile){
+    if(!shallowTrickRoomShell(profile))return 0;
+    const setters=(profile?.trickRoomSetters||[]).length;
+    const slowPayoffs=(profile?.trickRoomPayoffs||[]).length;
+    const fastAttackers=(profile?.fastAttackers||[]).length;
+    return 20+Math.max(0,setters-2)*4+Math.max(0,fastAttackers-2)*5+Math.max(0,1-slowPayoffs)*6;
+  }
+
   function cloneIdentityRow(row={}){
     return {...row,evidence:[...(row.evidence||[])]};
   }
@@ -81,24 +127,30 @@
     profile.sunPayoffAttackers=teamList.filter(mon=>{
       const ability=String(mon?.ability||'').trim();
       if(['Chlorophyll','Solar Power'].includes(ability))return true;
-      if(hasAnyMove(mon,['Weather Ball','Solar Beam','Solar Blade']))return true;
+      if(hasAnyMove(mon,SUN_MOVES))return true;
       return ability==='Protosynthesis'&&(offensiveTypes(mon).includes('Fire')||hasAnyMove(mon,['Hydro Steam']));
     }).map(mon=>mon.species);
+    profile.trickRoomSetters=teamList.filter(mon=>hasAnyMove(mon,['Trick Room'])).map(mon=>mon.species);
+    profile.fastAttackers=teamList.filter(isFastAttacker).map(mon=>mon.species);
+    profile.trickRoomPayoffs=teamList.filter(mon=>isSlowRoomPayoff(mon)&&!hasAnyMove(mon,['Trick Room'])).map(mon=>mon.species);
+    profile.trickRoomPayoffMoves=teamList.filter(mon=>moveCount(mon,['Trick Room'])===0&&isSlowRoomPayoff(mon)).map(mon=>mon.species);
     return profile;
   };
 
   root.detectIdentities=function patchedDetectIdentities(t=root.team,a=root.analysis,p=root.profileTeam(t,a)){
     const profile=p||root.profileTeam(t,a);
     const result=originalDetectIdentities.call(this,t,a,profile);
-    if(!profile?.weatherConflict&&!shallowRainShell(profile)&&!shallowSunShell(profile))return result;
+    if(!profile?.weatherConflict&&!shallowRainShell(profile)&&!shallowSunShell(profile)&&!shallowTrickRoomShell(profile))return result;
 
     const rows=(result?.all||[]).map(cloneIdentityRow);
     const {mixedWeatherPenalty,rainFirePenalty,sunWaterPenalty}=weatherTension(profile);
     const shallowRainShellPenalty=shallowRainPenalty(profile);
     const shallowSunShellPenalty=shallowSunPenalty(profile);
+    const shallowRoomShellPenalty=shallowTrickRoomPenalty(profile);
     const rain=rows.find(row=>row.name==='Rain Offense');
     const sun=rows.find(row=>row.name==='Sun Offense');
     const sunRoom=rows.find(row=>row.name==='Sun Room');
+    const trickRoom=rows.find(row=>row.name==='Trick Room Offense');
 
     if(rain){
       rain.score=root.njCap((rain.score||0)-mixedWeatherPenalty-rainFirePenalty-shallowRainShellPenalty,96);
@@ -122,9 +174,23 @@
       }
     }
     if(sunRoom){
-      sunRoom.score=root.njCap((sunRoom.score||0)-mixedWeatherPenalty-sunWaterPenalty-shallowSunShellPenalty,96);
+      sunRoom.score=root.njCap((sunRoom.score||0)-mixedWeatherPenalty-sunWaterPenalty-shallowSunShellPenalty-shallowRoomShellPenalty,96);
       if(profile.weatherConflict)addEvidence(sunRoom,'conflicting rain and sun setters');
       if(shallowSunShell(profile))addEvidence(sunRoom,'water-heavy shell undercuts sun turns');
+      if(shallowTrickRoomShell(profile)){
+        addEvidence(sunRoom,'multiple Trick Room setters but almost no slow payoff');
+        addEvidence(sunRoom,'fast attackers waste most Room turns');
+      }
+    }
+    if(trickRoom){
+      trickRoom.score=root.njCap((trickRoom.score||0)-shallowRoomShellPenalty,96);
+      if(shallowTrickRoomShell(profile)){
+        addEvidence(trickRoom,'multiple Trick Room setters but almost no slow payoff');
+        if((profile.trickRoomPayoffs||[]).length<=1){
+          addEvidence(trickRoom,'too few dedicated slow breakers to justify Room support');
+        }
+        addEvidence(trickRoom,'fast attackers waste most Room turns');
+      }
     }
 
     rows.sort((left,right)=>(right.score-left.score)||((priority[right.name]||0)-(priority[left.name]||0)));
@@ -173,6 +239,17 @@
           severity:'bad',
           title:'Sun plan clashes with Water core',
           detail:'Drought is supporting a roster that is still mostly trying to click Water attacks, so the weather slot is not producing a coherent closing plan.'
+        });
+      }
+    }
+    if(shallowTrickRoomShell(profile)){
+      next.scores.winReliability=root.njCap((next.scores.winReliability||0)-10,92);
+      next.scores.speedControl=root.njCap((next.scores.speedControl||0)-8,92);
+      if(!next.issues.some(issue=>issue?.title==='Trick Room plan lacks slow closers')){
+        next.issues.push({
+          severity:'bad',
+          title:'Trick Room plan lacks slow closers',
+          detail:'The team spends slots on Trick Room support, but most of the attackers are still too fast to exploit those turns, so the Room plan rarely converts into a real closing sequence.'
         });
       }
     }
