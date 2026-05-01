@@ -3,11 +3,12 @@ const vm = require('vm');
 const path = require('path');
 
 const src = fs.readFileSync(path.join('src', 'app.js'), 'utf8');
+const weatherUpgrades = fs.readFileSync(path.join('src', 'weather-identity-upgrades.js'), 'utf8');
 function makeEl(){return {value:'',checked:false,innerHTML:'',innerText:'',textContent:'',className:'',_items:[],options:[],style:{},dataset:{},classList:{add(){},remove(){},toggle(){}},querySelector(){return makeEl()},querySelectorAll(){return[]},scrollIntoView(){},appendChild(){},click(){},closest(){return null},getBoundingClientRect(){return {top:999}}}}
 const els={};
 const ctx={console,TextDecoder,setTimeout(fn){if(typeof fn==='function')fn();return 0},clearTimeout(){},alert(){},localStorage:{getItem(){return null},setItem(){}},navigator:{clipboard:{writeText(){}}},URL:{createObjectURL(){return 'blob:gauntlet'},revokeObjectURL(){}},Blob:function(){},fetch:async()=>{throw new Error('offline gauntlet')}};
 ctx.document={addEventListener(){},getElementById(id){return els[id]||(els[id]=makeEl())},querySelectorAll(){return[]},querySelector(){return null},createElement(){return makeEl()}};
-ctx.window=ctx;ctx.addEventListener=function(){};vm.createContext(ctx);vm.runInContext(src,ctx,{timeout:10000});
+ctx.window=ctx;ctx.addEventListener=function(){};vm.createContext(ctx);vm.runInContext(src,ctx,{timeout:10000});vm.runInContext(weatherUpgrades,ctx,{filename:'weather-identity-upgrades.js',timeout:10000});
 
 const S={
 Gholdengo:`Gholdengo @ Air Balloon\nAbility: Good as Gold\nTera Type: Fairy\nEVs: 252 HP / 196 Def / 60 Spe\nBold Nature\n- Nasty Plot\n- Shadow Ball\n- Recover\n- Make It Rain`,
