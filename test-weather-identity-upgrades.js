@@ -109,6 +109,15 @@ const passiveHazardTeam=[
   mon('Clodsire',{moves:['Toxic','Recover','Earthquake','Haze'],types:['Poison','Ground'],offensiveTypes:['Ground'],baseSpeed:20,atk:75,spa:45,isDefensiveAnchor:true}),
 ];
 
+const thinHazardTeam=[
+  mon('Gholdengo',{ability:'Good as Gold',moves:['Shadow Ball','Make It Rain','Recover','Nasty Plot'],types:['Steel','Ghost'],offensiveTypes:['Steel','Ghost'],baseSpeed:84,atk:60,spa:133,isRemovalDenial:true}),
+  mon('Gliscor',{moves:['Spikes','Knock Off','Toxic','Protect'],types:['Ground','Flying'],offensiveTypes:['Ground','Dark'],baseSpeed:95,atk:95,spa:45,isDefensiveAnchor:true}),
+  mon('Ting-Lu',{moves:['Stealth Rock','Ruination','Whirlwind','Earthquake'],types:['Dark','Ground'],offensiveTypes:['Ground'],baseSpeed:45,atk:110,spa:55,isDefensiveAnchor:true}),
+  mon('Alomomola',{moves:['Wish','Protect','Flip Turn','Scald'],types:['Water'],offensiveTypes:['Water'],baseSpeed:65,atk:75,spa:40,isDefensiveAnchor:true}),
+  mon('Blissey',{moves:['Soft-Boiled','Seismic Toss','Thunder Wave','Teleport'],types:['Normal'],offensiveTypes:['Normal'],baseSpeed:55,atk:10,spa:75,isDefensiveAnchor:true}),
+  mon('Clodsire',{moves:['Toxic','Recover','Earthquake','Haze'],types:['Poison','Ground'],offensiveTypes:['Ground'],baseSpeed:20,atk:75,spa:45,isDefensiveAnchor:true}),
+];
+
 const activeHazardTeam=[
   mon('Gholdengo',{ability:'Good as Gold',moves:['Shadow Ball','Make It Rain','Recover','Nasty Plot'],types:['Steel','Ghost'],offensiveTypes:['Steel','Ghost'],baseSpeed:84,atk:60,spa:133,isRemovalDenial:true}),
   mon('Tornadus-Therian',{moves:['Bleakwind Storm','U-turn','Knock Off','Heat Wave'],types:['Flying'],offensiveTypes:['Flying','Dark','Fire'],baseSpeed:121,atk:100,spa:110}),
@@ -153,12 +162,25 @@ assert(passiveHazardSynergy.scores.fieldControl<79,'expected passive hazard shel
 assert(passiveHazardSynergy.scores.offensiveCoverage<78,'expected passive hazard shell to lose offensive-coverage score');
 assert(passiveHazardSynergy.issues.some(issue=>issue.title==='Hazard plan lacks payoff attackers'),'expected passive hazard issue to surface');
 
+const thinHazardProfile=ctx.profileTeam(thinHazardTeam,{});
+assert(thinHazardProfile.hazardPayoffAttackers.length===2,'expected the thin hazard shell to have two nominal payoff attackers');
+assert(thinHazardProfile.hazardClosers.length===1,'expected the thin hazard shell to have only one real closer');
+const thinHazardIdentity=ctx.detectIdentities(thinHazardTeam,{},thinHazardProfile);
+const thinHazardRow=thinHazardIdentity.all.find(row=>row.name==='Hazard Stack Fat Balance');
+assert(thinHazardRow.score<73,'thin hazard shell should fall below the fallback balance read');
+assert(thinHazardRow.evidence.some(line=>/too few real closers/.test(line)),'expected hazard row to explain the thin closing pressure');
+const thinHazardSynergy=ctx.evaluateSynergy(thinHazardTeam,{},thinHazardProfile,thinHazardIdentity);
+assert(thinHazardSynergy.scores.fieldControl<79,'expected thin hazard shell to lose some field-control score');
+assert(thinHazardSynergy.scores.offensiveCoverage<78,'expected thin hazard shell to lose offensive-coverage score');
+assert(thinHazardSynergy.issues.some(issue=>issue.title==='Hazard plan leans on too few closers'),'expected thin hazard issue to surface');
+
 const activeHazardProfile=ctx.profileTeam(activeHazardTeam,{});
 assert(activeHazardProfile.hazardPayoffAttackers.length>=3,'expected the active hazard shell to keep multiple payoff attackers');
+assert(activeHazardProfile.hazardClosers.length>=2,'expected the active hazard shell to keep multiple real closers');
 const activeHazardIdentity=ctx.detectIdentities(activeHazardTeam,{},activeHazardProfile);
 const activeHazardRow=activeHazardIdentity.all.find(row=>row.name==='Hazard Stack Fat Balance');
 assert(activeHazardRow.score===88,'active hazard shell should keep its base hazard-stack confidence');
 const activeHazardSynergy=ctx.evaluateSynergy(activeHazardTeam,{},activeHazardProfile,activeHazardIdentity);
-assert(!activeHazardSynergy.issues.some(issue=>issue.title==='Hazard plan lacks payoff attackers'),'active hazard shell should not get the passive hazard issue');
+assert(!activeHazardSynergy.issues.some(issue=>issue.title==='Hazard plan leans on too few closers'),'active hazard shell should not get the thin hazard issue');
 
 console.log('[OK] weather identity upgrades Trick Room and hazard coherence checks passed');
