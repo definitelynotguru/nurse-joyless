@@ -26,6 +26,10 @@
   const SOUND_MOVES=new Set(['Bug Buzz','Clanging Scales','Hyper Voice','Overdrive','Parting Shot','Roar','Snarl','Torch Song']);
   const BALL_OR_BOMB_MOVES=new Set(['Aura Sphere','Energy Ball','Focus Blast','Gyro Ball','Magnet Bomb','Mud Bomb','Pyro Ball','Seed Bomb','Shadow Ball','Sludge Bomb','Weather Ball']);
   const WIND_MOVES=new Set(['Air Slash','Bleakwind Storm','Defog','Heat Wave','Hurricane','Icy Wind','Tailwind','Twister','Whirlwind']);
+  const POWDER_MOVES=new Set(['Cotton Spore','Poison Powder','Powder','Sleep Powder','Spore','Stun Spore']);
+  const EXTRA_SPECIES_BY_ID=Object.fromEntries(
+    Object.entries(EXTRA_SPECIES).map(([name,data])=>[DexRef.id?DexRef.id(name):String(name||'').toLowerCase(),data])
+  );
 
   function moveName(move=''){
     return DexRef.resolveMoveName?DexRef.resolveMoveName(move):String(move||'').trim();
@@ -33,13 +37,14 @@
   function isSoundMove(move=''){return SOUND_MOVES.has(moveName(move))}
   function isBallOrBombMove(move=''){return BALL_OR_BOMB_MOVES.has(moveName(move))}
   function isWindMove(move=''){return WIND_MOVES.has(moveName(move))}
+  function isPowderMove(move=''){return POWDER_MOVES.has(moveName(move))}
 
   const originalGetSpecies=DexRef.getSpecies.bind(DexRef);
   DexRef.getSpecies=function patchedGetSpecies(name){
     const resolved=this.resolveSpeciesName?this.resolveSpeciesName(name):String(name||'').trim();
     const existing=originalGetSpecies(name);
     if(existing)return existing;
-    return EXTRA_SPECIES[resolved]||null;
+    return EXTRA_SPECIES[resolved]||EXTRA_SPECIES_BY_ID[this.id?this.id(resolved):String(resolved||'').toLowerCase()]||null;
   };
 
   const originalGetMove=DexRef.getMove.bind(DexRef);
@@ -95,6 +100,7 @@
     if(ability==='Soundproof')return 'immunity to sound-based moves';
     if(ability==='Bulletproof')return 'immunity to ball and bomb moves';
     if(ability==='Wind Rider')return 'wind immunity plus an Attack boost';
+    if(ability==='Overcoat')return 'immunity to powder-based moves and weather chip';
     return originalAbilityRewardText.call(this,ability);
   };
 
@@ -103,6 +109,7 @@
     if(ability==='Soundproof')return isSoundMove(move);
     if(ability==='Bulletproof')return isBallOrBombMove(move);
     if(ability==='Wind Rider')return isWindMove(move);
+    if(ability==='Overcoat')return isPowderMove(move);
     return originalAbilityTriggeredByMove.call(this,ability,move);
   };
 
@@ -110,7 +117,7 @@
   proto.abilityClueLabel=function patchedAbilityClueLabel(ability, move=''){
     if(!move||!this.abilityTriggeredByMove(ability,move))return originalAbilityClueLabel.call(this,ability,move);
     if(ability==='Wind Rider')return `${ability} activated on ${move}`;
-    if(['Soundproof','Bulletproof'].includes(ability))return `${ability} blocked ${move}`;
+    if(['Soundproof','Bulletproof','Overcoat'].includes(ability))return `${ability} blocked ${move}`;
     return originalAbilityClueLabel.call(this,ability,move);
   };
 
@@ -119,7 +126,7 @@
     proto.abilityClueLabelWithProof=function patchedAbilityClueLabelWithProof(ability, move='', assumeTriggered=false){
       if(move&&(assumeTriggered||this.abilityTriggeredByMove(ability,move))){
         if(ability==='Wind Rider')return `${ability} activated on ${move}`;
-        if(['Soundproof','Bulletproof'].includes(ability))return `${ability} blocked ${move}`;
+        if(['Soundproof','Bulletproof','Overcoat'].includes(ability))return `${ability} blocked ${move}`;
       }
       return originalAbilityClueLabelWithProof.call(this,ability,move,assumeTriggered);
     };
@@ -128,7 +135,7 @@
   if(typeof proto.reactiveAbilityProof==='function'){
     const originalReactiveAbilityProof=proto.reactiveAbilityProof;
     proto.reactiveAbilityProof=function patchedReactiveAbilityProof(ability){
-      return ['Soundproof','Bulletproof','Wind Rider'].includes(ability)||originalReactiveAbilityProof.call(this,ability);
+      return ['Soundproof','Bulletproof','Wind Rider','Overcoat'].includes(ability)||originalReactiveAbilityProof.call(this,ability);
     };
   }
 })();
