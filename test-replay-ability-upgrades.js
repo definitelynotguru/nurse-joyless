@@ -255,6 +255,40 @@ const purifyingSaltThunderWaveRead = vm.runInContext('lastDetectiveRead', contex
 assert(!purifyingSaltThunderWaveRead.abilityRows.some(([name]) => name === 'Purifying Salt'), 'successful major-status application should remove Purifying Salt from the live detective pool');
 assert(purifyingSaltThunderWaveRead.summary.notes.some(x => /Purifying Salt impossible/i.test(x)), 'successful major-status application should carry the Purifying Salt contradiction into detective notes');
 
+const leafGuardSunThunderWaveLog = '|turn|1\n|switch|p1a: Torkoal|Torkoal, L80\n|-weather|SunnyDay|[from] ability: Drought|[of] p1a: Torkoal\n|switch|p2a: Leafeon|Leafeon, L80\n|move|p1a: Torkoal|Thunder Wave|p2a: Leafeon\n|-status|p2a: Leafeon|par';
+const leafGuardSunThunderWaveParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(leafGuardSunThunderWaveLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const leafGuardSunThunderWaveTarget = leafGuardSunThunderWaveParser.strongest;
+assert(leafGuardSunThunderWaveTarget?.ruledOutAbilities?.includes('Leaf Guard'), 'status landing in sun should rule out Leaf Guard when the target actually became paralyzed');
+assert(leafGuardSunThunderWaveTarget?.notes?.some(note => /Thunder Wave successfully caused paralysis/i.test(note)), 'status landing in sun should explain the Leaf Guard contradiction through the landed move note');
+
+vm.runInContext(
+  `team=[
+    preset("Leafeon","Heavy-Duty Boots","Jolly",{hp:0,atk:252,def:4,spa:0,spd:0,spe:252},["Leaf Blade","Knock Off","Swords Dance","Protect"])
+  ];
+  lastReplayRead=${JSON.stringify({ strongest: leafGuardSunThunderWaveTarget })};
+  loadReplayDetective();`,
+  context,
+  { timeout: 10000 }
+);
+
+const leafGuardSunThunderWaveRead = vm.runInContext('lastDetectiveRead', context, { timeout: 10000 });
+assert(!leafGuardSunThunderWaveRead.abilityRows.some(([name]) => name === 'Leaf Guard'), 'status landing in sun should remove Leaf Guard from the live detective pool');
+assert(leafGuardSunThunderWaveRead.summary.notes.some(x => /Leaf Guard impossible/i.test(x)), 'status landing in sun should carry the Leaf Guard contradiction into detective notes');
+
+const leafGuardNoSunThunderWaveLog = '|turn|1\n|switch|p1a: Torkoal|Torkoal, L80\n|switch|p2a: Leafeon|Leafeon, L80\n|move|p1a: Torkoal|Thunder Wave|p2a: Leafeon\n|-status|p2a: Leafeon|par';
+const leafGuardNoSunThunderWaveParser = vm.runInContext(`(() => {
+  const parser = new ReplayParser();
+  parser.parse(${JSON.stringify(leafGuardNoSunThunderWaveLog)});
+  return parser.replayRead;
+})()`, context, { timeout: 10000 });
+const leafGuardNoSunThunderWaveTarget = leafGuardNoSunThunderWaveParser.strongest;
+assert(!leafGuardNoSunThunderWaveTarget?.ruledOutAbilities?.includes('Leaf Guard'), 'status landing outside sun should not fake a Leaf Guard contradiction');
+assert(!leafGuardNoSunThunderWaveTarget?.notes?.some(note => /Leaf Guard/i.test(note)), 'status landing outside sun should stay silent about Leaf Guard');
+
 const strayBurnStatusLog = '|turn|1\n|switch|p1a: Skeledirge|Skeledirge, L80\n|switch|p2a: Great Tusk|Great Tusk, L80\n|-status|p2a: Great Tusk|brn';
 const strayBurnStatusParser = vm.runInContext(`(() => {
   const parser = new ReplayParser();
