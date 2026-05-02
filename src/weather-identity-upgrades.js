@@ -13,6 +13,9 @@
   const ROOM_SERVICE_ITEM='Room Service';
   const SETUP_MOVES=['Dragon Dance','Swords Dance','Nasty Plot','Calm Mind','Bulk Up','Quiver Dance','Curse'];
   const OFFENSIVE_ITEMS=['Choice Specs','Choice Band','Choice Scarf','Life Orb','Expert Belt','Booster Energy','Black Glasses','Charcoal','Flame Orb'];
+  const RECOVERY_MOVES=['Recover','Roost','Soft-Boiled','Slack Off','Moonlight','Morning Sun','Shore Up','Strength Sap','Wish','Rest','Milk Drink','Synthesis','Heal Order'];
+  const ATTRITION_MOVES=['Toxic','Toxic Spikes','Thunder Wave','Will-O-Wisp','Glare','Leech Seed','Salt Cure','Ruination','Whirlwind','Dragon Tail','Roar','Haze','Knock Off','Yawn','Encore'];
+  const PIVOT_MOVES=['U-turn','Volt Switch','Flip Turn','Parting Shot','Teleport'];
 
   function offensiveTypes(mon){
     if(typeof root.offensiveMoveTypes==='function')return root.offensiveMoveTypes(mon)||[];
@@ -67,6 +70,27 @@
     const attackStat=Math.max(Number(mon?.baseStats?.atk)||0,Number(mon?.baseStats?.spa)||0);
     const item=String(mon?.item||'').trim();
     return hasAnyMove(mon,SETUP_MOVES)||OFFENSIVE_ITEMS.includes(item)||attackStat>=120;
+  }
+
+  function isStallAnchor(mon){
+    const speed=baseSpeed(mon);
+    const bulky=Math.max(Number(mon?.baseStats?.def)||0,Number(mon?.baseStats?.spd)||0)>=95;
+    return !!mon?.isDefensiveAnchor||(bulky&&hasAnyMove(mon,RECOVERY_MOVES)&&(speed===null||speed<=90));
+  }
+
+  function isStallProgressPiece(mon){
+    return hasAnyMove(mon,ATTRITION_MOVES)||hasAnyMove(mon,RECOVERY_MOVES);
+  }
+
+  function isStallCloser(mon){
+    if(!isOffensiveMon(mon))return false;
+    if(hasAnyMove(mon,SETUP_MOVES))return true;
+    if(OFFENSIVE_ITEMS.includes(String(mon?.item||'').trim()))return true;
+    return (baseSpeed(mon)||0)>=95;
+  }
+
+  function isStallPivot(mon){
+    return hasAnyMove(mon,PIVOT_MOVES);
   }
 
   function weatherTension(profile){
@@ -221,6 +245,23 @@
     return 16+Math.max(0,anchors-4)*3+Math.max(0,2-payoffs)*4+Math.max(0,1-closers)*6;
   }
 
+  function falseStallShell(profile){
+    const anchors=(profile?.stallAnchors||[]).length;
+    const progress=(profile?.stallProgressPieces||[]).length;
+    const closers=(profile?.stallClosers||[]).length;
+    const fastAttackers=(profile?.fastAttackers||[]).length;
+    const pivots=(profile?.stallPivots||[]).length;
+    return anchors>=3&&progress>=3&&(closers>=2||fastAttackers>=2||(closers>=1&&pivots>=2));
+  }
+
+  function falseStallPenalty(profile){
+    if(!falseStallShell(profile))return 0;
+    const closers=(profile?.stallClosers||[]).length;
+    const fastAttackers=(profile?.fastAttackers||[]).length;
+    const pivots=(profile?.stallPivots||[]).length;
+    return 18+Math.max(0,closers-2)*5+Math.max(0,fastAttackers-2)*4+Math.max(0,pivots-2)*3;
+  }
+
   function cloneIdentityRow(row={}){
     return {...row,evidence:[...(row.evidence||[])]};
   }
@@ -278,13 +319,17 @@
     profile.trickRoomPayoffMoves=teamList.filter(mon=>moveCount(mon,['Trick Room'])===0&&isSlowRoomPayoff(mon)).map(mon=>mon.species);
     profile.hazardPayoffAttackers=teamList.filter(isHazardPayoffAttacker).map(mon=>mon.species);
     profile.hazardClosers=teamList.filter(isHazardCloser).map(mon=>mon.species);
+    profile.stallAnchors=teamList.filter(isStallAnchor).map(mon=>mon.species);
+    profile.stallProgressPieces=teamList.filter(isStallProgressPiece).map(mon=>mon.species);
+    profile.stallClosers=teamList.filter(isStallCloser).map(mon=>mon.species);
+    profile.stallPivots=teamList.filter(isStallPivot).map(mon=>mon.species);
     return profile;
   };
 
   root.detectIdentities=function patchedDetectIdentities(t=root.team,a=root.analysis,p=root.profileTeam(t,a)){
     const profile=p||root.profileTeam(t,a);
     const result=originalDetectIdentities.call(this,t,a,profile);
-    if(!profile?.weatherConflict&&!fakeRainShell(profile)&&!shallowRainShell(profile)&&!thinManualRainShell(profile)&&!fakeSunShell(profile)&&!shallowSunShell(profile)&&!thinManualSunShell(profile)&&!shallowTrickRoomShell(profile)&&!stagnantHazardShell(profile)&&!thinHazardConversionShell(profile))return result;
+    if(!profile?.weatherConflict&&!fakeRainShell(profile)&&!shallowRainShell(profile)&&!thinManualRainShell(profile)&&!fakeSunShell(profile)&&!shallowSunShell(profile)&&!thinManualSunShell(profile)&&!shallowTrickRoomShell(profile)&&!stagnantHazardShell(profile)&&!thinHazardConversionShell(profile)&&!falseStallShell(profile))return result;
 
     const rows=(result?.all||[]).map(cloneIdentityRow);
     const {mixedWeatherPenalty,rainFirePenalty,sunWaterPenalty}=weatherTension(profile);
@@ -297,11 +342,13 @@
     const shallowRoomShellPenalty=shallowTrickRoomPenalty(profile);
     const stagnantHazardShellPenalty=stagnantHazardPenalty(profile);
     const thinHazardShellPenalty=thinHazardConversionPenalty(profile);
+    const falseStallShellPenalty=falseStallPenalty(profile);
     const rain=rows.find(row=>row.name==='Rain Offense');
     const sun=rows.find(row=>row.name==='Sun Offense');
     const sunRoom=rows.find(row=>row.name==='Sun Room');
     const trickRoom=rows.find(row=>row.name==='Trick Room Offense');
     const hazard=rows.find(row=>row?.name==='Hazard Stack Fat Balance');
+    const stall=rows.find(row=>row?.name==='Stall');
 
     if(rain){
       rain.score=root.njCap((rain.score||0)-mixedWeatherPenalty-rainFirePenalty-fakeRainShellPenalty-shallowRainShellPenalty-thinManualRainShellPenalty,96);
@@ -366,6 +413,14 @@
       }else if(thinHazardConversionShell(profile)){
         addEvidence(hazard,'hazard shell leans on too few real closers');
         addEvidence(hazard,'chip plan is too thin to convert long games into a finish');
+      }
+    }
+    if(stall){
+      stall.score=root.njCap((stall.score||0)-falseStallShellPenalty,94);
+      if(falseStallShell(profile)){
+        addEvidence(stall,'too many proactive closers for a true stall shell');
+        addEvidence(stall,'fast breakers keep this closer to balance than hard attrition');
+        if((profile.stallPivots||[]).length>=2)addEvidence(stall,'multiple pivots point to a momentum shell, not pure stall');
       }
     }
 
@@ -450,6 +505,13 @@
       next.scores.fieldControl=root.njCap((next.scores.fieldControl||0)-5,92);
       if(!next.issues.some(issue=>issue?.title==='Hazard plan leans on too few closers')){
         next.issues.push({severity:'bad',title:'Hazard plan leans on too few closers',detail:'The team has hazard support and one serious closer, but the rest of the shell is too passive to keep forcing progress once that single payoff line gets checked.'});
+      }
+    }
+    if(falseStallShell(profile)){
+      next.scores.roleCompression=root.njCap((next.scores.roleCompression||0)-6,92);
+      next.scores.winReliability=root.njCap((next.scores.winReliability||0)-7,92);
+      if(!next.issues.some(issue=>issue?.title==='Stall read overstates a balance shell')){
+        next.issues.push({severity:'warn',title:'Stall read overstates a balance shell',detail:'The team has some recovery-and-status anchors, but it still leans on proactive breakers and pivot tempo too heavily to call the whole structure true stall.'});
       }
     }
     return next;
