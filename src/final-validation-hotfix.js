@@ -64,7 +64,8 @@
     Tyranitar: [['Rock', 'Dark'], [100, 134, 110, 95, 100, 61]],
     Excadrill: [['Ground', 'Steel'], [110, 135, 60, 50, 65, 88]],
     Volcanion: [['Fire', 'Water'], [80, 110, 120, 130, 90, 70]],
-    'Deoxys-Speed': [['Psychic'], [50, 95, 90, 95, 90, 180]]
+    'Deoxys-Speed': [['Psychic'], [50, 95, 90, 95, 90, 180]],
+    Persian: [['Normal'], [65, 70, 60, 65, 65, 115]]
   };
 
   const EXTRA_ABILITIES = {
@@ -80,7 +81,9 @@
     'Iron Valiant': {0: 'Quark Drive'},
     'Iron Treads': {0: 'Quark Drive'},
     'Landorus-Therian': {0: 'Intimidate'},
-    Pecharunt: {0: 'Poison Puppeteer'}
+    Pecharunt: {0: 'Poison Puppeteer'},
+    Persian: {0: 'Limber', 1: 'Technician', H: 'Unnerve'},
+    Toxapex: {0: 'Merciless', H: 'Regenerator'}
   };
 
   const EXTRA_MOVES = {
@@ -152,12 +155,12 @@
     try {
       if (typeof P !== 'undefined') Object.assign(P, EXTRA_SPECIES);
       if (typeof FALLBACK_ABILITIES !== 'undefined') Object.assign(FALLBACK_ABILITIES, EXTRA_ABILITIES);
-      if (typeof MOVES !== 'undefined') Object.assign(MOVES, EXTRA_MOVES);
       if (typeof REPLAY_MOVE_HINTS !== 'undefined') {
         Object.assign(REPLAY_MOVE_HINTS, Object.fromEntries(
           Object.entries(EXTRA_MOVES).map(([name, data]) => [name, [data[0], data[1], data[4] || 0]])
         ));
       }
+      if (typeof MOVES !== 'undefined') Object.assign(MOVES, EXTRA_MOVES);
     } catch (err) {
       console.warn('[final-validation-hotfix] fallback patch skipped:', err.message);
     }
