@@ -30,6 +30,7 @@ function makeContext(){
         secondary:[],
         all:[
           {name:'Hazard Stack Fat Balance',score:88,evidence:['base read']},
+          {name:'Rain Offense',score:86,evidence:['base read']},
           {name:'Trick Room Offense',score:84,evidence:['base read']},
           {name:'Sun Room',score:80,evidence:['base read']},
           {name:'Balance',score:73,evidence:['base read']},
@@ -82,6 +83,24 @@ function assert(condition,message){
 
 const ctx=makeContext();
 
+const fakeRainTeam=[
+  mon('Charizard',{moves:['Flamethrower','Hurricane','Defog','Roost'],types:['Fire','Flying'],offensiveTypes:['Fire','Flying'],baseSpeed:100,atk:84,spa:109}),
+  mon('Volcarona',{moves:['Fiery Dance','Bug Buzz','Giga Drain','Quiver Dance'],types:['Fire','Bug'],offensiveTypes:['Fire','Bug','Grass'],baseSpeed:100,atk:60,spa:135}),
+  mon('Moltres',{moves:['Hurricane','Roost','Will-O-Wisp','Flamethrower'],types:['Fire','Flying'],offensiveTypes:['Fire','Flying'],baseSpeed:90,atk:100,spa:125}),
+  mon('Arcanine',{moves:['Fire Punch','Crunch','Extreme Speed','Close Combat'],types:['Fire'],offensiveTypes:['Fire','Dark','Fighting'],baseSpeed:95,atk:110,spa:80}),
+  mon('Dragonite',{moves:['Dragon Dance','Extreme Speed','Earthquake','Fire Punch'],types:['Dragon','Flying'],offensiveTypes:['Dragon','Ground','Fire'],baseSpeed:80,atk:134,spa:100}),
+  mon('Great Tusk',{moves:['Rapid Spin','Stealth Rock','Headlong Rush','Knock Off'],types:['Ground','Fighting'],offensiveTypes:['Ground','Dark','Fighting'],baseSpeed:87,atk:131,spa:53}),
+];
+
+const manualRainTeam=[
+  mon('Tornadus-Therian',{moves:['Rain Dance','Hurricane','U-turn','Knock Off'],types:['Flying'],offensiveTypes:['Flying','Dark'],baseSpeed:121,atk:100,spa:110}),
+  mon('Barraskewda',{ability:'Swift Swim',item:'Choice Band',moves:['Waterfall','Close Combat','Flip Turn','Aqua Jet'],types:['Water'],offensiveTypes:['Water','Fighting'],baseSpeed:136,atk:123,spa:60}),
+  mon('Zapdos',{moves:['Thunder','Volt Switch','Roost','Weather Ball'],types:['Electric','Flying'],offensiveTypes:['Electric','Flying'],baseSpeed:100,atk:90,spa:125}),
+  mon('Archaludon',{moves:['Draco Meteor','Thunder','Flash Cannon','Body Press'],types:['Steel','Dragon'],offensiveTypes:['Dragon','Electric','Steel','Fighting'],baseSpeed:85,atk:105,spa:125}),
+  mon('Great Tusk',{moves:['Rapid Spin','Stealth Rock','Headlong Rush','Knock Off'],types:['Ground','Fighting'],offensiveTypes:['Ground','Dark','Fighting'],baseSpeed:87,atk:131,spa:53}),
+  mon('Raging Bolt',{moves:['Thunderclap','Thunder','Dragon Pulse','Calm Mind'],types:['Electric','Dragon'],offensiveTypes:['Electric','Dragon'],baseSpeed:75,atk:73,spa:137}),
+];
+
 const shallowRoomTeam=[
   mon('Hatterene',{moves:['Trick Room','Psychic Noise','Dazzling Gleam','Healing Wish'],types:['Psychic','Fairy'],offensiveTypes:['Psychic','Fairy'],baseSpeed:29,atk:90,spa:136}),
   mon('Cresselia',{moves:['Trick Room','Moonlight','Ice Beam','Lunar Dance'],types:['Psychic'],offensiveTypes:['Ice'],baseSpeed:85,atk:70,spa:75}),
@@ -126,6 +145,26 @@ const activeHazardTeam=[
   mon('Garganacl',{moves:['Stealth Rock','Salt Cure','Recover','Protect'],types:['Rock'],offensiveTypes:['Rock'],baseSpeed:35,atk:100,spa:45,isDefensiveAnchor:true}),
   mon('Hatterene',{moves:['Trick Room','Psychic Noise','Dazzling Gleam','Healing Wish'],types:['Psychic','Fairy'],offensiveTypes:['Psychic','Fairy'],baseSpeed:29,atk:90,spa:136}),
 ];
+
+const fakeRainProfile=ctx.profileTeam(fakeRainTeam,{});
+assert(fakeRainProfile.rainSetters.length===0,'expected fake rain shell to have no real rain setter');
+assert(fakeRainProfile.rainSignalAttackers.length>=2,'expected fake rain shell to borrow multiple rain-only move signals');
+const fakeRainIdentity=ctx.detectIdentities(fakeRainTeam,{},fakeRainProfile);
+const fakeRainRow=fakeRainIdentity.all.find(row=>row.name==='Rain Offense');
+assert(fakeRainIdentity.primary.name!=='Rain Offense','weatherless fire stack should not keep Rain Offense as the primary read');
+assert(fakeRainRow&&fakeRainRow.score<fakeRainIdentity.all.find(row=>row.name==='Balance').score,'fake rain score should fall below the more coherent balance read');
+assert(fakeRainRow.evidence.some(line=>/no real rain setter/.test(line)),'expected Rain Offense row to explain the missing setter');
+const fakeRainSynergy=ctx.evaluateSynergy(fakeRainTeam,{},fakeRainProfile,fakeRainIdentity);
+assert(fakeRainSynergy.scores.winReliability<81,'expected fake rain shell to lose win reliability');
+assert(fakeRainSynergy.issues.some(issue=>issue.title==='Rain read lacks a real setter'),'expected fake rain issue to surface');
+
+const manualRainProfile=ctx.profileTeam(manualRainTeam,{});
+assert(manualRainProfile.rainSetters.length===1,'expected manual rain team to keep a real rain setter');
+const manualRainIdentity=ctx.detectIdentities(manualRainTeam,{},manualRainProfile);
+const manualRainRow=manualRainIdentity.all.find(row=>row.name==='Rain Offense');
+assert(manualRainRow&&manualRainRow.score===86,'manual Rain Dance team should keep the base rain confidence when the setter is real');
+const manualRainSynergy=ctx.evaluateSynergy(manualRainTeam,{},manualRainProfile,manualRainIdentity);
+assert(!manualRainSynergy.issues.some(issue=>issue.title==='Rain read lacks a real setter'),'manual rain team should not get the fake rain issue');
 
 const shallowProfile=ctx.profileTeam(shallowRoomTeam,{});
 assert(shallowProfile.trickRoomSetters.length===2,'expected two Trick Room setters in shallow shell');
@@ -183,4 +222,4 @@ assert(activeHazardRow.score===88,'active hazard shell should keep its base haza
 const activeHazardSynergy=ctx.evaluateSynergy(activeHazardTeam,{},activeHazardProfile,activeHazardIdentity);
 assert(!activeHazardSynergy.issues.some(issue=>issue.title==='Hazard plan leans on too few closers'),'active hazard shell should not get the thin hazard issue');
 
-console.log('[OK] weather identity upgrades Trick Room and hazard coherence checks passed');
+console.log('[OK] weather identity upgrades fake-rain, Trick Room, and hazard coherence checks passed');
