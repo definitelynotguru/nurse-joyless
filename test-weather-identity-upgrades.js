@@ -31,7 +31,8 @@ function makeContext(){
         all:[
           {name:'Hazard Stack Fat Balance',score:88,evidence:['base read']},
           {name:'Rain Offense',score:86,evidence:['base read']},
-          {name:'Trick Room Offense',score:84,evidence:['base read']},
+          {name:'Sun Offense',score:84,evidence:['base read']},
+          {name:'Trick Room Offense',score:82,evidence:['base read']},
           {name:'Sun Room',score:80,evidence:['base read']},
           {name:'Balance',score:73,evidence:['base read']},
           {name:'Stall',score:70,evidence:['base read']},
@@ -101,6 +102,24 @@ const manualRainTeam=[
   mon('Raging Bolt',{moves:['Thunderclap','Thunder','Dragon Pulse','Calm Mind'],types:['Electric','Dragon'],offensiveTypes:['Electric','Dragon'],baseSpeed:75,atk:73,spa:137}),
 ];
 
+const fakeSunTeam=[
+  mon('Walking Wake',{ability:'Protosynthesis',moves:['Hydro Steam','Draco Meteor','Flamethrower','Flip Turn'],types:['Water','Dragon'],offensiveTypes:['Water','Dragon','Fire'],baseSpeed:109,atk:83,spa:125}),
+  mon('Charizard',{moves:['Flamethrower','Weather Ball','Solar Beam','Roost'],types:['Fire','Flying'],offensiveTypes:['Fire','Flying','Grass','Normal'],baseSpeed:100,atk:84,spa:109}),
+  mon('Volcarona',{moves:['Fiery Dance','Bug Buzz','Giga Drain','Quiver Dance'],types:['Fire','Bug'],offensiveTypes:['Fire','Bug','Grass'],baseSpeed:100,atk:60,spa:135}),
+  mon('Roaring Moon',{ability:'Protosynthesis',moves:['Dragon Dance','Crunch','Acrobatics','Earthquake'],types:['Dragon','Dark'],offensiveTypes:['Dragon','Dark','Flying','Ground'],baseSpeed:119,atk:139,spa:55}),
+  mon('Great Tusk',{moves:['Rapid Spin','Stealth Rock','Headlong Rush','Knock Off'],types:['Ground','Fighting'],offensiveTypes:['Ground','Dark','Fighting'],baseSpeed:87,atk:131,spa:53}),
+  mon('Kingambit',{moves:['Swords Dance','Kowtow Cleave','Sucker Punch','Iron Head'],types:['Dark','Steel'],offensiveTypes:['Dark','Steel'],baseSpeed:50,atk:135,spa:60}),
+];
+
+const manualSunTeam=[
+  mon('Whimsicott',{moves:['Sunny Day','Encore','U-turn','Moonblast'],types:['Grass','Fairy'],offensiveTypes:['Grass','Fairy'],baseSpeed:116,atk:77,spa:77}),
+  mon('Walking Wake',{ability:'Protosynthesis',moves:['Hydro Steam','Draco Meteor','Flamethrower','Flip Turn'],types:['Water','Dragon'],offensiveTypes:['Water','Dragon','Fire'],baseSpeed:109,atk:83,spa:125}),
+  mon('Charizard',{moves:['Flamethrower','Weather Ball','Solar Beam','Roost'],types:['Fire','Flying'],offensiveTypes:['Fire','Flying','Grass','Normal'],baseSpeed:100,atk:84,spa:109}),
+  mon('Venusaur',{ability:'Chlorophyll',moves:['Growth','Giga Drain','Weather Ball','Sleep Powder'],types:['Grass','Poison'],offensiveTypes:['Grass','Normal'],baseSpeed:80,atk:82,spa:100}),
+  mon('Great Tusk',{moves:['Rapid Spin','Stealth Rock','Headlong Rush','Knock Off'],types:['Ground','Fighting'],offensiveTypes:['Ground','Dark','Fighting'],baseSpeed:87,atk:131,spa:53}),
+  mon('Kingambit',{moves:['Swords Dance','Kowtow Cleave','Sucker Punch','Iron Head'],types:['Dark','Steel'],offensiveTypes:['Dark','Steel'],baseSpeed:50,atk:135,spa:60}),
+];
+
 const shallowRoomTeam=[
   mon('Hatterene',{moves:['Trick Room','Psychic Noise','Dazzling Gleam','Healing Wish'],types:['Psychic','Fairy'],offensiveTypes:['Psychic','Fairy'],baseSpeed:29,atk:90,spa:136}),
   mon('Cresselia',{moves:['Trick Room','Moonlight','Ice Beam','Lunar Dance'],types:['Psychic'],offensiveTypes:['Ice'],baseSpeed:85,atk:70,spa:75}),
@@ -166,6 +185,26 @@ assert(manualRainRow&&manualRainRow.score===86,'manual Rain Dance team should ke
 const manualRainSynergy=ctx.evaluateSynergy(manualRainTeam,{},manualRainProfile,manualRainIdentity);
 assert(!manualRainSynergy.issues.some(issue=>issue.title==='Rain read lacks a real setter'),'manual rain team should not get the fake rain issue');
 
+const fakeSunProfile=ctx.profileTeam(fakeSunTeam,{});
+assert(fakeSunProfile.sunSetters.length===0,'expected fake sun shell to have no real sun setter');
+assert(fakeSunProfile.sunSignalAttackers.length>=2,'expected fake sun shell to borrow multiple sun-only payoff signals');
+const fakeSunIdentity=ctx.detectIdentities(fakeSunTeam,{},fakeSunProfile);
+const fakeSunRow=fakeSunIdentity.all.find(row=>row.name==='Sun Offense');
+assert(fakeSunIdentity.primary.name!=='Sun Offense','weatherless solar shell should not keep Sun Offense as the primary read');
+assert(fakeSunRow&&fakeSunRow.score<fakeSunIdentity.all.find(row=>row.name==='Balance').score,'fake sun score should fall below the more coherent balance read');
+assert(fakeSunRow.evidence.some(line=>/no real sun setter/.test(line)),'expected Sun Offense row to explain the missing setter');
+const fakeSunSynergy=ctx.evaluateSynergy(fakeSunTeam,{},fakeSunProfile,fakeSunIdentity);
+assert(fakeSunSynergy.scores.winReliability<81,'expected fake sun shell to lose win reliability');
+assert(fakeSunSynergy.issues.some(issue=>issue.title==='Sun read lacks a real setter'),'expected fake sun issue to surface');
+
+const manualSunProfile=ctx.profileTeam(manualSunTeam,{});
+assert(manualSunProfile.sunSetters.length===1,'expected manual sun team to keep a real sun setter');
+const manualSunIdentity=ctx.detectIdentities(manualSunTeam,{},manualSunProfile);
+const manualSunRow=manualSunIdentity.all.find(row=>row.name==='Sun Offense');
+assert(manualSunRow&&manualSunRow.score===84,'manual Sunny Day team should keep the base sun confidence when the setter is real');
+const manualSunSynergy=ctx.evaluateSynergy(manualSunTeam,{},manualSunProfile,manualSunIdentity);
+assert(!manualSunSynergy.issues.some(issue=>issue.title==='Sun read lacks a real setter'),'manual sun team should not get the fake sun issue');
+
 const shallowProfile=ctx.profileTeam(shallowRoomTeam,{});
 assert(shallowProfile.trickRoomSetters.length===2,'expected two Trick Room setters in shallow shell');
 assert(shallowProfile.trickRoomPayoffs.length===1,'expected only one real Trick Room payoff in shallow shell');
@@ -186,7 +225,7 @@ const goodProfile=ctx.profileTeam(goodRoomTeam,{});
 assert(goodProfile.trickRoomPayoffs.length>=2,'expected the good Room team to have multiple payoffs');
 const goodIdentity=ctx.detectIdentities(goodRoomTeam,{},goodProfile);
 const goodTrickRoomRow=goodIdentity.all.find(row=>row.name==='Trick Room Offense');
-assert(goodTrickRoomRow&&goodTrickRoomRow.score===84,'real Room team should keep the base Trick Room confidence when the payoff is real');
+assert(goodTrickRoomRow&&goodTrickRoomRow.score===82,'real Room team should keep the base Trick Room confidence when the payoff is real');
 const goodSynergy=ctx.evaluateSynergy(goodRoomTeam,{},goodProfile,goodIdentity);
 assert(!goodSynergy.issues.some(issue=>issue.title==='Trick Room plan lacks slow closers'),'real Room team should not get the shallow Trick Room issue');
 
@@ -222,4 +261,4 @@ assert(activeHazardRow.score===88,'active hazard shell should keep its base haza
 const activeHazardSynergy=ctx.evaluateSynergy(activeHazardTeam,{},activeHazardProfile,activeHazardIdentity);
 assert(!activeHazardSynergy.issues.some(issue=>issue.title==='Hazard plan leans on too few closers'),'active hazard shell should not get the thin hazard issue');
 
-console.log('[OK] weather identity upgrades fake-rain, Trick Room, and hazard coherence checks passed');
+console.log('[OK] weather identity upgrades fake weather, Trick Room, and hazard coherence checks passed');
