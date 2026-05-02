@@ -234,7 +234,6 @@
   root.profileTeam=function patchedProfileTeam(t=root.team,a=root.analysis){
     const profile=originalProfileTeam.call(this,t,a);
     const teamList=Array.isArray(t)?t:[];
-    profile.weatherConflict=!!(profile?.drought?.length&&profile?.drizzle?.length);
     profile.fireTypes=teamList.filter(mon=>root.types(mon).includes('Fire')).map(mon=>mon.species);
     profile.waterTypes=teamList.filter(mon=>root.types(mon).includes('Water')).map(mon=>mon.species);
     profile.fireAttackers=teamList.filter(mon=>offensiveTypes(mon).includes('Fire')).map(mon=>mon.species);
@@ -272,6 +271,7 @@
       return ability==='Protosynthesis'&&(offensiveTypes(mon).includes('Fire')||hasAnyMove(mon,['Hydro Steam']));
     }).map(mon=>mon.species);
     profile.sunDedicatedPayoffs=[...(profile.sunPayoffAttackers||[])];
+    profile.weatherConflict=!!((profile?.drought?.length||profile?.sunSetters?.length)&&(profile?.drizzle?.length||profile?.rainSetters?.length));
     profile.trickRoomSetters=teamList.filter(mon=>hasAnyMove(mon,['Trick Room'])).map(mon=>mon.species);
     profile.fastAttackers=teamList.filter(isFastAttacker).map(mon=>mon.species);
     profile.trickRoomPayoffs=teamList.filter(mon=>isSlowRoomPayoff(mon)&&!hasAnyMove(mon,['Trick Room'])).map(mon=>mon.species);
