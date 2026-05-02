@@ -149,6 +149,22 @@
     return 18+Math.max(0,2-dedicatedPayoffs)*4;
   }
 
+  function overstretchedManualRainShell(profile){
+    if(profile?.drizzle?.length||profile?.weatherConflict)return false;
+    const setters=(profile?.rainSetters||[]).length;
+    const dedicatedPayoffs=(profile?.rainDedicatedPayoffs||[]).length;
+    const waterAttackers=(profile?.waterAttackers||[]).length;
+    const swiftSwim=(profile?.rainSpeedAbusers||[]).length;
+    return setters>=2&&dedicatedPayoffs<=Math.max(2,setters)&&waterAttackers<=1&&swiftSwim===0;
+  }
+
+  function overstretchedManualRainPenalty(profile){
+    if(!overstretchedManualRainShell(profile))return 0;
+    const setters=(profile?.rainSetters||[]).length;
+    const dedicatedPayoffs=(profile?.rainDedicatedPayoffs||[]).length;
+    return 18+Math.max(0,setters-2)*4+Math.max(0,Math.max(2,setters)-dedicatedPayoffs)*4;
+  }
+
   function shallowSunShell(profile){
     if(!profile?.drought?.length||profile?.weatherConflict)return false;
     const waterAttackers=(profile.waterAttackers||[]).length;
@@ -194,6 +210,21 @@
     if(!thinManualSunShell(profile))return 0;
     const dedicatedPayoffs=(profile?.sunDedicatedPayoffs||[]).length;
     return 16+Math.max(0,2-dedicatedPayoffs)*4;
+  }
+
+  function overstretchedManualSunShell(profile){
+    if(profile?.drought?.length||profile?.weatherConflict)return false;
+    const setters=(profile?.sunSetters||[]).length;
+    const dedicatedPayoffs=(profile?.sunDedicatedPayoffs||[]).length;
+    const waterAttackers=(profile?.waterAttackers||[]).length;
+    return setters>=2&&dedicatedPayoffs<=Math.max(2,setters)&&waterAttackers>=1;
+  }
+
+  function overstretchedManualSunPenalty(profile){
+    if(!overstretchedManualSunShell(profile))return 0;
+    const setters=(profile?.sunSetters||[]).length;
+    const dedicatedPayoffs=(profile?.sunDedicatedPayoffs||[]).length;
+    return 16+Math.max(0,setters-2)*4+Math.max(0,Math.max(2,setters)-dedicatedPayoffs)*4;
   }
 
   function shallowTrickRoomShell(profile){
@@ -329,16 +360,18 @@
   root.detectIdentities=function patchedDetectIdentities(t=root.team,a=root.analysis,p=root.profileTeam(t,a)){
     const profile=p||root.profileTeam(t,a);
     const result=originalDetectIdentities.call(this,t,a,profile);
-    if(!profile?.weatherConflict&&!fakeRainShell(profile)&&!shallowRainShell(profile)&&!thinManualRainShell(profile)&&!fakeSunShell(profile)&&!shallowSunShell(profile)&&!thinManualSunShell(profile)&&!shallowTrickRoomShell(profile)&&!stagnantHazardShell(profile)&&!thinHazardConversionShell(profile)&&!falseStallShell(profile))return result;
+    if(!profile?.weatherConflict&&!fakeRainShell(profile)&&!shallowRainShell(profile)&&!thinManualRainShell(profile)&&!overstretchedManualRainShell(profile)&&!fakeSunShell(profile)&&!shallowSunShell(profile)&&!thinManualSunShell(profile)&&!overstretchedManualSunShell(profile)&&!shallowTrickRoomShell(profile)&&!stagnantHazardShell(profile)&&!thinHazardConversionShell(profile)&&!falseStallShell(profile))return result;
 
     const rows=(result?.all||[]).map(cloneIdentityRow);
     const {mixedWeatherPenalty,rainFirePenalty,sunWaterPenalty}=weatherTension(profile);
     const fakeRainShellPenalty=fakeRainPenalty(profile);
     const shallowRainShellPenalty=shallowRainPenalty(profile);
     const thinManualRainShellPenalty=thinManualRainPenalty(profile);
+    const overstretchedManualRainShellPenalty=overstretchedManualRainPenalty(profile);
     const fakeSunShellPenalty=fakeSunPenalty(profile);
     const shallowSunShellPenalty=shallowSunPenalty(profile);
     const thinManualSunShellPenalty=thinManualSunPenalty(profile);
+    const overstretchedManualSunShellPenalty=overstretchedManualSunPenalty(profile);
     const shallowRoomShellPenalty=shallowTrickRoomPenalty(profile);
     const stagnantHazardShellPenalty=stagnantHazardPenalty(profile);
     const thinHazardShellPenalty=thinHazardConversionPenalty(profile);
@@ -351,7 +384,7 @@
     const stall=rows.find(row=>row?.name==='Stall');
 
     if(rain){
-      rain.score=root.njCap((rain.score||0)-mixedWeatherPenalty-rainFirePenalty-fakeRainShellPenalty-shallowRainShellPenalty-thinManualRainShellPenalty,96);
+      rain.score=root.njCap((rain.score||0)-mixedWeatherPenalty-rainFirePenalty-fakeRainShellPenalty-shallowRainShellPenalty-thinManualRainShellPenalty-overstretchedManualRainShellPenalty,96);
       if(profile.weatherConflict)addEvidence(rain,'conflicting rain and sun setters');
       if(fakeRainShell(profile)){
         addEvidence(rain,'no real rain setter is present');
@@ -366,9 +399,13 @@
         addEvidence(rain,'only one thin manual rain setter is carrying the weather plan');
         addEvidence(rain,'too few dedicated rain payoffs to justify the Rain Dance slot');
       }
+      if(overstretchedManualRainShell(profile)){
+        addEvidence(rain,'multiple manual rain setters are spending slots without enough real payoffs');
+        addEvidence(rain,'the team is using extra Rain Dance support to prop up a thin rain backbone');
+      }
     }
     if(sun){
-      sun.score=root.njCap((sun.score||0)-mixedWeatherPenalty-sunWaterPenalty-fakeSunShellPenalty-shallowSunShellPenalty-thinManualSunShellPenalty,92);
+      sun.score=root.njCap((sun.score||0)-mixedWeatherPenalty-sunWaterPenalty-fakeSunShellPenalty-shallowSunShellPenalty-thinManualSunShellPenalty-overstretchedManualSunShellPenalty,92);
       if(profile.weatherConflict)addEvidence(sun,'conflicting rain and sun setters');
       if(fakeSunShell(profile)){
         addEvidence(sun,'no real sun setter is present');
@@ -382,9 +419,13 @@
         addEvidence(sun,'only one thin manual sun setter is carrying the weather plan');
         addEvidence(sun,'too few dedicated sun payoffs to justify the Sunny Day slot');
       }
+      if(overstretchedManualSunShell(profile)){
+        addEvidence(sun,'multiple manual sun setters are spending slots without enough real payoffs');
+        addEvidence(sun,'the team is using extra Sunny Day support to prop up a thin sun backbone');
+      }
     }
     if(sunRoom){
-      sunRoom.score=root.njCap((sunRoom.score||0)-mixedWeatherPenalty-sunWaterPenalty-fakeSunShellPenalty-shallowSunShellPenalty-thinManualSunShellPenalty-shallowRoomShellPenalty,96);
+      sunRoom.score=root.njCap((sunRoom.score||0)-mixedWeatherPenalty-sunWaterPenalty-fakeSunShellPenalty-shallowSunShellPenalty-thinManualSunShellPenalty-overstretchedManualSunShellPenalty-shallowRoomShellPenalty,96);
       if(profile.weatherConflict)addEvidence(sunRoom,'conflicting rain and sun setters');
       if(fakeSunShell(profile)){
         addEvidence(sunRoom,'no real sun setter is present');
@@ -392,6 +433,7 @@
       }
       if(shallowSunShell(profile))addEvidence(sunRoom,'water-heavy shell undercuts sun turns');
       if(thinManualSunShell(profile))addEvidence(sunRoom,'only one thin manual sun setter is carrying the weather plan');
+      if(overstretchedManualSunShell(profile))addEvidence(sunRoom,'multiple manual sun setters are spending slots without enough real payoffs');
       if(shallowTrickRoomShell(profile)){
         addEvidence(sunRoom,'multiple Trick Room setters but almost no slow payoff');
         addEvidence(sunRoom,'fast attackers waste most Room turns');
@@ -465,6 +507,13 @@
         next.issues.push({severity:'bad',title:'Manual rain support is too thin',detail:'One Rain Dance slot is doing too much work. The team does not have enough dedicated rain payoffs to treat that one manual setter as a real Rain Offense backbone.'});
       }
     }
+    if(overstretchedManualRainShell(profile)){
+      next.scores.winReliability=root.njCap((next.scores.winReliability||0)-8,92);
+      next.scores.roleCompression=root.njCap((next.scores.roleCompression||0)-6,92);
+      if(!next.issues.some(issue=>issue?.title==='Manual rain support is overstretched')){
+        next.issues.push({severity:'bad',title:'Manual rain support is overstretched',detail:'The team is burning multiple Rain Dance slots without enough real rain payoffs behind them, so the setter burden is larger than the actual weather reward.'});
+      }
+    }
     if(shallowSunShell(profile)){
       next.scores.winReliability=root.njCap((next.scores.winReliability||0)-8,92);
       if(!next.issues.some(issue=>issue?.title==='Sun plan clashes with Water core')){
@@ -483,6 +532,13 @@
       next.scores.roleCompression=root.njCap((next.scores.roleCompression||0)-5,92);
       if(!next.issues.some(issue=>issue?.title==='Manual sun support is too thin')){
         next.issues.push({severity:'bad',title:'Manual sun support is too thin',detail:'One Sunny Day slot is doing too much work. The team does not have enough dedicated sun payoffs to treat that one manual setter as a real Sun Offense backbone.'});
+      }
+    }
+    if(overstretchedManualSunShell(profile)){
+      next.scores.winReliability=root.njCap((next.scores.winReliability||0)-7,92);
+      next.scores.roleCompression=root.njCap((next.scores.roleCompression||0)-6,92);
+      if(!next.issues.some(issue=>issue?.title==='Manual sun support is overstretched')){
+        next.issues.push({severity:'bad',title:'Manual sun support is overstretched',detail:'The team is burning multiple Sunny Day slots without enough real sun payoffs behind them, so the setter burden is larger than the actual weather reward.'});
       }
     }
     if(shallowTrickRoomShell(profile)){
