@@ -7,6 +7,8 @@
   const originalEvaluateSynergy=root.evaluateSynergy;
   const priority={'Sun Room':30,'Trick Room Offense':24,'Hazard Stack Fat Balance':22,'Dragon Spam Offense':20,'Rain Offense':18,'Sun Offense':16,'Balance':12,'Bulky Offense':10,'Hyper Offense':8,'Stall':4};
   const SUN_MOVES=['Weather Ball','Solar Beam','Solar Blade'];
+  const RAIN_SIGNAL_MOVES=['Hurricane','Thunder'];
+  const RAIN_SETTER_MOVES=['Rain Dance'];
   const ROOM_SERVICE_ITEM='Room Service';
   const SETUP_MOVES=['Dragon Dance','Swords Dance','Nasty Plot','Calm Mind','Bulk Up','Quiver Dance','Curse'];
   const OFFENSIVE_ITEMS=['Choice Specs','Choice Band','Choice Scarf','Life Orb','Expert Belt','Booster Energy','Black Glasses','Charcoal','Flame Orb'];
@@ -72,6 +74,23 @@
       rainFirePenalty:Math.max(0,(profile?.fireTypes||[]).length-1)*8,
       sunWaterPenalty:Math.max(0,(profile?.waterTypes||[]).length-2)*6,
     };
+  }
+
+  function fakeRainShell(profile){
+    if((profile?.rainSetters||[]).length)return false;
+    const fireAttackers=(profile?.fireAttackers||[]).length;
+    const waterAttackers=(profile?.waterAttackers||[]).length;
+    const waterTypes=(profile?.waterTypes||[]).length;
+    const swiftSwim=(profile?.rainSpeedAbusers||[]).length;
+    const rainSignals=(profile?.rainSignalAttackers||[]).length;
+    return fireAttackers>=3&&waterAttackers<=1&&waterTypes<=1&&swiftSwim===0&&rainSignals>=2;
+  }
+
+  function fakeRainPenalty(profile){
+    if(!fakeRainShell(profile))return 0;
+    const fireAttackers=(profile?.fireAttackers||[]).length;
+    const rainSignals=(profile?.rainSignalAttackers||[]).length;
+    return 24+Math.max(0,fireAttackers-3)*4+Math.max(0,rainSignals-2)*3;
   }
 
   function shallowRainShell(profile){
@@ -175,6 +194,15 @@
     profile.fireAttackers=teamList.filter(mon=>offensiveTypes(mon).includes('Fire')).map(mon=>mon.species);
     profile.waterAttackers=teamList.filter(mon=>offensiveTypes(mon).includes('Water')).map(mon=>mon.species);
     profile.rainSpeedAbusers=teamList.filter(mon=>String(mon?.ability||'').trim()==='Swift Swim').map(mon=>mon.species);
+    profile.rainSetters=teamList.filter(mon=>{
+      const ability=String(mon?.ability||'').trim();
+      return ability==='Drizzle'||hasAnyMove(mon,RAIN_SETTER_MOVES);
+    }).map(mon=>mon.species);
+    profile.rainSignalAttackers=teamList.filter(mon=>{
+      const ability=String(mon?.ability||'').trim();
+      if(ability==='Swift Swim')return true;
+      return hasAnyMove(mon,RAIN_SIGNAL_MOVES);
+    }).map(mon=>mon.species);
     profile.sunPayoffAttackers=teamList.filter(mon=>{
       const ability=String(mon?.ability||'').trim();
       if(['Chlorophyll','Solar Power'].includes(ability))return true;
@@ -193,10 +221,11 @@
   root.detectIdentities=function patchedDetectIdentities(t=root.team,a=root.analysis,p=root.profileTeam(t,a)){
     const profile=p||root.profileTeam(t,a);
     const result=originalDetectIdentities.call(this,t,a,profile);
-    if(!profile?.weatherConflict&&!shallowRainShell(profile)&&!shallowSunShell(profile)&&!shallowTrickRoomShell(profile)&&!stagnantHazardShell(profile)&&!thinHazardConversionShell(profile))return result;
+    if(!profile?.weatherConflict&&!fakeRainShell(profile)&&!shallowRainShell(profile)&&!shallowSunShell(profile)&&!shallowTrickRoomShell(profile)&&!stagnantHazardShell(profile)&&!thinHazardConversionShell(profile))return result;
 
     const rows=(result?.all||[]).map(cloneIdentityRow);
     const {mixedWeatherPenalty,rainFirePenalty,sunWaterPenalty}=weatherTension(profile);
+    const fakeRainShellPenalty=fakeRainPenalty(profile);
     const shallowRainShellPenalty=shallowRainPenalty(profile);
     const shallowSunShellPenalty=shallowSunPenalty(profile);
     const shallowRoomShellPenalty=shallowTrickRoomPenalty(profile);
@@ -210,8 +239,12 @@
     const hazard=rows.find(hazardStack);
 
     if(rain){
-      rain.score=root.njCap((rain.score||0)-mixedWeatherPenalty-rainFirePenalty-shallowRainShellPenalty,96);
+      rain.score=root.njCap((rain.score||0)-mixedWeatherPenalty-rainFirePenalty-fakeRainShellPenalty-shallowRainShellPenalty,96);
       if(profile.weatherConflict)addEvidence(rain,'conflicting rain and sun setters');
+      if(fakeRainShell(profile)){
+        addEvidence(rain,'no real rain setter is present');
+        addEvidence(rain,'weatherless Hurricane pressure is not a real rain plan');
+      }
       if(rainFirePenalty)addEvidence(rain,`${(profile.fireTypes||[]).length} Fire-type member(s) pulling against rain`);
       if(shallowRainShell(profile)){
         addEvidence(rain,'fire-heavy shell undercuts rain turns');
@@ -289,6 +322,17 @@
       }
     }
 
+    if(fakeRainShell(profile)){
+      next.scores.winReliability=root.njCap((next.scores.winReliability||0)-9,92);
+      next.scores.roleCompression=root.njCap((next.scores.roleCompression||0)-6,92);
+      if(!next.issues.some(issue=>issue?.title==='Rain read lacks a real setter')){
+        next.issues.push({
+          severity:'bad',
+          title:'Rain read lacks a real setter',
+          detail:'The team borrows Hurricane-style rain signals, but it has no Drizzle or Rain Dance support, so a Rain Offense label would be describing fake weather rather than the real game plan.'
+        });
+      }
+    }
     if(shallowRainShell(profile)){
       next.scores.winReliability=root.njCap((next.scores.winReliability||0)-8,92);
       if(!next.issues.some(issue=>issue?.title==='Rain plan clashes with Fire core')){
