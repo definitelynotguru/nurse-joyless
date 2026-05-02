@@ -38,6 +38,20 @@
   function isBallOrBombMove(move=''){return BALL_OR_BOMB_MOVES.has(moveName(move))}
   function isWindMove(move=''){return WIND_MOVES.has(moveName(move))}
   function isPowderMove(move=''){return POWDER_MOVES.has(moveName(move))}
+  function addUnique(list=[]){return [...new Set((list||[]).filter(Boolean))]}
+  function moveSpecificImmunityAbility(ability='', move=''){
+    const name=String(ability||'').trim();
+    if(name==='Soundproof'&&isSoundMove(move))return 'Soundproof';
+    if(name==='Bulletproof'&&isBallOrBombMove(move))return 'Bulletproof';
+    if(name==='Wind Rider'&&isWindMove(move))return 'Wind Rider';
+    if(name==='Overcoat'&&isPowderMove(move))return 'Overcoat';
+    return '';
+  }
+  function detectiveAbilityPool(species=''){
+    if(typeof detectiveAbilities==='function')return detectiveAbilities(species)||[];
+    const data=DexRef.getSpecies?DexRef.getSpecies(species):null;
+    return data?.abilities?Object.values(data.abilities).filter(Boolean):[];
+  }
 
   const originalGetSpecies=DexRef.getSpecies.bind(DexRef);
   DexRef.getSpecies=function patchedGetSpecies(name){
@@ -62,10 +76,8 @@
   if(typeof moveBlockingAbility==='function'){
     const originalMoveBlockingAbility=moveBlockingAbility;
     moveBlockingAbility=function patchedMoveBlockingAbility(moveType, category, ability, move=''){
-      const name=String(ability||'').trim();
-      if(name==='Soundproof'&&isSoundMove(move))return 'Soundproof';
-      if(name==='Bulletproof'&&isBallOrBombMove(move))return 'Bulletproof';
-      if(name==='Wind Rider'&&isWindMove(move))return 'Wind Rider';
+      const blocker=moveSpecificImmunityAbility(ability,move);
+      if(blocker)return blocker;
       return originalMoveBlockingAbility(moveType,category,ability);
     };
   }
@@ -136,6 +148,19 @@
     const originalReactiveAbilityProof=proto.reactiveAbilityProof;
     proto.reactiveAbilityProof=function patchedReactiveAbilityProof(ability){
       return ['Soundproof','Bulletproof','Wind Rider','Overcoat'].includes(ability)||originalReactiveAbilityProof.call(this,ability);
+    };
+  }
+
+  if(typeof proto.moveBlockedAbilities==='function'){
+    const originalMoveBlockedAbilities=proto.moveBlockedAbilities;
+    proto.moveBlockedAbilities=function patchedMoveBlockedAbilities(state, move=''){
+      const base=originalMoveBlockedAbilities.call(this,state,move)||[];
+      const moveNameValue=String(move||'').trim();
+      if(!moveNameValue)return base;
+      if(typeof this.abilitySuppressionActive==='function'&&this.abilitySuppressionActive(state))return base;
+      if(typeof this.moveAbilityBypass==='function'&&this.moveAbilityBypass(state,moveNameValue))return base;
+      const extra=detectiveAbilityPool(state?.species).filter(ability=>moveSpecificImmunityAbility(ability,moveNameValue));
+      return addUnique([...base,...extra]);
     };
   }
 })();
