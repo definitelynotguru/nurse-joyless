@@ -118,6 +118,24 @@ const goodManualSunTeam=[
   mon('Kingambit',{moves:['Swords Dance','Kowtow Cleave','Sucker Punch','Iron Head'],types:['Dark','Steel'],offensiveTypes:['Dark','Steel'],baseSpeed:50,atk:135,spa:60}),
 ];
 
+const overstretchedManualRainTeam=[
+  mon('Tornadus-Therian',{moves:['Rain Dance','Hurricane','U-turn','Knock Off'],types:['Flying'],offensiveTypes:['Flying','Dark'],baseSpeed:121,atk:100,spa:110}),
+  mon('Whimsicott',{moves:['Rain Dance','Encore','U-turn','Moonblast'],types:['Grass','Fairy'],offensiveTypes:['Grass','Fairy'],baseSpeed:116,atk:77,spa:77}),
+  mon('Zapdos',{moves:['Thunder','Volt Switch','Roost','Weather Ball'],types:['Electric','Flying'],offensiveTypes:['Electric','Flying'],baseSpeed:100,atk:90,spa:125}),
+  mon('Heatran',{moves:['Magma Storm','Earth Power','Protect','Stealth Rock'],types:['Fire','Steel'],offensiveTypes:['Fire','Ground'],baseSpeed:77,atk:90,spa:130}),
+  mon('Great Tusk',{moves:['Rapid Spin','Headlong Rush','Knock Off','Close Combat'],types:['Ground','Fighting'],offensiveTypes:['Ground','Dark','Fighting'],baseSpeed:87,atk:131,spa:53}),
+  mon('Kingambit',{moves:['Sucker Punch','Kowtow Cleave','Iron Head','Swords Dance'],types:['Dark','Steel'],offensiveTypes:['Dark','Steel'],baseSpeed:50,atk:135,spa:60}),
+];
+
+const overstretchedManualSunTeam=[
+  mon('Whimsicott',{moves:['Sunny Day','Encore','U-turn','Moonblast'],types:['Grass','Fairy'],offensiveTypes:['Grass','Fairy'],baseSpeed:116,atk:77,spa:77}),
+  mon('Talonflame',{moves:['Sunny Day','U-turn','Flare Blitz','Roost'],types:['Fire','Flying'],offensiveTypes:['Fire','Flying'],baseSpeed:126,atk:81,spa:74}),
+  mon('Charizard',{moves:['Flamethrower','Weather Ball','Solar Beam','Roost'],types:['Fire','Flying'],offensiveTypes:['Fire','Flying','Grass','Normal'],baseSpeed:100,atk:84,spa:109}),
+  mon('Primarina',{moves:['Surf','Moonblast','Calm Mind','Psychic Noise'],types:['Water','Fairy'],offensiveTypes:['Water','Fairy','Psychic'],baseSpeed:60,atk:74,spa:126}),
+  mon('Great Tusk',{moves:['Rapid Spin','Headlong Rush','Knock Off','Close Combat'],types:['Ground','Fighting'],offensiveTypes:['Ground','Dark','Fighting'],baseSpeed:87,atk:131,spa:53}),
+  mon('Kingambit',{moves:['Sucker Punch','Kowtow Cleave','Iron Head','Swords Dance'],types:['Dark','Steel'],offensiveTypes:['Dark','Steel'],baseSpeed:50,atk:135,spa:60}),
+];
+
 const tokenRainProfile=ctx.profileTeam(tokenManualRainTeam,{});
 assert(tokenRainProfile.rainSetters.length===1,'token manual rain team should have one rain setter');
 assert(tokenRainProfile.rainDedicatedPayoffs.length<=2,'token manual rain team should have too few dedicated rain payoffs');
@@ -159,5 +177,29 @@ const goodSunRow=goodSunIdentity.all.find(row=>row.name==='Sun Offense');
 assert(goodSunRow&&goodSunRow.score===84,'good manual sun team should keep the base sun confidence');
 const goodSunSynergy=ctx.evaluateSynergy(goodManualSunTeam,{},goodSunProfile,goodSunIdentity);
 assert(!goodSunSynergy.issues.some(issue=>issue.title==='Manual sun support is too thin'),'good manual sun team should not get the thin manual sun issue');
+
+const overstretchedRainProfile=ctx.profileTeam(overstretchedManualRainTeam,{});
+assert(overstretchedRainProfile.rainSetters.length===2,'overstretched manual rain team should have two rain setters');
+assert(overstretchedRainProfile.rainDedicatedPayoffs.length<=2,'overstretched manual rain team should still have too few dedicated payoffs');
+const overstretchedRainIdentity=ctx.detectIdentities(overstretchedManualRainTeam,{},overstretchedRainProfile);
+const overstretchedRainRow=overstretchedRainIdentity.all.find(row=>row.name==='Rain Offense');
+assert(overstretchedRainIdentity.primary.name!=='Rain Offense','overstretched manual rain shell should not keep Rain Offense as the primary read');
+assert(overstretchedRainRow.score<overstretchedRainIdentity.all.find(row=>row.name==='Balance').score,'overstretched manual rain score should fall below the balance read');
+assert(overstretchedRainRow.evidence.some(line=>/multiple manual rain setters/i.test(line)),'overstretched manual rain shell should explain the setter burden');
+const overstretchedRainSynergy=ctx.evaluateSynergy(overstretchedManualRainTeam,{},overstretchedRainProfile,overstretchedRainIdentity);
+assert(overstretchedRainSynergy.scores.winReliability<81,'overstretched manual rain shell should lose win reliability');
+assert(overstretchedRainSynergy.issues.some(issue=>issue.title==='Manual rain support is overstretched'),'overstretched manual rain shell should surface the setter-burden issue');
+
+const overstretchedSunProfile=ctx.profileTeam(overstretchedManualSunTeam,{});
+assert(overstretchedSunProfile.sunSetters.length===2,'overstretched manual sun team should have two sun setters');
+assert(overstretchedSunProfile.sunDedicatedPayoffs.length<=2,'overstretched manual sun team should still have too few dedicated payoffs');
+const overstretchedSunIdentity=ctx.detectIdentities(overstretchedManualSunTeam,{},overstretchedSunProfile);
+const overstretchedSunRow=overstretchedSunIdentity.all.find(row=>row.name==='Sun Offense');
+assert(overstretchedSunIdentity.primary.name!=='Sun Offense','overstretched manual sun shell should not keep Sun Offense as the primary read');
+assert(overstretchedSunRow.score<overstretchedSunIdentity.all.find(row=>row.name==='Balance').score,'overstretched manual sun score should fall below the balance read');
+assert(overstretchedSunRow.evidence.some(line=>/multiple manual sun setters/i.test(line)),'overstretched manual sun shell should explain the setter burden');
+const overstretchedSunSynergy=ctx.evaluateSynergy(overstretchedManualSunTeam,{},overstretchedSunProfile,overstretchedSunIdentity);
+assert(overstretchedSunSynergy.scores.winReliability<81,'overstretched manual sun shell should lose win reliability');
+assert(overstretchedSunSynergy.issues.some(issue=>issue.title==='Manual sun support is overstretched'),'overstretched manual sun shell should surface the setter-burden issue');
 
 console.log('[OK] manual weather depth checks passed');
