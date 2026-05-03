@@ -5,6 +5,7 @@ ctx.window = ctx; ctx.addEventListener = function(){};
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync('src/app.js','utf8'), ctx, {filename:'app.js'});
 vm.runInContext(fs.readFileSync('src/weather-identity-upgrades.js','utf8'), ctx, {filename:'weather-identity-upgrades.js'});
+vm.runInContext(fs.readFileSync('src/balance-identity-upgrades.js','utf8'), ctx, {filename:'balance-identity-upgrades.js'});
 const hazard = `Gholdengo @ Air Balloon
 Ability: Good as Gold
 Tera Type: Fairy
