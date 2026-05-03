@@ -111,6 +111,29 @@ assert(falseBalanceSynergy.scores.offensiveCoverage<78,'false balance shell shou
 assert(falseBalanceSynergy.scores.roleCompression<76,'false balance shell should lose role compression');
 assert(falseBalanceSynergy.issues.some(issue=>issue.title==='Balance read overstates a semistall shell'),'false balance shell should surface the semistall warning');
 
+const closerlessSemistallTeam=[
+  mon('Dondozo',{moves:['Waterfall','Rest','Sleep Talk','Curse'],types:['Water'],offensiveTypes:['Water'],baseSpeed:35,atk:100,def:115,spa:65,spd:65,isDefensiveAnchor:true}),
+  mon('Garganacl',{moves:['Salt Cure','Recover','Protect','Stealth Rock'],types:['Rock'],offensiveTypes:['Rock'],baseSpeed:35,atk:100,def:130,spa:45,spd:90,isDefensiveAnchor:true}),
+  mon('Blissey',{moves:['Thunder Wave','Wish','Protect','Toxic'],types:['Normal'],offensiveTypes:['Normal'],baseSpeed:55,atk:10,def:10,spa:75,spd:135,isDefensiveAnchor:true}),
+  mon('Alomomola',{moves:['Wish','Protect','Flip Turn','Toxic'],types:['Water'],offensiveTypes:['Water'],baseSpeed:65,atk:75,def:80,spa:40,spd:45,isDefensiveAnchor:true}),
+  mon('Toxapex',{moves:['Recover','Toxic','Haze','Surf'],types:['Water','Poison'],offensiveTypes:['Water'],baseSpeed:35,atk:63,def:152,spa:53,spd:142,isDefensiveAnchor:true}),
+  mon('Corviknight',{moves:['Roost','Defog','U-turn','Body Press'],types:['Flying','Steel'],offensiveTypes:['Fighting'],baseSpeed:67,atk:87,def:105,spa:53,spd:85,isDefensiveAnchor:true}),
+];
+
+const closerlessProfile=ctx.profileTeam(closerlessSemistallTeam,{});
+assert(closerlessProfile.bulkyOffenseClosers.length===0,'expected the six-wall shell to have zero real closers');
+const closerlessIdentity=ctx.detectIdentities(closerlessSemistallTeam,{},closerlessProfile);
+const closerlessBalanceRow=closerlessIdentity.all.find(row=>row.name==='Balance');
+const closerlessStallRow=closerlessIdentity.all.find(row=>row.name==='Stall');
+assert(closerlessIdentity.primary.name==='Stall','closerless semistall shell should resolve to Stall');
+assert(closerlessBalanceRow&&closerlessStallRow&&closerlessBalanceRow.score<closerlessStallRow.score,'closerless shell should push Balance below Stall');
+assert(closerlessBalanceRow.evidence.some(line=>/no true closer/.test(line)),'closerless shell should explain the missing closer problem');
+const closerlessSynergy=ctx.evaluateSynergy(closerlessSemistallTeam,{},closerlessProfile,closerlessIdentity);
+assert(closerlessSynergy.scores.winReliability<81,'closerless shell should lose even more reliability');
+assert(closerlessSynergy.scores.offensiveCoverage<78,'closerless shell should lose offensive coverage');
+assert(closerlessSynergy.scores.roleCompression<76,'closerless shell should lose role compression');
+assert(closerlessSynergy.issues.some(issue=>issue.title==='Balance read overstates a semistall shell'),'closerless shell should surface the semistall warning');
+
 const realBalanceTeam=[
   mon('Deoxys-Speed',{item:'Life Orb',moves:['Nasty Plot','Psycho Boost','Focus Blast','Shadow Ball'],types:['Psychic'],offensiveTypes:['Psychic','Fighting','Ghost'],baseSpeed:180,atk:95,def:90,spa:95,spd:90}),
   mon('Dondozo',{moves:['Waterfall','Curse','Rest','Sleep Talk'],types:['Water'],offensiveTypes:['Water'],baseSpeed:35,atk:100,def:115,spa:65,spd:65,isDefensiveAnchor:true}),
