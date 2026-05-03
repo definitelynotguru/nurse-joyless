@@ -16,6 +16,7 @@
   const RECOVERY_MOVES=['Recover','Roost','Soft-Boiled','Slack Off','Moonlight','Morning Sun','Shore Up','Strength Sap','Wish','Rest','Milk Drink','Synthesis','Heal Order'];
   const ATTRITION_MOVES=['Toxic','Toxic Spikes','Thunder Wave','Will-O-Wisp','Glare','Leech Seed','Salt Cure','Ruination','Whirlwind','Dragon Tail','Roar','Haze','Knock Off','Yawn','Encore'];
   const PIVOT_MOVES=['U-turn','Volt Switch','Flip Turn','Parting Shot','Teleport'];
+  const SCREEN_MOVES=['Reflect','Light Screen','Aurora Veil'];
 
   function offensiveTypes(mon){
     if(typeof root.offensiveMoveTypes==='function')return root.offensiveMoveTypes(mon)||[];
@@ -60,6 +61,27 @@
     const speed=baseSpeed(mon);
     if(speed===null)return false;
     return speed>=85&&isOffensiveMon(mon);
+  }
+
+  function isSetupAttacker(mon){
+    return isOffensiveMon(mon)&&hasAnyMove(mon,SETUP_MOVES);
+  }
+
+  function isRecoveryAnchor(mon){
+    const speed=baseSpeed(mon);
+    const bulky=Math.max(Number(mon?.baseStats?.def)||0,Number(mon?.baseStats?.spd)||0)>=90;
+    return hasAnyMove(mon,RECOVERY_MOVES)&&(!!mon?.isDefensiveAnchor||(bulky&&(speed===null||speed<=105)));
+  }
+
+  function isScreenSetter(mon){
+    return hasAnyMove(mon,SCREEN_MOVES);
+  }
+
+  function isHyperOffenseCloser(mon){
+    if(!isOffensiveMon(mon))return false;
+    const attackStat=Math.max(Number(mon?.baseStats?.atk)||0,Number(mon?.baseStats?.spa)||0);
+    const item=String(mon?.item||'').trim();
+    return hasAnyMove(mon,SETUP_MOVES)||OFFENSIVE_ITEMS.includes(item)||attackStat>=120||(baseSpeed(mon)||0)>=110;
   }
 
   function isHazardPayoffAttacker(mon){
@@ -315,6 +337,24 @@
     return 18+Math.max(0,closers-2)*5+Math.max(0,fastAttackers-2)*4+Math.max(0,pivots-2)*3;
   }
 
+  function falseHyperOffenseShell(profile){
+    const fastAttackers=(profile?.fastAttackers||[]).length;
+    const setupAttackers=(profile?.setupAttackers||[]).length;
+    const anchors=(profile?.defensiveAnchors||[]).length;
+    const recoveryAnchors=(profile?.recoveryAnchors||[]).length;
+    const pivots=(profile?.pivot||[]).length;
+    const screens=(profile?.screenSetters||[]).length;
+    return fastAttackers>=3&&setupAttackers>=2&&anchors>=2&&recoveryAnchors>=2&&pivots>=2&&screens<=1;
+  }
+
+  function falseHyperOffensePenalty(profile){
+    if(!falseHyperOffenseShell(profile))return 0;
+    const anchors=(profile?.defensiveAnchors||[]).length;
+    const recoveryAnchors=(profile?.recoveryAnchors||[]).length;
+    const pivots=(profile?.pivot||[]).length;
+    return 18+Math.max(0,anchors-2)*4+Math.max(0,recoveryAnchors-2)*4+Math.max(0,pivots-2)*3;
+  }
+
   function falseDragonSpamShell(profile){
     const dragons=(profile?.dragonTypes||[]).length;
     const pressure=(profile?.dragonPressureAttackers||[]).length;
@@ -389,6 +429,10 @@
     profile.weatherConflict=!!((profile?.drought?.length||profile?.sunSetters?.length)&&(profile?.drizzle?.length||profile?.rainSetters?.length));
     profile.trickRoomSetters=teamList.filter(mon=>hasAnyMove(mon,['Trick Room'])).map(mon=>mon.species);
     profile.fastAttackers=teamList.filter(isFastAttacker).map(mon=>mon.species);
+    profile.setupAttackers=teamList.filter(isSetupAttacker).map(mon=>mon.species);
+    profile.recoveryAnchors=teamList.filter(isRecoveryAnchor).map(mon=>mon.species);
+    profile.screenSetters=teamList.filter(isScreenSetter).map(mon=>mon.species);
+    profile.hyperOffenseClosers=teamList.filter(isHyperOffenseCloser).map(mon=>mon.species);
     profile.trickRoomPayoffs=teamList.filter(mon=>isSlowRoomPayoff(mon)&&!hasAnyMove(mon,['Trick Room'])).map(mon=>mon.species);
     profile.trickRoomPayoffMoves=teamList.filter(mon=>moveCount(mon,['Trick Room'])===0&&isSlowRoomPayoff(mon)).map(mon=>mon.species);
     profile.hazardPayoffAttackers=teamList.filter(isHazardPayoffAttacker).map(mon=>mon.species);
@@ -406,7 +450,7 @@
   root.detectIdentities=function patchedDetectIdentities(t=root.team,a=root.analysis,p=root.profileTeam(t,a)){
     const profile=p||root.profileTeam(t,a);
     const result=originalDetectIdentities.call(this,t,a,profile);
-    if(!profile?.weatherConflict&&!fakeRainShell(profile)&&!shallowRainShell(profile)&&!thinManualRainShell(profile)&&!overstretchedManualRainShell(profile)&&!fakeSunShell(profile)&&!shallowSunShell(profile)&&!thinManualSunShell(profile)&&!overstretchedManualSunShell(profile)&&!shallowTrickRoomShell(profile)&&!stagnantHazardShell(profile)&&!thinHazardConversionShell(profile)&&!falseStallShell(profile)&&!falseDragonSpamShell(profile))return result;
+    if(!profile?.weatherConflict&&!fakeRainShell(profile)&&!shallowRainShell(profile)&&!thinManualRainShell(profile)&&!overstretchedManualRainShell(profile)&&!fakeSunShell(profile)&&!shallowSunShell(profile)&&!thinManualSunShell(profile)&&!overstretchedManualSunShell(profile)&&!shallowTrickRoomShell(profile)&&!stagnantHazardShell(profile)&&!thinHazardConversionShell(profile)&&!falseStallShell(profile)&&!falseHyperOffenseShell(profile)&&!falseDragonSpamShell(profile))return result;
 
     const rows=(result?.all||[]).map(cloneIdentityRow);
     const {mixedWeatherPenalty,rainFirePenalty,sunWaterPenalty}=weatherTension(profile);
@@ -422,6 +466,7 @@
     const stagnantHazardShellPenalty=stagnantHazardPenalty(profile);
     const thinHazardShellPenalty=thinHazardConversionPenalty(profile);
     const falseStallShellPenalty=falseStallPenalty(profile);
+    const falseHyperShellPenalty=falseHyperOffensePenalty(profile);
     const falseDragonPenalty=falseDragonSpamPenalty(profile);
     const rain=rows.find(row=>row.name==='Rain Offense');
     const sun=rows.find(row=>row.name==='Sun Offense');
@@ -429,6 +474,7 @@
     const trickRoom=rows.find(row=>row.name==='Trick Room Offense');
     const hazard=rows.find(row=>row?.name==='Hazard Stack Fat Balance');
     const stall=rows.find(row=>row?.name==='Stall');
+    const hyper=rows.find(row=>row?.name==='Hyper Offense');
     const dragon=rows.find(row=>row?.name==='Dragon Spam Offense');
 
     if(rain){
@@ -516,6 +562,15 @@
         addEvidence(stall,'too many proactive closers for a true stall shell');
         addEvidence(stall,'fast breakers keep this closer to balance than hard attrition');
         if((profile.stallPivots||[]).length>=2)addEvidence(stall,'multiple pivots point to a momentum shell, not pure stall');
+      }
+    }
+    if(hyper){
+      hyper.score=root.njCap((hyper.score||0)-falseHyperShellPenalty,94);
+      if(falseHyperOffenseShell(profile)){
+        addEvidence(hyper,'speed and setup are being propped up by bulky recovery pivots');
+        addEvidence(hyper,'too many defensive anchors for a real all-in offense shell');
+        if((profile.recoveryAnchors||[]).length>=2)addEvidence(hyper,'multiple recovery anchors point to bulky offense, not true Hyper Offense');
+        if((profile.pivot||[]).length>=2)addEvidence(hyper,'pivot scaffolding slows this closer to a tempo balance shell');
       }
     }
     if(dragon){
@@ -630,6 +685,13 @@
       next.scores.winReliability=root.njCap((next.scores.winReliability||0)-7,92);
       if(!next.issues.some(issue=>issue?.title==='Stall read overstates a balance shell')){
         next.issues.push({severity:'warn',title:'Stall read overstates a balance shell',detail:'The team has some recovery-and-status anchors, but it still leans on proactive breakers and pivot tempo too heavily to call the whole structure true stall.'});
+      }
+    }
+    if(falseHyperOffenseShell(profile)){
+      next.scores.winReliability=root.njCap((next.scores.winReliability||0)-7,92);
+      next.scores.roleCompression=root.njCap((next.scores.roleCompression||0)-6,92);
+      if(!next.issues.some(issue=>issue?.title==='Hyper offense read overstates a bulky tempo shell')){
+        next.issues.push({severity:'warn',title:'Hyper offense read overstates a bulky tempo shell',detail:'The team has speed and setup, but too many recovery anchors and pivots are still doing glue work for it to behave like true all-in Hyper Offense. It plays more like bulky offense with fast pressure.'});
       }
     }
     if(falseDragonSpamShell(profile)){
