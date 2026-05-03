@@ -98,6 +98,17 @@
     return hasAnyMove(mon,PIVOT_MOVES);
   }
 
+  function isDragonPressureMon(mon){
+    return offensiveTypes(mon).includes('Dragon')&&isOffensiveMon(mon);
+  }
+
+  function isDragonCloser(mon){
+    if(!offensiveTypes(mon).includes('Dragon'))return false;
+    const attackStat=Math.max(Number(mon?.baseStats?.atk)||0,Number(mon?.baseStats?.spa)||0);
+    const item=String(mon?.item||'').trim();
+    return hasAnyMove(mon,SETUP_MOVES)||OFFENSIVE_ITEMS.includes(item)||attackStat>=120||(baseSpeed(mon)||0)>=100;
+  }
+
   function weatherTension(profile){
     return {
       mixedWeatherPenalty:profile?.weatherConflict?30:0,
@@ -304,6 +315,25 @@
     return 18+Math.max(0,closers-2)*5+Math.max(0,fastAttackers-2)*4+Math.max(0,pivots-2)*3;
   }
 
+  function falseDragonSpamShell(profile){
+    const dragons=(profile?.dragonTypes||[]).length;
+    const pressure=(profile?.dragonPressureAttackers||[]).length;
+    const closers=(profile?.dragonClosers||[]).length;
+    const anchors=(profile?.defensiveAnchors||[]).length;
+    const pivots=(profile?.pivot||[]).length;
+    const supportDragons=Math.max(0,dragons-pressure);
+    return dragons>=3&&pressure<=2&&closers<=1&&(supportDragons>=2||anchors>=2||pivots>=2);
+  }
+
+  function falseDragonSpamPenalty(profile){
+    if(!falseDragonSpamShell(profile))return 0;
+    const dragons=(profile?.dragonTypes||[]).length;
+    const pressure=(profile?.dragonPressureAttackers||[]).length;
+    const closers=(profile?.dragonClosers||[]).length;
+    const anchors=(profile?.defensiveAnchors||[]).length;
+    return 20+Math.max(0,dragons-3)*4+Math.max(0,2-pressure)*6+Math.max(0,1-closers)*8+Math.max(0,anchors-2)*3;
+  }
+
   function cloneIdentityRow(row={}){
     return {...row,evidence:[...(row.evidence||[])]};
   }
@@ -367,13 +397,16 @@
     profile.stallProgressPieces=teamList.filter(isStallProgressPiece).map(mon=>mon.species);
     profile.stallClosers=teamList.filter(isStallCloser).map(mon=>mon.species);
     profile.stallPivots=teamList.filter(isStallPivot).map(mon=>mon.species);
+    profile.dragonTypes=teamList.filter(mon=>root.types(mon).includes('Dragon')).map(mon=>mon.species);
+    profile.dragonPressureAttackers=teamList.filter(isDragonPressureMon).map(mon=>mon.species);
+    profile.dragonClosers=teamList.filter(isDragonCloser).map(mon=>mon.species);
     return profile;
   };
 
   root.detectIdentities=function patchedDetectIdentities(t=root.team,a=root.analysis,p=root.profileTeam(t,a)){
     const profile=p||root.profileTeam(t,a);
     const result=originalDetectIdentities.call(this,t,a,profile);
-    if(!profile?.weatherConflict&&!fakeRainShell(profile)&&!shallowRainShell(profile)&&!thinManualRainShell(profile)&&!overstretchedManualRainShell(profile)&&!fakeSunShell(profile)&&!shallowSunShell(profile)&&!thinManualSunShell(profile)&&!overstretchedManualSunShell(profile)&&!shallowTrickRoomShell(profile)&&!stagnantHazardShell(profile)&&!thinHazardConversionShell(profile)&&!falseStallShell(profile))return result;
+    if(!profile?.weatherConflict&&!fakeRainShell(profile)&&!shallowRainShell(profile)&&!thinManualRainShell(profile)&&!overstretchedManualRainShell(profile)&&!fakeSunShell(profile)&&!shallowSunShell(profile)&&!thinManualSunShell(profile)&&!overstretchedManualSunShell(profile)&&!shallowTrickRoomShell(profile)&&!stagnantHazardShell(profile)&&!thinHazardConversionShell(profile)&&!falseStallShell(profile)&&!falseDragonSpamShell(profile))return result;
 
     const rows=(result?.all||[]).map(cloneIdentityRow);
     const {mixedWeatherPenalty,rainFirePenalty,sunWaterPenalty}=weatherTension(profile);
@@ -389,12 +422,14 @@
     const stagnantHazardShellPenalty=stagnantHazardPenalty(profile);
     const thinHazardShellPenalty=thinHazardConversionPenalty(profile);
     const falseStallShellPenalty=falseStallPenalty(profile);
+    const falseDragonPenalty=falseDragonSpamPenalty(profile);
     const rain=rows.find(row=>row.name==='Rain Offense');
     const sun=rows.find(row=>row.name==='Sun Offense');
     const sunRoom=rows.find(row=>row.name==='Sun Room');
     const trickRoom=rows.find(row=>row.name==='Trick Room Offense');
     const hazard=rows.find(row=>row?.name==='Hazard Stack Fat Balance');
     const stall=rows.find(row=>row?.name==='Stall');
+    const dragon=rows.find(row=>row?.name==='Dragon Spam Offense');
 
     if(rain){
       rain.score=root.njCap((rain.score||0)-mixedWeatherPenalty-rainFirePenalty-fakeRainShellPenalty-shallowRainShellPenalty-thinManualRainShellPenalty-overstretchedManualRainShellPenalty,96);
@@ -481,6 +516,15 @@
         addEvidence(stall,'too many proactive closers for a true stall shell');
         addEvidence(stall,'fast breakers keep this closer to balance than hard attrition');
         if((profile.stallPivots||[]).length>=2)addEvidence(stall,'multiple pivots point to a momentum shell, not pure stall');
+      }
+    }
+    if(dragon){
+      dragon.score=root.njCap((dragon.score||0)-falseDragonPenalty,95);
+      if(falseDragonSpamShell(profile)){
+        addEvidence(dragon,'Dragon count is not translating into repeated Dragon STAB pressure');
+        if((profile.dragonPressureAttackers||[]).length<=2)addEvidence(dragon,'too few dragons are actually functioning as Dragon-type breakers');
+        if((profile.dragonClosers||[]).length<=1)addEvidence(dragon,'the team lacks enough real Dragon endgame pressure');
+        if((profile.defensiveAnchors||[]).length>=2)addEvidence(dragon,'too many Dragon slots are doing balance work instead of forcing trades');
       }
     }
 
@@ -586,6 +630,13 @@
       next.scores.winReliability=root.njCap((next.scores.winReliability||0)-7,92);
       if(!next.issues.some(issue=>issue?.title==='Stall read overstates a balance shell')){
         next.issues.push({severity:'warn',title:'Stall read overstates a balance shell',detail:'The team has some recovery-and-status anchors, but it still leans on proactive breakers and pivot tempo too heavily to call the whole structure true stall.'});
+      }
+    }
+    if(falseDragonSpamShell(profile)){
+      next.scores.winReliability=root.njCap((next.scores.winReliability||0)-8,92);
+      next.scores.offensiveCoverage=root.njCap((next.scores.offensiveCoverage||0)-7,92);
+      if(!next.issues.some(issue=>issue?.title==='Dragon stack lacks repeated Dragon pressure')){
+        next.issues.push({severity:'warn',title:'Dragon stack lacks repeated Dragon pressure',detail:'The team has several Dragon bodies, but too few of them are actually forcing trades with Dragon STAB. It plays more like bulky balance than true Dragon Spam Offense.'});
       }
     }
     return next;
