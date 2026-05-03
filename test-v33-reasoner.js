@@ -2,7 +2,7 @@ const fs=require('fs'),vm=require('vm');
 const source=fs.readFileSync('src/app.js','utf8');
 function makeEl(){return {value:'',checked:false,innerHTML:'',textContent:'',className:'',_items:[],options:[],style:{},dataset:{},classList:{add(){},remove(){},toggle(){}},querySelector(){return makeEl()},scrollIntoView(){},appendChild(){},click(){},getBoundingClientRect(){return{top:999}}}}
 const els={};const ctx={console,setTimeout(fn){fn()},alert(){},localStorage:{getItem(){return null},setItem(){}},navigator:{clipboard:{writeText(){}}},URL:{createObjectURL(){return 'blob:'},revokeObjectURL(){}},Blob:function(){},fetch:async()=>{throw Error('offline')}};
-ctx.document={addEventListener(){},getElementById(id){return els[id]||(els[id]=makeEl())},querySelectorAll(){return[]},createElement(){return makeEl()}};ctx.window=ctx;ctx.addEventListener=function(){};vm.createContext(ctx);vm.runInContext(source,ctx,{timeout:5000});vm.runInContext(fs.readFileSync('src/weather-identity-upgrades.js','utf8'),ctx,{filename:'weather-identity-upgrades.js',timeout:5000});
+ctx.document={addEventListener(){},getElementById(id){return els[id]||(els[id]=makeEl())},querySelectorAll(){return[]},createElement(){return makeEl()}};ctx.window=ctx;ctx.addEventListener=function(){};vm.createContext(ctx);vm.runInContext(source,ctx,{timeout:5000});vm.runInContext(fs.readFileSync('src/weather-identity-upgrades.js','utf8'),ctx,{filename:'weather-identity-upgrades.js',timeout:5000});vm.runInContext(fs.readFileSync('src/balance-identity-upgrades.js','utf8'),ctx,{filename:'balance-identity-upgrades.js',timeout:5000});
 function check(name, teamText, judge){
   const code = `team=parseTeam(${JSON.stringify(teamText)}); analysis=analyze(team); lastReasoning=buildReasoningReport(); lastReasoning`;
   const r = vm.runInContext(code, ctx);
@@ -644,7 +644,7 @@ check('passive hazard shell', passiveHazardShell, r=>{
   const hazardRow=r.identity.all.find(x=>x.name==='Hazard Stack Fat Balance');
   return hazardRow&&hazardRow.score<60&&r.synergy.issues.some(issue=>/Hazard plan lacks payoff attackers/.test(issue.title));
 });
-check('fat passive stall', badPassive, r=>/Stall|Balance/.test(r.identity.primary.name)&&r.synergy.scores.offensiveCoverage<85);
+check('fat passive stall', badPassive, r=>/Stall/.test(r.identity.primary.name)&&r.synergy.issues.some(issue=>/Balance read overstates a semistall shell/.test(issue.title))&&r.synergy.scores.offensiveCoverage<85);
 check('bad six sweepers', badSixSweepers, r=>/Hyper Offense|Dragon Spam/.test(r.identity.primary.name)&&r.synergy.scores.defensiveBackbone<45);
 check('bad no win field spam', badNoWin, r=>r.synergy.scores.winReliability<70&&r.synergy.scores.fieldControl<45);
 console.log('\n[OK] V3.3 reasoner 12-team audit passed');
