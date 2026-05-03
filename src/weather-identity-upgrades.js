@@ -44,6 +44,11 @@
     return offensiveTypes(mon).length>=2||attackStat>=105;
   }
 
+  function externalWeatherPayoffs(payoffs=[],setters=[]){
+    const setterIds=new Set((setters||[]).map(name=>String(name||'').trim()).filter(Boolean));
+    return root.unique((payoffs||[]).filter(name=>name&&!setterIds.has(String(name||'').trim())));
+  }
+
   function isSlowRoomPayoff(mon){
     const speed=baseSpeed(mon);
     if(speed===null)return false;
@@ -155,14 +160,17 @@
     const dedicatedPayoffs=(profile?.rainDedicatedPayoffs||[]).length;
     const waterAttackers=(profile?.waterAttackers||[]).length;
     const swiftSwim=(profile?.rainSpeedAbusers||[]).length;
-    return setters>=2&&dedicatedPayoffs<=Math.max(2,setters)&&waterAttackers<=1&&swiftSwim===0;
+    const externalPayoffs=(profile?.rainExternalPayoffs||[]).length;
+    return setters>=2&&dedicatedPayoffs<=Math.max(2,setters)&&waterAttackers<=1&&swiftSwim===0
+      || setters>=2&&externalPayoffs<setters&&waterAttackers<=1&&swiftSwim===0;
   }
 
   function overstretchedManualRainPenalty(profile){
     if(!overstretchedManualRainShell(profile))return 0;
     const setters=(profile?.rainSetters||[]).length;
     const dedicatedPayoffs=(profile?.rainDedicatedPayoffs||[]).length;
-    return 18+Math.max(0,setters-2)*4+Math.max(0,Math.max(2,setters)-dedicatedPayoffs)*4;
+    const externalPayoffs=(profile?.rainExternalPayoffs||[]).length;
+    return 18+Math.max(0,setters-2)*4+Math.max(0,Math.max(2,setters)-dedicatedPayoffs)*4+Math.max(0,setters-externalPayoffs)*4;
   }
 
   function shallowSunShell(profile){
@@ -217,14 +225,17 @@
     const setters=(profile?.sunSetters||[]).length;
     const dedicatedPayoffs=(profile?.sunDedicatedPayoffs||[]).length;
     const waterAttackers=(profile?.waterAttackers||[]).length;
-    return setters>=2&&dedicatedPayoffs<=Math.max(2,setters)&&waterAttackers>=1;
+    const externalPayoffs=(profile?.sunExternalPayoffs||[]).length;
+    return setters>=2&&dedicatedPayoffs<=Math.max(2,setters)&&waterAttackers>=1
+      || setters>=2&&externalPayoffs<setters&&waterAttackers>=1;
   }
 
   function overstretchedManualSunPenalty(profile){
     if(!overstretchedManualSunShell(profile))return 0;
     const setters=(profile?.sunSetters||[]).length;
     const dedicatedPayoffs=(profile?.sunDedicatedPayoffs||[]).length;
-    return 16+Math.max(0,setters-2)*4+Math.max(0,Math.max(2,setters)-dedicatedPayoffs)*4;
+    const externalPayoffs=(profile?.sunExternalPayoffs||[]).length;
+    return 16+Math.max(0,setters-2)*4+Math.max(0,Math.max(2,setters)-dedicatedPayoffs)*4+Math.max(0,setters-externalPayoffs)*4;
   }
 
   function shallowTrickRoomShell(profile){
@@ -326,6 +337,7 @@
       if(offensiveTypes(mon).includes('Water'))return true;
       return isOffensiveMon(mon)&&!offensiveTypes(mon).includes('Fire')&&hasAnyMove(mon,RAIN_SIGNAL_MOVES);
     }).map(mon=>mon.species);
+    profile.rainExternalPayoffs=externalWeatherPayoffs(profile.rainDedicatedPayoffs,profile.rainSetters);
     profile.sunSetters=teamList.filter(mon=>{
       const ability=String(mon?.ability||'').trim();
       return ability==='Drought'||hasAnyMove(mon,SUN_SETTER_MOVES);
@@ -343,6 +355,7 @@
       return ability==='Protosynthesis'&&(offensiveTypes(mon).includes('Fire')||hasAnyMove(mon,['Hydro Steam']));
     }).map(mon=>mon.species);
     profile.sunDedicatedPayoffs=[...(profile.sunPayoffAttackers||[])];
+    profile.sunExternalPayoffs=externalWeatherPayoffs(profile.sunDedicatedPayoffs,profile.sunSetters);
     profile.weatherConflict=!!((profile?.drought?.length||profile?.sunSetters?.length)&&(profile?.drizzle?.length||profile?.rainSetters?.length));
     profile.trickRoomSetters=teamList.filter(mon=>hasAnyMove(mon,['Trick Room'])).map(mon=>mon.species);
     profile.fastAttackers=teamList.filter(isFastAttacker).map(mon=>mon.species);
@@ -402,6 +415,7 @@
       if(overstretchedManualRainShell(profile)){
         addEvidence(rain,'multiple manual rain setters are spending slots without enough real payoffs');
         addEvidence(rain,'the team is using extra Rain Dance support to prop up a thin rain backbone');
+        addEvidence(rain,'most of the rain payoff load is still sitting on the setters themselves');
       }
     }
     if(sun){
@@ -422,6 +436,7 @@
       if(overstretchedManualSunShell(profile)){
         addEvidence(sun,'multiple manual sun setters are spending slots without enough real payoffs');
         addEvidence(sun,'the team is using extra Sunny Day support to prop up a thin sun backbone');
+        addEvidence(sun,'most of the sun payoff load is still sitting on the setters themselves');
       }
     }
     if(sunRoom){
@@ -433,7 +448,10 @@
       }
       if(shallowSunShell(profile))addEvidence(sunRoom,'water-heavy shell undercuts sun turns');
       if(thinManualSunShell(profile))addEvidence(sunRoom,'only one thin manual sun setter is carrying the weather plan');
-      if(overstretchedManualSunShell(profile))addEvidence(sunRoom,'multiple manual sun setters are spending slots without enough real payoffs');
+      if(overstretchedManualSunShell(profile)){
+        addEvidence(sunRoom,'multiple manual sun setters are spending slots without enough real payoffs');
+        addEvidence(sunRoom,'most of the sun payoff load is still sitting on the setters themselves');
+      }
       if(shallowTrickRoomShell(profile)){
         addEvidence(sunRoom,'multiple Trick Room setters but almost no slow payoff');
         addEvidence(sunRoom,'fast attackers waste most Room turns');
@@ -511,7 +529,7 @@
       next.scores.winReliability=root.njCap((next.scores.winReliability||0)-8,92);
       next.scores.roleCompression=root.njCap((next.scores.roleCompression||0)-6,92);
       if(!next.issues.some(issue=>issue?.title==='Manual rain support is overstretched')){
-        next.issues.push({severity:'bad',title:'Manual rain support is overstretched',detail:'The team is burning multiple Rain Dance slots without enough real rain payoffs behind them, so the setter burden is larger than the actual weather reward.'});
+        next.issues.push({severity:'bad',title:'Manual rain support is overstretched',detail:'The team is burning multiple Rain Dance slots without enough real weather conversion behind them. Too much of the rain payoff is still trapped on the setters themselves, so the setter burden is larger than the actual reward.'});
       }
     }
     if(shallowSunShell(profile)){
@@ -538,7 +556,7 @@
       next.scores.winReliability=root.njCap((next.scores.winReliability||0)-7,92);
       next.scores.roleCompression=root.njCap((next.scores.roleCompression||0)-6,92);
       if(!next.issues.some(issue=>issue?.title==='Manual sun support is overstretched')){
-        next.issues.push({severity:'bad',title:'Manual sun support is overstretched',detail:'The team is burning multiple Sunny Day slots without enough real sun payoffs behind them, so the setter burden is larger than the actual weather reward.'});
+        next.issues.push({severity:'bad',title:'Manual sun support is overstretched',detail:'The team is burning multiple Sunny Day slots without enough real weather conversion behind them. Too much of the sun payoff is still trapped on the setters themselves, so the setter burden is larger than the actual reward.'});
       }
     }
     if(shallowTrickRoomShell(profile)){
