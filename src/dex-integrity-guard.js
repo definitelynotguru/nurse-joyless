@@ -31,7 +31,9 @@
     Darkrai: [['Dark'], [70, 90, 90, 135, 90, 125]],
     Arceus: [['Normal'], [120, 120, 120, 120, 120, 120]],
     Lunala: [['Psychic', 'Ghost'], [137, 113, 89, 137, 107, 97]],
-    Solgaleo: [['Psychic', 'Steel'], [137, 137, 107, 113, 89, 97]]
+    Solgaleo: [['Psychic', 'Steel'], [137, 137, 107, 113, 89, 97]],
+    Giratina: [['Ghost', 'Dragon'], [150, 100, 120, 100, 120, 90]],
+    Togekiss: [['Fairy', 'Flying'], [85, 50, 95, 120, 115, 80]]
   };
 
   const EXTRA_ABILITIES = {
@@ -63,7 +65,9 @@
     Darkrai: {0: 'Bad Dreams'},
     Arceus: {0: 'Multitype'},
     Lunala: {0: 'Shadow Shield'},
-    Solgaleo: {0: 'Full Metal Body'}
+    Solgaleo: {0: 'Full Metal Body'},
+    Giratina: {0: 'Pressure', H: 'Telepathy'},
+    Togekiss: {0: 'Hustle', 1: 'Serene Grace', H: 'Super Luck'}
   };
 
   const EXTRA_MOVES = {
@@ -233,7 +237,6 @@
           const candidateLocal = localSpeciesName(candidate);
           if (candidateLocal) return candidateLocal;
           if (typeof P !== 'undefined' && P[candidate]) return candidate;
-          if (originalGetSpecies && originalGetSpecies(candidate)) return candidate;
         }
         return ensureUnknownSpecies(name);
       };
