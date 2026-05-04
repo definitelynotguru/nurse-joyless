@@ -45,6 +45,11 @@
     return offensiveTypes(mon).length>=2||attackStat>=105;
   }
 
+  function isKnownDefensiveAnchor(mon){
+    if(mon?.isDefensiveAnchor)return true;
+    return typeof root.isDefensiveAnchor==='function'&&root.isDefensiveAnchor(mon);
+  }
+
   function externalWeatherPayoffs(payoffs=[],setters=[]){
     const setterIds=new Set((setters||[]).map(name=>String(name||'').trim()).filter(Boolean));
     return root.unique((payoffs||[]).filter(name=>name&&!setterIds.has(String(name||'').trim())));
@@ -70,7 +75,7 @@
   function isRecoveryAnchor(mon){
     const speed=baseSpeed(mon);
     const bulky=Math.max(Number(mon?.baseStats?.def)||0,Number(mon?.baseStats?.spd)||0)>=90;
-    return hasAnyMove(mon,RECOVERY_MOVES)&&(!!mon?.isDefensiveAnchor||(bulky&&(speed===null||speed<=105)));
+    return hasAnyMove(mon,RECOVERY_MOVES)&&(isKnownDefensiveAnchor(mon)||(bulky&&(speed===null||speed<=105)));
   }
 
   function isScreenSetter(mon){
@@ -109,7 +114,7 @@
   function isStallAnchor(mon){
     const speed=baseSpeed(mon);
     const bulky=Math.max(Number(mon?.baseStats?.def)||0,Number(mon?.baseStats?.spd)||0)>=95;
-    return !!mon?.isDefensiveAnchor||(bulky&&hasAnyMove(mon,RECOVERY_MOVES)&&(speed===null||speed<=90));
+    return isKnownDefensiveAnchor(mon)||(bulky&&hasAnyMove(mon,RECOVERY_MOVES)&&(speed===null||speed<=90));
   }
 
   function isStallProgressPiece(mon){

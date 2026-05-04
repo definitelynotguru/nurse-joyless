@@ -163,4 +163,16 @@
       return addUnique([...base,...extra]);
     };
   }
+
+  if(typeof proto.moveContradictionNote==='function'){
+    const originalMoveContradictionNote=proto.moveContradictionNote;
+    proto.moveContradictionNote=function patchedMoveContradictionNote(state, move=''){
+      const moveNameValue=String(move||'').trim();
+      const abilities=this.moveBlockedAbilities(state,moveNameValue)||[];
+      if(moveNameValue&&abilities.length){
+        return `${moveNameValue} successfully landed, so ${this.joinWithOr(abilities)} impossible as the current ability.`;
+      }
+      return originalMoveContradictionNote.call(this,state,move);
+    };
+  }
 })();

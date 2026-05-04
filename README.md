@@ -48,6 +48,21 @@ Most team analyzers stop at weaknesses. Nurse Joyless goes deeper by connecting 
 6. Use Suggested Additions to compare patch lanes, open the three-dot action menu, and swap a suggested set into the team.
 7. Export the final Markdown report for a shareable scouting sheet.
 
+## Final submission demo script
+
+For the judged demo, lead with the deterministic reasoning engine. The recommended path is:
+
+1. Load one curated test team: Dragon Spam, Hazard Stack, or Sun Room.
+2. Click **Analyze Patient** and call out the patient status.
+3. Run **Advanced Lab** and show Identity, Matchup Matrix, Synergy, and Tera Plan.
+4. Run **Validate Team** to show confidence-based validation instead of false hard-invalid spam.
+5. Open **Suggest Additions** and show a targeted patch lane plus quick-swap behavior.
+6. Use **KO Actuary** for OHKO / 2HKO / 3HKO risk and reverse-KO danger.
+7. Paste replay evidence into **Replay Observer**, then use **Hidden Info Detective** for hard eliminations vs soft clues.
+8. Copy the **Markdown Export** as the final shareable scouting report.
+
+Kimi and Ollama Cloud are optional BYOK paths. The app is designed to remain fully demoable without external model keys.
+
 ## Core features
 
 ### Sparring Lab
