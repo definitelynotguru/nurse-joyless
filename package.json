@@ -18,7 +18,7 @@
     "hidden-info": "node test-hidden-info-reasoning.js && node test-replay-ability-upgrades.js && node test-choice-lock-timeline-upgrades.js && node test-item-transfer-timeline-upgrades.js && node test-replay-neutralizing-gas-end.js && node test-replay-mycilium-might.js && node test-move-immunity-reasoning.js && node test-move-immunity-contradictions.js && node test-fallback-ability-fixes.js && node test-priority-blocking-upgrades.js",
     "validation-fixes": "node test-validation-fixes.js",
     "tera-plan": "node test-tera-plan.js",
-    "dex-integrity": "node --check src/dex-integrity-guard.js && node test-dex-integrity-guard.js",
+    "dex-integrity": "node --check src/dex-integrity-guard.js && node test-dex-integrity-guard.js && node test-dex-integrity-massive.js",
     "submission-polish": "node --check src/submission-polish.js && node test-submission-polish.js"
   }
 }
