@@ -17,8 +17,8 @@ const context = {
     Gyarados: {0: 'Intimidate', H: 'Moxie'}
   },
   REPLAY_MOVE_HINTS: {
-    'Extreme Speed': ['Normal', 'Physical', 2],
-    'Aqua Jet': ['Water', 'Physical', 1]
+    'Aqua Jet': ['Water', 'Physical', 1],
+    'Extreme Speed': ['Normal', 'Physical', 2]
   },
   DexAdapter: {
     id(value) {
@@ -70,6 +70,11 @@ const context = {
     return Object.values(context.FALLBACK_ABILITIES[species] || {}).filter(Boolean);
   },
   ReplayParser: class ReplayParser {
+    constructor() {
+      this.turnMoves = [];
+      this.revealed = [];
+      this.states = {};
+    }
     moveBlockedAbilities() {
       return [];
     }
@@ -84,6 +89,40 @@ const context = {
     }
     abilityRewardText() {
       return 'base reward';
+    }
+    abilityTriggeredByMove() {
+      return false;
+    }
+    abilityClueLabel(ability) {
+      return `${ability} revealed`;
+    }
+    abilityClueLabelWithProof(ability) {
+      return `${ability} revealed`;
+    }
+    reactiveAbilityProof() {
+      return false;
+    }
+    ensureState(target) {
+      const raw = String(target || '');
+      const species = raw.split(':').slice(1).join(':').trim();
+      const slot = raw.split(':')[0].trim();
+      const key = `${slot}|${species}`;
+      if (!this.states[key]) this.states[key] = {species, slot, abilityHints: []};
+      return this.states[key];
+    }
+    recordAbilityReveal(state, turn, ability, moveEvent, text, clueLabel) {
+      if (!state.abilityHints.includes(ability)) state.abilityHints.push(ability);
+      this.revealed.push({
+        state,
+        turn,
+        ability,
+        move: moveEvent?.move || '',
+        label: clueLabel,
+        text
+      });
+    }
+    extractEvidence() {
+      return 'base';
     }
   }
 };
@@ -131,5 +170,22 @@ assert(/priority/i.test(reward), 'priority blockers should explain their actual 
 
 const farigirafSpecies = context.DexAdapter.getSpecies('Farigiraf');
 assert(farigirafSpecies?.abilities?.[1] === 'Armor Tail', 'Farigiraf fallback data should expose Armor Tail offline');
+
+assert(parser.abilityTriggeredByMove('Armor Tail', 'Extreme Speed'), 'priority blockers should count as move-triggered reveals for replay clue labeling');
+assert(parser.abilityClueLabel('Dazzling', 'Aqua Jet') === 'Dazzling blocked Aqua Jet', 'priority blockers should keep move-specific replay clue labels');
+assert(parser.abilityClueLabelWithProof('Queenly Majesty', 'Extreme Speed', true) === 'Queenly Majesty blocked Extreme Speed', 'proof-backed priority blocker labels should stay move-specific');
+assert(parser.reactiveAbilityProof('Armor Tail'), 'priority blockers should count as hard reactive replay proof');
+
+parser.turnMoves = [{ slot: 'p1a', species: 'Dragonite', move: 'Extreme Speed' }];
+parser.extractEvidence({ type: '-activate', target: 'p2a: Farigiraf', effect: 'ability: Armor Tail' }, 3);
+assert(parser.revealed.length === 1, 'explicit blocked-priority replay events should create an ability reveal');
+assert(parser.revealed[0].ability === 'Armor Tail', 'blocked-priority replay events should reveal the correct ability');
+assert(parser.revealed[0].label === 'Armor Tail blocked Extreme Speed', 'blocked-priority replay events should preserve the blocked move in the clue label');
+assert(parser.revealed[0].state.abilityHints.includes('Armor Tail'), 'blocked-priority replay events should anchor the live ability hint');
+
+parser.revealed = [];
+parser.turnMoves = [{ slot: 'p1a', species: 'Zapdos', move: 'Thunderbolt' }];
+parser.extractEvidence({ type: '-activate', target: 'p2a: Farigiraf', effect: 'ability: Armor Tail' }, 4);
+assert(parser.revealed.length === 0, 'non-priority activate events should not fabricate a priority-blocker reveal');
 
 console.log('[OK] priority blocking upgrades passed');
