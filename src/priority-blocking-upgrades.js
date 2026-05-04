@@ -28,13 +28,17 @@
   };
   const EXTRA_MOVES={
     'Accelerock':['Rock','Physical',40,100,1],
+    'Aqua Jet':['Water','Physical',40,100,1],
     'Bullet Punch':['Steel','Physical',40,100,1],
+    'Extreme Speed':['Normal','Physical',80,100,2],
     'Fake Out':['Normal','Physical',40,100,3],
     'First Impression':['Bug','Physical',90,100,2],
     'Ice Shard':['Ice','Physical',40,100,1],
     'Jet Punch':['Water','Physical',60,100,1],
     'Mach Punch':['Fighting','Physical',40,100,1],
     'Shadow Sneak':['Ghost','Physical',40,100,1],
+    'Sucker Punch':['Dark','Physical',70,100,1],
+    'Thunderclap':['Electric','Special',70,100,1],
     'Vacuum Wave':['Fighting','Special',40,100,1]
   };
   const EXTRA_SPECIES_BY_ID=Object.fromEntries(
@@ -79,6 +83,14 @@
     if(!isBlockedPriorityMove(move))return [];
     return detectiveAbilityPool(species).filter(ability=>priorityBlockingAbility(ability,move));
   }
+  function normalizeAbilityLabel(raw=''){
+    return String(raw||'').replace(/^(ability|move): /,'').trim();
+  }
+  function priorityBlockerClueLabel(ability='', move=''){
+    const blocker=priorityBlockingAbility(ability,move);
+    if(!blocker||!move)return `${ability} revealed`;
+    return `${blocker} blocked ${move}`;
+  }
 
   const originalGetSpecies=DexRef.getSpecies.bind(DexRef);
   DexRef.getSpecies=function patchedGetSpecies(name){
@@ -103,13 +115,17 @@
   if(typeof REPLAY_MOVE_HINTS!=='undefined'){
     Object.assign(REPLAY_MOVE_HINTS,{
       'Accelerock':['Rock','Physical',1],
+      'Aqua Jet':['Water','Physical',1],
       'Bullet Punch':['Steel','Physical',1],
+      'Extreme Speed':['Normal','Physical',2],
       'Fake Out':['Normal','Physical',3],
       'First Impression':['Bug','Physical',2],
       'Ice Shard':['Ice','Physical',1],
       'Jet Punch':['Water','Physical',1],
       'Mach Punch':['Fighting','Physical',1],
       'Shadow Sneak':['Ghost','Physical',1],
+      'Sucker Punch':['Dark','Physical',1],
+      'Thunderclap':['Electric','Special',1],
       'Vacuum Wave':['Fighting','Special',1]
     });
   }
@@ -171,6 +187,68 @@
     proto.abilityRewardText=function patchedAbilityRewardText(ability){
       if(isPriorityBlockingAbility(ability))return 'blanking opposing priority attacks';
       return originalAbilityRewardText.call(this,ability);
+    };
+  }
+
+  if(typeof proto.abilityTriggeredByMove==='function'){
+    const originalAbilityTriggeredByMove=proto.abilityTriggeredByMove;
+    proto.abilityTriggeredByMove=function patchedAbilityTriggeredByMove(ability,move=''){
+      if(priorityBlockingAbility(ability,move))return true;
+      return originalAbilityTriggeredByMove.call(this,ability,move);
+    };
+  }
+
+  if(typeof proto.abilityClueLabel==='function'){
+    const originalAbilityClueLabel=proto.abilityClueLabel;
+    proto.abilityClueLabel=function patchedAbilityClueLabel(ability,move=''){
+      if(priorityBlockingAbility(ability,move))return priorityBlockerClueLabel(ability,move);
+      return originalAbilityClueLabel.call(this,ability,move);
+    };
+  }
+
+  if(typeof proto.abilityClueLabelWithProof==='function'){
+    const originalAbilityClueLabelWithProof=proto.abilityClueLabelWithProof;
+    proto.abilityClueLabelWithProof=function patchedAbilityClueLabelWithProof(ability,move='',assumeTriggered=false){
+      if(move&&(assumeTriggered||priorityBlockingAbility(ability,move))){
+        const label=priorityBlockerClueLabel(ability,move);
+        if(label!==`${ability} revealed`)return label;
+      }
+      return originalAbilityClueLabelWithProof.call(this,ability,move,assumeTriggered);
+    };
+  }
+
+  if(typeof proto.reactiveAbilityProof==='function'){
+    const originalReactiveAbilityProof=proto.reactiveAbilityProof;
+    proto.reactiveAbilityProof=function patchedReactiveAbilityProof(ability){
+      return isPriorityBlockingAbility(ability)||originalReactiveAbilityProof.call(this,ability);
+    };
+  }
+
+  if(typeof proto.extractEvidence==='function'){
+    const originalExtractEvidence=proto.extractEvidence;
+    proto.extractEvidence=function patchedExtractEvidence(event,turn){
+      if(event?.type==='-activate'&&event.target){
+        const ability=normalizeAbilityLabel(event.effect||event.from||'');
+        if(isPriorityBlockingAbility(ability)&&typeof this.ensureState==='function'){
+          const state=this.ensureState(event.target,event.details);
+          const moveEvent=Array.isArray(this.turnMoves)
+            ? [...this.turnMoves].reverse().find(entry=>entry?.move&&entry.slot&&entry.slot!==state?.slot)
+            : null;
+          const moveNameValue=String(moveEvent?.move||'').trim();
+          if(state&&moveNameValue&&isBlockedPriorityMove(moveNameValue)&&typeof this.recordAbilityReveal==='function'){
+            this.recordAbilityReveal(
+              state,
+              turn||0,
+              ability,
+              moveEvent,
+              `${state.species} revealed ${ability} by blocking ${moveNameValue}`,
+              priorityBlockerClueLabel(ability,moveNameValue),
+              {assumeReactiveMove:true}
+            );
+          }
+        }
+      }
+      return originalExtractEvidence.call(this,event,turn);
     };
   }
 })();
