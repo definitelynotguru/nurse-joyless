@@ -71,6 +71,14 @@ Sparring Lab is the main reasoning engine. It classifies the team by intent and 
 
 It reports three different score families:
 
+### Dex Integrity Guard
+
+Dex Integrity Guard prevents unsupported species from silently becoming Normal-type in type triage. If a species is known, the guard injects accurate fallback typing, stats, abilities, and common moves. If a species is still unknown, it is marked as Unknown and surfaced as unsupported instead of being counted as a fake Fighting weakness or fake Normal profile.
+
+The guard also adds final fallback coverage for common legendary / Ubers examples such as Palkia-Origin, Xerneas, Necrozma-Dusk-Mane, Yveltal, Marshadow, Noivern, Koraidon, Miraidon, Zacian-Crowned, Calyrex forms, Ho-Oh, Lugia, Kyogre, Groudon, Rayquaza, and Eternatus.
+
+This keeps weakness analysis honest: accurate when species data exists, explicit when data is missing.
+
 | Score family | Meaning |
 |---|---|
 | Identity Confidence | How strongly the team resembles an archetype |

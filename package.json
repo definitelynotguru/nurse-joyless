@@ -10,7 +10,7 @@
     "server-smoke": "node --check server.js && node test-server.js",
     "smoke": "node test-smoke.js",
     "dom-smoke": "node test-dom-smoke.js",
-    "test": "npm run check && npm run server-smoke && npm run smoke && npm run dom-smoke && npm run v33-audit && npm run v35-gauntlet && npm run v35-legacy && npm run weather-identity && npm run hidden-info && npm run validation-fixes && npm run tera-plan && npm run submission-polish",
+    "test": "npm run check && npm run server-smoke && npm run smoke && npm run dom-smoke && npm run v33-audit && npm run v35-gauntlet && npm run v35-legacy && npm run weather-identity && npm run hidden-info && npm run validation-fixes && npm run tera-plan && npm run dex-integrity && npm run submission-polish",
     "v33-audit": "node test-v33-reasoner.js",
     "v35-gauntlet": "node test-v35-gauntlet.js",
     "v35-legacy": "node test-v35-legacy-and-suggestions.js",
@@ -18,6 +18,7 @@
     "hidden-info": "node test-hidden-info-reasoning.js && node test-replay-ability-upgrades.js && node test-choice-lock-timeline-upgrades.js && node test-item-transfer-timeline-upgrades.js && node test-replay-neutralizing-gas-end.js && node test-replay-mycilium-might.js && node test-move-immunity-reasoning.js && node test-move-immunity-contradictions.js && node test-fallback-ability-fixes.js && node test-priority-blocking-upgrades.js",
     "validation-fixes": "node test-validation-fixes.js",
     "tera-plan": "node test-tera-plan.js",
+    "dex-integrity": "node --check src/dex-integrity-guard.js && node test-dex-integrity-guard.js",
     "submission-polish": "node --check src/submission-polish.js && node test-submission-polish.js"
   }
 }
