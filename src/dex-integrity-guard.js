@@ -33,7 +33,10 @@
     Lunala: [['Psychic', 'Ghost'], [137, 113, 89, 137, 107, 97]],
     Solgaleo: [['Psychic', 'Steel'], [137, 137, 107, 113, 89, 97]],
     Giratina: [['Ghost', 'Dragon'], [150, 100, 120, 100, 120, 90]],
-    Togekiss: [['Fairy', 'Flying'], [85, 50, 95, 120, 115, 80]]
+    Togekiss: [['Fairy', 'Flying'], [85, 50, 95, 120, 115, 80]],
+    'Greninja-Ash': [['Water', 'Dark'], [72, 145, 67, 153, 71, 132]],
+    Incineroar: [['Fire', 'Dark'], [95, 115, 90, 80, 90, 60]],
+    'Tapu Koko': [['Electric', 'Fairy'], [70, 115, 85, 95, 75, 130]]
   };
 
   const EXTRA_ABILITIES = {
@@ -67,7 +70,10 @@
     Lunala: {0: 'Shadow Shield'},
     Solgaleo: {0: 'Full Metal Body'},
     Giratina: {0: 'Pressure', H: 'Telepathy'},
-    Togekiss: {0: 'Hustle', 1: 'Serene Grace', H: 'Super Luck'}
+    Togekiss: {0: 'Hustle', 1: 'Serene Grace', H: 'Super Luck'},
+    'Greninja-Ash': {0: 'Battle Bond'},
+    Incineroar: {0: 'Blaze', H: 'Intimidate'},
+    'Tapu Koko': {0: 'Electric Surge', H: 'Telepathy'}
   };
 
   const EXTRA_MOVES = {
@@ -97,7 +103,9 @@
     'Hone Claws': ['Dark', 'Status', 0, 100],
     'Heat Wave': ['Fire', 'Special', 95, 90],
     'Air Slash': ['Flying', 'Special', 75, 95],
-    'Hurricane': ['Flying', 'Special', 110, 70]
+    'Hurricane': ['Flying', 'Special', 110, 70],
+    'Water Shuriken': ['Water', 'Special', 20, 100, 1],
+    'Flare Blitz': ['Fire', 'Physical', 120, 100]
   };
 
   const EXTRA_ALIASES = {
@@ -128,7 +136,11 @@
     calyrexice: 'Calyrex-Ice',
     calyrexi: 'Calyrex-Ice',
     kyuremwhite: 'Kyurem-White',
-    kyuremblack: 'Kyurem-Black'
+    kyuremblack: 'Kyurem-Black',
+    greninjaash: 'Greninja-Ash',
+    ashgreninja: 'Greninja-Ash',
+    tapukoko: 'Tapu Koko',
+    koko: 'Tapu Koko'
   };
 
   const TRUSTED_LEARNSETS = {
@@ -382,15 +394,29 @@
       const currentTeam = typeof team !== 'undefined' ? team : [];
       const report = analyzeTypeTriage(currentTeam);
       const unsupported = report.unsupported.filter(Boolean);
-      const old = document.querySelectorAll('.dex-integrity-warning');
-      old.forEach(node => node.remove());
-      if (!unsupported.length) return;
+      const old = Array.from(document.querySelectorAll('.dex-integrity-warning'));
+      if (!unsupported.length) {
+        old.forEach(node => node.remove());
+        return;
+      }
       const target = document.getElementById('diagnosis') || document.getElementById('archetypeResults');
       if (!target) return;
+
+      const message = `Dex integrity guard: ${unsupported.join(', ')} could not be resolved, so it was not counted as fake Normal-type weakness data. Add fallback Dex data before trusting detailed triage for those slots.`;
+      const existing = old.find(node => node.parentNode === target) || null;
+      old.forEach(node => {
+        if (node !== existing) node.remove();
+      });
+
+      if (existing) {
+        if (existing.textContent !== message) existing.textContent = message;
+        return;
+      }
+
       const note = document.createElement('div');
       note.className = 'dex-integrity-warning';
       note.style.cssText = 'margin:10px 0;padding:10px 12px;border:1px solid #ffd166;color:#ffd166;background:rgba(255,209,102,.08);font-size:12px;line-height:1.45';
-      note.textContent = `Dex integrity guard: ${unsupported.join(', ')} could not be resolved, so it was not counted as fake Normal-type weakness data. Add fallback Dex data before trusting detailed triage for those slots.`;
+      note.textContent = message;
       target.prepend(note);
     } catch (_) {}
   }
@@ -415,11 +441,12 @@
     installMutationWarnings();
     showIntegrityWarning();
     root.NURSE_JOYLESS_DEX_INTEGRITY_GUARD = {
-      version: 'v3.5-final',
+      version: 'v3.5.1-freeze-guard',
       extraSpecies: Object.keys(EXTRA_SPECIES),
       analyzeTypeTriage,
       getSpecies: name => (typeof DexAdapter !== 'undefined' && DexAdapter.getSpecies ? DexAdapter.getSpecies(name) : getLocalSpeciesData(name)),
-      isUnknownSpeciesName
+      isUnknownSpeciesName,
+      showIntegrityWarning
     };
   }
 
