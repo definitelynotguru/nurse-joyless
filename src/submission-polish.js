@@ -1,6 +1,7 @@
 (function(){
   const root = typeof window !== 'undefined' ? window : globalThis;
   const $ = id => (typeof document !== 'undefined' ? document.getElementById(id) : null);
+
   const clean = value => String(value || '')
     .replace(/\s+\n/g, '\n')
     .replace(/\n\s+/g, '\n')
@@ -36,6 +37,25 @@
     return SOFT_VALIDATION_PATTERNS.some(pattern => pattern.test(text));
   }
 
+  function buildValidationReasoning(row, hardCount, warningCount) {
+    if (hardCount > 0) {
+      return {
+        state: 'hard-blocker',
+        note: 'Hard validation blockers remain, so this set still needs a direct legality fix.'
+      };
+    }
+    if (warningCount > 0) {
+      return {
+        state: 'warning-only',
+        note: 'Only soft validation warnings remain. The set is still usable, but some checks rely on fallback or manual confirmation.'
+      };
+    }
+    return {
+      state: 'clean',
+      note: 'No validation blockers remain in the current offline pass.'
+    };
+  }
+
   function normalizeValidationRows(rows, sourceTeam) {
     if (!Array.isArray(rows)) return rows;
     return rows.map((row, index) => {
@@ -57,6 +77,12 @@
       const hardCount = ['hardIssues', 'hard', 'errors', 'issues']
         .reduce((sum, key) => sum + (Array.isArray(row[key]) ? row[key].length : 0), 0);
       const warningCount = row.warnings.length;
+      const reasoning = buildValidationReasoning(row, hardCount, warningCount);
+
+      row.hardIssueCount = hardCount;
+      row.warningCount = warningCount;
+      row.validationState = reasoning.state;
+      row.validationReasoning = reasoning.note;
 
       if (hardCount === 0) row.status = warningCount ? 'WARNING' : 'VALID';
       if (hardCount === 0 && String(row.confidence || '').toLowerCase() === 'low') {
@@ -97,7 +123,7 @@
     const status = clean(($('status') && $('status').innerText) || '');
     const detail = clean(($('statusText') && $('statusText').innerText) || '');
     if (!status && !detail) return '';
-    return `${status}${detail ? ` — ${detail}` : ''}`;
+    return `${status}${detail ? ` - ${detail}` : ''}`;
   }
 
   function sectionBlock(title, body, maxLength = 3600) {
@@ -105,6 +131,54 @@
     if (!text) return '';
     const clipped = text.length > maxLength ? `${text.slice(0, maxLength).trim()}\n...` : text;
     return `\n## ${title}\n\n\`\`\`text\n${clipped}\n\`\`\`\n`;
+  }
+
+  function collectConfidenceNotes() {
+    const notes = [];
+    const validation = panelText('validationResults');
+    const detective = panelText('detective');
+    const replay = panelText('replayResults');
+
+    if (validation) {
+      if (/manual verification|legality is unconfirmed|warning/i.test(validation) && !/unknown move:|invalid ability|ev total|ev stat/i.test(validation)) {
+        notes.push('Validation is warning-only right now: the offline pass found ambiguity or fallback-data gaps, not a proven illegal set.');
+      } else if (/unknown move:|invalid ability|ev total|ev stat|assault vest|invalid tera type/i.test(validation)) {
+        notes.push('Validation still contains hard blockers, so at least one set needs a direct legality fix before the build is clean.');
+      } else if (/valid/i.test(validation)) {
+        notes.push('Validation is currently clean in the offline pass, with no remaining hard blockers surfaced in the visible panel.');
+      }
+    }
+
+    if (detective) {
+      if (/replay clues/i.test(detective)) {
+        notes.push('Hidden-info output is replay-backed here, but it is still clue-driven rather than a full certainty proof.');
+      } else if (/blocked/i.test(detective)) {
+        notes.push('The hidden-info lane is fully contradicted for at least one modeled line, which is useful negative evidence rather than a blind guess.');
+      } else if (/high confidence/i.test(detective)) {
+        notes.push('The hidden-info read is currently high confidence, so the export can lean on it as a strong but still model-bounded inference.');
+      } else if (/medium confidence|low confidence/i.test(detective)) {
+        notes.push('The hidden-info read is still ambiguous, so the export should treat it as a constrained shortlist instead of a solved reveal.');
+      }
+    } else {
+      notes.push('No hidden-info detective snapshot is loaded into this export yet, so opponent-set claims remain outside the current evidence bundle.');
+    }
+
+    if (!replay || /paste a replay log|no replay/i.test(replay)) {
+      notes.push('No replay evidence is attached yet, so this export is grounded in team and panel analysis rather than battle-log proof.');
+    }
+
+    return [...new Set(notes)];
+  }
+
+  function confidenceNotesBlock() {
+    const notes = collectConfidenceNotes();
+    if (!notes.length) return '';
+    return [
+      '\n## Confidence Notes',
+      '',
+      ...notes.map(note => `- ${note}`),
+      ''
+    ].join('\n');
   }
 
   function submissionSnapshotMarkdown(original) {
@@ -127,6 +201,8 @@
       '5. Use Suggested Additions for patch lanes and quick swaps.',
       '6. Use KO Actuary for OHKO / 2HKO / 3HKO and reverse-KO risk.',
       '7. Paste replay evidence into Replay Observer and open Hidden Info Detective.',
+      '',
+      confidenceNotesBlock(),
       '',
       teamImport ? `### Team Import\n\n\`\`\`text\n${teamImport}\n\`\`\`` : '',
       sectionBlock('Sparring Lab Output', panelText('archetypeResults')),
@@ -166,7 +242,7 @@
     try {
       if (!document || document.querySelector('.submission-demo-banner')) return;
       const host = document.querySelector('.hero-copy .actions') || document.querySelector('.hero-copy');
-      if (!host) return;
+      if (!host || !host.parentNode || !document.createElement) return;
       const banner = document.createElement('div');
       banner.className = 'submission-demo-banner';
       banner.innerHTML = [
@@ -194,24 +270,6 @@
       if (output && /select an agent/i.test(output.textContent || '')) {
         output.innerHTML = '<div class="agent-welcome"><strong>Local agents ready.</strong><br>Use Local mode for the judged demo. Kimi/Ollama Cloud are optional BYOK paths and may require a proxy on GitHub Pages.</div>';
       }
-
-      document.addEventListener('click', event => {
-        const modeButton = event.target && event.target.closest && event.target.closest('.mode-btn[data-mode]');
-        if (!modeButton) return;
-        const mode = modeButton.getAttribute('data-mode');
-        if (mode === 'local') return;
-
-        setTimeout(() => {
-          const key = mode === 'kimi'
-            ? (($('kimiKey') && $('kimiKey').value) || localStorage.getItem('nursejoyless_kimiKey') || '')
-            : (($('ollamaKey') && $('ollamaKey').value) || localStorage.getItem('nursejoyless_ollamaKey') || '');
-          if (key) return;
-          const target = $('agentOutput');
-          if (target) {
-            target.innerHTML = `<div class="agent-welcome"><strong>${mode === 'kimi' ? 'Kimi' : 'Ollama Cloud'} is optional BYOK.</strong><br>No key is saved. The deterministic Local mode is the recommended hackathon demo path.</div>`;
-          }
-        }, 0);
-      }, true);
     } catch (err) {
       console.warn('[submission-polish] agent honesty skipped:', err.message);
     }
@@ -234,7 +292,7 @@
       const panels = ['archetypeResults', 'synergyResults'].map($).filter(Boolean);
       panels.forEach(panel => {
         if (!/Tera Plan/i.test(panel.textContent || '')) return;
-        if (panel.querySelector('.tera-one-resource-note')) return;
+        if (panel.querySelector && panel.querySelector('.tera-one-resource-note')) return;
         const note = document.createElement('div');
         note.className = 'tera-one-resource-note';
         note.textContent = 'Tera is scored as a single shared resource: one defensive patch or one offensive conversion, not six permanent type changes.';
@@ -245,11 +303,6 @@
 
     try {
       addReminder();
-      const observer = new MutationObserver(addReminder);
-      ['archetypeResults', 'synergyResults'].forEach(id => {
-        const panel = $(id);
-        if (panel) observer.observe(panel, { childList: true, subtree: true, characterData: true });
-      });
     } catch (_) {}
   }
 
@@ -263,10 +316,6 @@
     root.NURSE_JOYLESS_SUBMISSION_POLISH = true;
   }
 
-  if (typeof document !== 'undefined') {
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', installSubmissionPolish);
-    else installSubmissionPolish();
-  } else {
-    installSubmissionPolish();
-  }
+  if (typeof document !== 'undefined') installSubmissionPolish();
+  else installSubmissionPolish();
 })();
