@@ -9,7 +9,26 @@
   if(typeof originalBuild!=='function'&& !proto)return;
 
   const CHOICE_ITEMS=new Set(['Choice Band','Choice Specs','Choice Scarf']);
-  const TRANSFER_MOVES=new Set(['Trick','Switcheroo']);
+  const ITEM_TRANSFER_SOURCES=new Set([
+    'move: Bestow',
+    'move: Recycle',
+    'move: Switcheroo',
+    'move: Trick',
+    'ability: Harvest',
+    'ability: Magician',
+    'ability: Pickpocket',
+    'ability: Symbiosis'
+  ]);
+  const SOURCE_LABEL_OVERRIDES={
+    'move: Bestow':'Bestow',
+    'move: Recycle':'Recycle',
+    'move: Switcheroo':'Switcheroo',
+    'move: Trick':'Trick',
+    'ability: Harvest':'Harvest',
+    'ability: Magician':'Magician',
+    'ability: Pickpocket':'Pickpocket',
+    'ability: Symbiosis':'Symbiosis'
+  };
 
   function itemName(value=''){
     return String(value||'').trim();
@@ -19,16 +38,23 @@
     return CHOICE_ITEMS.has(itemName(value));
   }
 
-  function transferMoveName(event={}){
-    const raw=String(event?.raw||'');
-    const rawFrom=raw
-      .split('|')
-      .filter(Boolean)
-      .find(part=>part.startsWith('[from]'))
-      ?.replace('[from] ','')||'';
-    const from=String(event?.from||rawFrom).trim();
-    const move=from.match(/^move: (.+)$/)?.[1]||'';
-    return TRANSFER_MOVES.has(move)?move:'';
+  function normalizeSourceTag(value=''){
+    return String(value||'').trim().replace(/^\[from\]\s*/,'');
+  }
+
+  function itemSourceTag(event={}){
+    const rawParts=String(event?.raw||'').split('|').filter(Boolean);
+    const rawFrom=rawParts.find(part=>part.startsWith('[from]'))||'';
+    return normalizeSourceTag(event?.from||rawFrom);
+  }
+
+  function trackedItemSource(event={}){
+    const source=itemSourceTag(event);
+    return ITEM_TRANSFER_SOURCES.has(source)?source:'';
+  }
+
+  function trackedSourceLabel(source=''){
+    return SOURCE_LABEL_OVERRIDES[source]||source.replace(/^(move|ability): /,'').trim();
   }
 
   function transferredItemName(event={}){
@@ -47,10 +73,13 @@
   }
 
   function transferTimelineNote(input={}){
-    const move=itemName(input?.itemTransferMove)||'Trick';
+    const source=trackedSourceLabel(itemName(input?.itemTransferSource))||itemName(input?.itemTransferMove)||'a replay item event';
     const removed=itemName(input?.removedItem)||'the old item';
     const gained=currentTransferredItem(input)||itemName(input?.revealedItem)||'the new item';
-    return `${move} swapped away ${removed} and revealed ${gained} as the current item, so the detective now treats the received item as live instead of leaving the slot stuck on the old timeline.`;
+    if(itemName(input?.removedItem)){
+      return `${source} replaced ${removed} with ${gained} as the current item, so the detective now treats the received item as live instead of leaving the slot stuck on the old timeline.`;
+    }
+    return `${source} revealed ${gained} as the current item, so the detective now reopens the slot instead of leaving it anchored to the old empty-item timeline.`;
   }
 
   function uniqueNotes(list=[]){
@@ -80,6 +109,7 @@
         read.input.revealedItem=gained;
         read.input.itemGone=false;
         read.input.currentTransferredItem=gained;
+        if(input?.itemTransferSource)read.input.itemTransferSource=input.itemTransferSource;
         if(clearHistoricalChoice)read.input.clearedHistoricalChoiceLock=true;
       }
       addTransferReadNote(read,input);
@@ -97,26 +127,28 @@
 
   proto.extractEvidence=function patchedExtractEvidence(event,turn){
     const result=originalExtractEvidence.call(this,event,turn);
-    const move=transferMoveName(event);
-    if(!move||!event?.target)return result;
+    const source=trackedItemSource(event);
+    if(!source||!event?.target)return result;
     const state=this.ensureState?.(event.target,event.details);
     const item=transferredItemName(event);
     if(!state||!item)return result;
     if(event.type==='-enditem'){
       state.removedItem=item;
       state.itemGone=true;
-      state.itemTransferMove=move;
+      state.itemTransferMove=trackedSourceLabel(source);
+      state.itemTransferSource=source;
       state.lastTransferredOutItem=item;
     }else if(event.type==='-item'){
       state.acquiredItem=item;
       state.revealedItem=item;
       state.itemGone=false;
-      state.itemTransferMove=move;
+      state.itemTransferMove=trackedSourceLabel(source);
+      state.itemTransferSource=source;
       if(typeof this.addEvidence==='function'){
-        this.addEvidence(state,turn||0,'reveal',`${state.species} received ${item} from ${move}`,'Transferred item confirmed',4,{hard:true,revealedItem:item});
+        this.addEvidence(state,turn||0,'reveal',`${state.species} received ${item} from ${trackedSourceLabel(source)}`,'Transferred item confirmed',4,{hard:true,revealedItem:item});
       }
       if(typeof this.addClueObservation==='function'){
-        this.addClueObservation(state,{turn:turn||0,label:`${move} revealed ${item} as the new item`});
+        this.addClueObservation(state,{turn:turn||0,label:`${trackedSourceLabel(source)} revealed ${item} as the new item`});
       }
     }
     return result;
