@@ -18,7 +18,10 @@ const context = {
   },
   REPLAY_MOVE_HINTS: {
     'Aqua Jet': ['Water', 'Physical', 1],
-    'Extreme Speed': ['Normal', 'Physical', 2]
+    'Extreme Speed': ['Normal', 'Physical', 2],
+    'Helping Hand': ['Normal', 'Status', 5],
+    Protect: ['Normal', 'Status', 4],
+    Quash: ['Dark', 'Status', 1]
   },
   DexAdapter: {
     id(value) {
@@ -45,6 +48,9 @@ const context = {
   moveMeta(move) {
     const meta = context.REPLAY_MOVE_HINTS[String(move || '').trim()];
     return meta ? [meta[0], meta[1], 0, 100, meta[2]] : null;
+  },
+  moveCategory(move) {
+    return context.REPLAY_MOVE_HINTS[String(move || '').trim()]?.[1] || 'Status';
   },
   moveBlockingAbility() {
     return '';
@@ -152,6 +158,10 @@ const liveThunderbolt = context.dmg({ species: 'Zapdos' }, gyarados, 'Thunderbol
 assert(!liveThunderbolt.blockedBy, 'non-priority moves should stay live');
 assert(liveThunderbolt.maxd > 0, 'non-priority moves should keep their normal damage rolls');
 
+const liveProtect = context.dmg({ species: 'Farigiraf' }, farigiraf, 'Protect');
+assert(!liveProtect.blockedBy, 'self-targeting support priority should not be treated as an Armor Tail damage block');
+assert(liveProtect.maxd > 0, 'self-targeting support priority should keep the normal calculator path');
+
 const parser = new context.ReplayParser();
 const farigirafBlocked = parser.moveBlockedAbilities({ species: 'Farigiraf' }, 'Extreme Speed');
 assert(farigirafBlocked.includes('Armor Tail'), 'landed Extreme Speed should rule out Armor Tail in replay contradictions');
@@ -161,6 +171,15 @@ assert(bruxishBlocked.includes('Dazzling'), 'landed Aqua Jet should rule out Daz
 
 const nonPriorityBlocked = parser.moveBlockedAbilities({ species: 'Farigiraf' }, 'Thunderbolt');
 assert(!nonPriorityBlocked.includes('Armor Tail'), 'non-priority moves should not fabricate priority-blocking contradictions');
+
+const supportBlocked = parser.moveBlockedAbilities({ species: 'Farigiraf' }, 'Helping Hand');
+assert(!supportBlocked.includes('Armor Tail'), 'self or ally support priority should not fabricate Armor Tail contradictions');
+
+const protectBlocked = parser.moveBlockedAbilities({ species: 'Farigiraf' }, 'Protect');
+assert(!protectBlocked.includes('Armor Tail'), 'Protect should not count as blockable priority against Armor Tail');
+
+const quashBlocked = parser.moveBlockedAbilities({ species: 'Farigiraf' }, 'Quash');
+assert(quashBlocked.includes('Armor Tail'), 'foe-targeting priority status like Quash should still count as blocked by Armor Tail');
 
 const bypassProtected = parser.moveAbilityBypassProtectedAbilities({ species: 'Farigiraf', bypassAbility: 'Mold Breaker' }, 'Extreme Speed');
 assert(bypassProtected.includes('Armor Tail'), 'bypass notes should still know Armor Tail was the ignored protection');
@@ -184,8 +203,13 @@ assert(parser.revealed[0].label === 'Armor Tail blocked Extreme Speed', 'blocked
 assert(parser.revealed[0].state.abilityHints.includes('Armor Tail'), 'blocked-priority replay events should anchor the live ability hint');
 
 parser.revealed = [];
-parser.turnMoves = [{ slot: 'p1a', species: 'Zapdos', move: 'Thunderbolt' }];
+parser.turnMoves = [{ slot: 'p1a', species: 'Farigiraf', move: 'Helping Hand' }];
 parser.extractEvidence({ type: '-activate', target: 'p2a: Farigiraf', effect: 'ability: Armor Tail' }, 4);
+assert(parser.revealed.length === 0, 'support priority activate events should not fabricate a priority-blocker reveal');
+
+parser.revealed = [];
+parser.turnMoves = [{ slot: 'p1a', species: 'Zapdos', move: 'Thunderbolt' }];
+parser.extractEvidence({ type: '-activate', target: 'p2a: Farigiraf', effect: 'ability: Armor Tail' }, 5);
 assert(parser.revealed.length === 0, 'non-priority activate events should not fabricate a priority-blocker reveal');
 
 console.log('[OK] priority blocking upgrades passed');
