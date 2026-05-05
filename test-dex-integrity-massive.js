@@ -8,7 +8,7 @@ function extractConst(name) {
   const re = new RegExp(`const ${name}=([^;]+);`, 's');
   const m = appSrc.match(re);
   if (!m) throw new Error(`Cannot extract ${name}`);
-  return eval('(' + m[1] + ')');
+  return vm.runInNewContext('(' + m[1] + ')', {});
 }
 
 const TYPES  = extractConst('TYPES');
@@ -35,6 +35,7 @@ const context = {
   FALLBACK_ABILITIES: {},
   MOVES: {},
   REPLAY_MOVE_HINTS: {},
+  id: s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, ''),
   DexAdapter: {
     resolveSpeciesName(name){ return String(name || '').replace(/\b\w/g, c => c.toUpperCase()); },
     getSpecies(name){
@@ -66,7 +67,7 @@ if (!guard) throw new Error('Guard failed to install');
 const extraSpeciesMatch = guardSrc.match(/const EXTRA_SPECIES = \{([^]*?)\};/);
 let EXTRA_SPECIES = {};
 if (extraSpeciesMatch) {
-  EXTRA_SPECIES = eval('({' + extraSpeciesMatch[1] + '})');
+  EXTRA_SPECIES = vm.runInNewContext('({' + extraSpeciesMatch[1] + '})', {});
 }
 context.P = { ...context.P, ...EXTRA_SPECIES };
 

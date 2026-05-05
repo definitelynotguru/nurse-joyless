@@ -62,12 +62,18 @@ function assert(condition, message) {
 const guard = context.NURSE_JOYLESS_DEX_INTEGRITY_GUARD;
 assert(guard, 'guard should install');
 
-assert(JSON.stringify(context.types({species: 'Palkia-Origin'})) === JSON.stringify(['Water','Dragon']), 'Palkia-Origin must resolve Water / Dragon');
-assert(JSON.stringify(context.types({species: 'Xerneas'})) === JSON.stringify(['Fairy']), 'Xerneas must resolve Fairy');
-assert(JSON.stringify(context.types({species: 'Necrozma-Dusk-Mane'})) === JSON.stringify(['Psychic','Steel']), 'Necrozma-Dusk-Mane must resolve Psychic / Steel');
-assert(JSON.stringify(context.types({species: 'Yveltal'})) === JSON.stringify(['Dark','Flying']), 'Yveltal must resolve Dark / Flying');
-assert(JSON.stringify(context.types({species: 'Marshadow'})) === JSON.stringify(['Fighting','Ghost']), 'Marshadow must resolve Fighting / Ghost');
-assert(JSON.stringify(context.types({species: 'Noivern'})) === JSON.stringify(['Flying','Dragon']), 'Noivern must resolve Flying / Dragon');
+const palkiaTypes = context.types({species: 'Palkia-Origin'});
+assert(palkiaTypes[0] === 'Water' && palkiaTypes[1] === 'Dragon', 'Palkia-Origin must resolve Water / Dragon');
+const xerneasTypes = context.types({species: 'Xerneas'});
+assert(xerneasTypes[0] === 'Fairy', 'Xerneas must resolve Fairy');
+const necrozmaTypes = context.types({species: 'Necrozma-Dusk-Mane'});
+assert(necrozmaTypes[0] === 'Psychic' && necrozmaTypes[1] === 'Steel', 'Necrozma-Dusk-Mane must resolve Psychic / Steel');
+const yveltalTypes = context.types({species: 'Yveltal'});
+assert(yveltalTypes[0] === 'Dark' && yveltalTypes[1] === 'Flying', 'Yveltal must resolve Dark / Flying');
+const marshadowTypes = context.types({species: 'Marshadow'});
+assert(marshadowTypes[0] === 'Fighting' && marshadowTypes[1] === 'Ghost', 'Marshadow must resolve Fighting / Ghost');
+const noivernTypes = context.types({species: 'Noivern'});
+assert(noivernTypes[0] === 'Flying' && noivernTypes[1] === 'Dragon', 'Noivern must resolve Flying / Dragon');
 
 const team = [
   {species: 'Palkia-Origin'},

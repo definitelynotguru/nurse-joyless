@@ -223,20 +223,20 @@ const DexAdapter={dex:null,useDex:false,learnsets:null,init(){if(typeof window!=
   'rotommow':'Rotom-Mow','rotomm':'Rotom-Mow','rotom-m':'Rotom-Mow',
   'rotomfrost':'Rotom-Frost','rotomfr':'Rotom-Frost','rotom-fr':'Rotom-Frost',
   // Therian forms
-  'landorus-therian':'Landorus-Therian','landorust':'Landorus-Therian','landorus-t':'Landorus-Therian','lando-t':'Landorus-Therian','landot':'Landorus-Therian',
-  'tornadus-therian':'Tornadus-Therian','tornadust':'Tornadus-Therian','tornadus-t':'Tornadus-Therian','torn-t':'Tornadus-Therian','tornadustherian':'Tornadus-Therian',
-  'thundurus-therian':'Thundurus-Therian','thundurust':'Thundurus-Therian','thundurus-t':'Thundurus-Therian','thund-t':'Thundurus-Therian','thundurustherian':'Thundurus-Therian',
+  'landorustherian':'Landorus-Therian','landorust':'Landorus-Therian','landorus-t':'Landorus-Therian','lando-t':'Landorus-Therian','landot':'Landorus-Therian',
+  'tornadus-therian':'Tornadus-Therian','tornadust':'Tornadus-Therian','tornadus-t':'Tornadus-Therian','tornt':'Tornadus-Therian','tornadustherian':'Tornadus-Therian',
+  'thundurus-therian':'Thundurus-Therian','thundurust':'Thundurus-Therian','thundurus-t':'Thundurus-Therian','thundt':'Thundurus-Therian','thundurustherian':'Thundurus-Therian',
   // Legendary forms
-  'giratina-origin':'Giratina-Origin','giratinao':'Giratina-Origin','giratina-o':'Giratina-Origin',
+  'giratinaorigin':'Giratina-Origin','giratinao':'Giratina-Origin','giratina-o':'Giratina-Origin',
   // Urshifu
-  'urshifu-rapid-strike':'Urshifu-Rapid-Strike','urshifu-rapid':'Urshifu-Rapid-Strike','urshifu-r':'Urshifu-Rapid-Strike','urshifurs':'Urshifu-Rapid-Strike','urshifurapid':'Urshifu-Rapid-Strike',
+  'urshifurapidstrike':'Urshifu-Rapid-Strike','urshifu-rapid':'Urshifu-Rapid-Strike','urshifur':'Urshifu-Rapid-Strike','urshifurs':'Urshifu-Rapid-Strike','urshifurapid':'Urshifu-Rapid-Strike',
   // Ogerpon forms
-  'ogerpon-wellspring':'Ogerpon-Wellspring','ogerponwellspring':'Ogerpon-Wellspring','ogerpon-w':'Ogerpon-Wellspring',
-  'ogerpon-hearthflame':'Ogerpon-Hearthflame','ogerponhearthflame':'Ogerpon-Hearthflame','ogerpon-hf':'Ogerpon-Hearthflame',
-  'ogerpon-cornerstone':'Ogerpon-Cornerstone','ogerponcornerstone':'Ogerpon-Cornerstone','ogerpon-cs':'Ogerpon-Cornerstone',
-  'ogerpon-teal':'Ogerpon','ogerpont':'Ogerpon','ogerpon-teal-mask':'Ogerpon',
+  'ogerpon-wellspring':'Ogerpon-Wellspring','ogerponwellspring':'Ogerpon-Wellspring','ogerponw':'Ogerpon-Wellspring',
+  'ogerpon-hearthflame':'Ogerpon-Hearthflame','ogerponhearthflame':'Ogerpon-Hearthflame','ogerponhf':'Ogerpon-Hearthflame',
+  'ogerpon-cornerstone':'Ogerpon-Cornerstone','ogerponcornerstone':'Ogerpon-Cornerstone','ogerponcs':'Ogerpon-Cornerstone',
+  'ogerponteal':'Ogerpon','ogerpont':'Ogerpon','ogerpontealmask':'Ogerpon',
   // Tauros Paldea
-  'tauros-paldea':'Tauros-Paldea-Combat','tauros-paldea-combat':'Tauros-Paldea-Combat','tauros-paldea-blaze':'Tauros-Paldea-Blaze','tauros-paldea-aqua':'Tauros-Paldea-Aqua','taurospaldea':'Tauros-Paldea-Combat',
+  'tauros-paldea':'Tauros-Paldea-Combat','taurospaldeacombat':'Tauros-Paldea-Combat','taurospaldeablaze':'Tauros-Paldea-Blaze','taurospaldeaaqua':'Tauros-Paldea-Aqua','taurospaldea':'Tauros-Paldea-Combat',
   // Common nicknames
   'pult':'Dragapult','tusk':'Great Tusk','gambit':'Kingambit','valiant':'Iron Valiant','hoopau':'Hoopa-Unbound','lando':'Landorus-Therian'
 };let alias=aliases[this.id(raw)]||raw;if(this.useDex){let direct=this.dex.species.get(alias);if(direct&&direct.exists!==false&&direct.name)return direct.name;let hit=this.speciesNames().find(k=>this.id(k)===this.id(alias));if(hit)return hit}return alias.replace(/\b\w/g,c=>c.toUpperCase())},resolveMoveName(name){let raw=String(name||'').trim();if(!raw)return'';let local=keys(MOVES).find(k=>this.id(k)===this.id(raw));if(local)return local;if(this.useDex){let direct=this.dex.moves.get(raw);if(direct&&direct.exists!==false&&direct.name)return direct.name;let hit=this.moveNames().find(k=>this.id(k)===this.id(raw));if(hit)return hit}return raw},getSpecies(name){let n=this.resolveSpeciesName(name);if(this.useDex){let s=this.dex.species.get(n);if(s&&s.exists!==false&&s.baseStats)return{name:s.name,types:s.types||['Normal'],baseStats:[s.baseStats.hp,s.baseStats.atk,s.baseStats.def,s.baseStats.spa,s.baseStats.spd,s.baseStats.spe],abilities:s.abilities||{}}}return P[n]?{name:n,types:P[n][0],baseStats:P[n][1],abilities:FALLBACK_ABILITIES[n]||{}}:null},getMove(name){let n=this.resolveMoveName(name);if(this.useDex){let m=this.dex.moves.get(n);if(m&&m.exists!==false&&m.name){let acc=m.accuracy===true?100:(m.accuracy||100),extra=null,id=this.id(m.name);if(id==='bodypress')extra='def';if(['psyshock','psystrike','secretsword'].includes(id))extra='targetDef';return[m.type||'Normal',m.category||'Status',m.basePower||0,acc,m.priority||0,extra]}}return MOVES[n]||null},async loadLearnsets(){if(this.learnsets)return this.learnsets;if(!this.useDex||typeof this.dex.getLearnsets!=='function')return null;try{this.learnsets=await this.dex.getLearnsets();return this.learnsets}catch(e){return null}},async canLearn(species,move){let s=this.useDex?this.dex.species.get(species):null,m=this.useDex?this.dex.moves.get(move):null;if(!this.useDex||!s||!m||s.exists===false||m.exists===false){return {known:false,can:null,reason:'learnset data unavailable in fallback mode'}}let all=await this.loadLearnsets();let data=all?.learnsets?.[s.id]||all?.[s.id]||this.dex.data?.Learnsets?.[s.id];let learnset=data?.learnset||data;if(!learnset)return {known:false,can:null,reason:'learnset not loaded for this species'};return {known:true,can:!!learnset[m.id],reason:learnset[m.id]?'move present in learnset':'move not found in learnset'}}};

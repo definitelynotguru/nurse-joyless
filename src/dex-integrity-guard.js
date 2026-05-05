@@ -1,6 +1,6 @@
 (function(){
   const root = typeof window !== 'undefined' ? window : globalThis;
-  const id = value => String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const slugify = value => String(value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
   const EXTRA_SPECIES = {
     Noivern: [['Flying', 'Dragon'], [85, 70, 80, 97, 80, 123]],
@@ -36,7 +36,9 @@
     Togekiss: [['Fairy', 'Flying'], [85, 50, 95, 120, 115, 80]],
     'Greninja-Ash': [['Water', 'Dark'], [72, 145, 67, 153, 71, 132]],
     Incineroar: [['Fire', 'Dark'], [95, 115, 90, 80, 90, 60]],
-    'Tapu Koko': [['Electric', 'Fairy'], [70, 115, 85, 95, 75, 130]]
+    'Tapu Koko': [['Electric', 'Fairy'], [70, 115, 85, 95, 75, 130]],
+    'Kyurem-White': [['Dragon', 'Ice'], [125, 120, 90, 170, 100, 95]],
+    'Kyurem-Black': [['Dragon', 'Ice'], [125, 170, 100, 120, 90, 95]]
   };
 
   const EXTRA_ABILITIES = {
@@ -73,7 +75,9 @@
     Togekiss: {0: 'Hustle', 1: 'Serene Grace', H: 'Super Luck'},
     'Greninja-Ash': {0: 'Battle Bond'},
     Incineroar: {0: 'Blaze', H: 'Intimidate'},
-    'Tapu Koko': {0: 'Electric Surge', H: 'Telepathy'}
+    'Tapu Koko': {0: 'Electric Surge', H: 'Telepathy'},
+    'Kyurem-White': {0: 'Turboblaze'},
+    'Kyurem-Black': {0: 'Teravolt'}
   };
 
   const EXTRA_MOVES = {
@@ -143,6 +147,9 @@
     koko: 'Tapu Koko'
   };
 
+  // Trusted learnsets: manually-curated common competitive sets.
+  // These are fallback suggestions when the full dex learnset data is unavailable.
+  // Update when new formats or movepools shift significantly.
   const TRUSTED_LEARNSETS = {
     Noivern: ['Draco Meteor', 'Hurricane', 'Flamethrower', 'Roost', 'Defog', 'U-turn', 'Boomburst', 'Heat Wave'],
     'Palkia-Origin': ['Spacial Rend', 'Hydro Pump', 'Thunder', 'Fire Blast', 'Draco Meteor', 'Surf'],
@@ -152,8 +159,36 @@
     Marshadow: ['Spectral Thief', 'Close Combat', 'Shadow Sneak', 'Rock Tomb', 'Bulk Up']
   };
 
+  // Default stats for unknown species: [HP, Atk, Def, SpA, SpD, Spe]
   const UNKNOWN_STATS = [100, 100, 100, 100, 100, 100];
   const UNKNOWN_TYPE = 'Unknown';
+  const unknownSpeciesSet = new Set();
+
+  // Original references for uninstall
+  let originalNorm = null;
+  let originalTypes = null;
+  let originalValidateTeamAdvanced = null;
+  let originalResolveSpeciesName = null;
+  let originalGetSpecies = null;
+  let originalResolveMoveName = null;
+  let originalGetMove = null;
+  let mutationObserver = null;
+
+  // Build normalized key maps once to avoid repeated O(n) scans
+  const speciesKeyMap = new Map();
+  const moveKeyMap = new Map();
+  function rebuildKeyMaps() {
+    speciesKeyMap.clear();
+    moveKeyMap.clear();
+    if (typeof P !== 'undefined') {
+      Object.keys(P).forEach(name => speciesKeyMap.set(slugify(name), name));
+    }
+    Object.keys(EXTRA_SPECIES).forEach(name => speciesKeyMap.set(slugify(name), name));
+    if (typeof MOVES !== 'undefined') {
+      Object.keys(MOVES).forEach(name => moveKeyMap.set(slugify(name), name));
+    }
+    Object.keys(EXTRA_MOVES).forEach(name => moveKeyMap.set(slugify(name), name));
+  }
 
   function titleCaseSpecies(raw) {
     return String(raw || 'Unknown Species')
@@ -176,34 +211,21 @@
 
   function localSpeciesName(raw) {
     const cleaned = cleanSpeciesInput(raw);
-    const key = id(cleaned);
+    const key = slugify(cleaned);
     if (EXTRA_ALIASES[key]) return EXTRA_ALIASES[key];
-    if (typeof P !== 'undefined') {
-      const direct = Object.keys(P).find(name => id(name) === key);
-      if (direct) return direct;
-    }
-    const extra = Object.keys(EXTRA_SPECIES).find(name => id(name) === key);
-    if (extra) return extra;
+    const mapped = speciesKeyMap.get(key);
+    if (mapped) return mapped;
     return '';
   }
 
   function ensureUnknownSpecies(raw) {
     const display = titleCaseSpecies(cleanSpeciesInput(raw));
-    if (typeof P !== 'undefined' && display && !P[display]) {
-      P[display] = [[UNKNOWN_TYPE], UNKNOWN_STATS];
-    }
-    if (typeof FALLBACK_ABILITIES !== 'undefined' && display && !FALLBACK_ABILITIES[display]) {
-      FALLBACK_ABILITIES[display] = {};
-    }
+    if (display) unknownSpeciesSet.add(display);
     return display || 'Unknown Species';
   }
 
   function isUnknownSpeciesName(name) {
-    try {
-      return !!(typeof P !== 'undefined' && P[name] && Array.isArray(P[name][0]) && P[name][0].includes(UNKNOWN_TYPE));
-    } catch (_) {
-      return false;
-    }
+    return unknownSpeciesSet.has(name);
   }
 
   function addFallbackData() {
@@ -233,14 +255,10 @@
     };
   }
 
-  function patchDexAdapter() {
+  function patchResolveSpeciesName() {
     try {
-      if (typeof DexAdapter === 'undefined') return;
-      const originalResolveSpeciesName = DexAdapter.resolveSpeciesName ? DexAdapter.resolveSpeciesName.bind(DexAdapter) : null;
-      const originalGetSpecies = DexAdapter.getSpecies ? DexAdapter.getSpecies.bind(DexAdapter) : null;
-      const originalResolveMoveName = DexAdapter.resolveMoveName ? DexAdapter.resolveMoveName.bind(DexAdapter) : null;
-      const originalGetMove = DexAdapter.getMove ? DexAdapter.getMove.bind(DexAdapter) : null;
-
+      if (typeof DexAdapter === 'undefined' || !DexAdapter.resolveSpeciesName) return;
+      originalResolveSpeciesName = DexAdapter.resolveSpeciesName.bind(DexAdapter);
       DexAdapter.resolveSpeciesName = function resolveSpeciesNameWithIntegrity(name) {
         const local = localSpeciesName(name);
         if (local) return local;
@@ -252,7 +270,15 @@
         }
         return ensureUnknownSpecies(name);
       };
+    } catch (err) {
+      console.warn('[dex-integrity] resolveSpeciesName patch skipped:', err.message);
+    }
+  }
 
+  function patchGetSpecies() {
+    try {
+      if (typeof DexAdapter === 'undefined' || !DexAdapter.getSpecies) return;
+      originalGetSpecies = DexAdapter.getSpecies.bind(DexAdapter);
       DexAdapter.getSpecies = function getSpeciesWithIntegrity(name) {
         const local = getLocalSpeciesData(name);
         if (local) return local;
@@ -263,19 +289,31 @@
         const resolved = DexAdapter.resolveSpeciesName(name);
         return getLocalSpeciesData(resolved);
       };
+    } catch (err) {
+      console.warn('[dex-integrity] getSpecies patch skipped:', err.message);
+    }
+  }
 
+  function patchResolveMoveName() {
+    try {
+      if (typeof DexAdapter === 'undefined' || !DexAdapter.resolveMoveName) return;
+      originalResolveMoveName = DexAdapter.resolveMoveName.bind(DexAdapter);
       DexAdapter.resolveMoveName = function resolveMoveNameWithIntegrity(name) {
         const raw = String(name || '').trim();
-        const key = id(raw);
-        if (typeof MOVES !== 'undefined') {
-          const local = Object.keys(MOVES).find(move => id(move) === key);
-          if (local) return local;
-        }
-        const extra = Object.keys(EXTRA_MOVES).find(move => id(move) === key);
-        if (extra) return extra;
+        const key = slugify(raw);
+        const mapped = moveKeyMap.get(key);
+        if (mapped) return mapped;
         return originalResolveMoveName ? originalResolveMoveName(name) : raw;
       };
+    } catch (err) {
+      console.warn('[dex-integrity] resolveMoveName patch skipped:', err.message);
+    }
+  }
 
+  function patchGetMove() {
+    try {
+      if (typeof DexAdapter === 'undefined' || !DexAdapter.getMove) return;
+      originalGetMove = DexAdapter.getMove.bind(DexAdapter);
       DexAdapter.getMove = function getMoveWithIntegrity(name) {
         const resolved = DexAdapter.resolveMoveName(name);
         if (typeof MOVES !== 'undefined' && MOVES[resolved]) return MOVES[resolved];
@@ -283,13 +321,14 @@
         return originalGetMove ? originalGetMove(name) : null;
       };
     } catch (err) {
-      console.warn('[dex-integrity] DexAdapter patch skipped:', err.message);
+      console.warn('[dex-integrity] getMove patch skipped:', err.message);
     }
   }
 
   function patchNorm() {
     try {
       if (typeof norm !== 'function' || norm.__dexIntegrityGuard) return;
+      originalNorm = norm;
       norm = function normWithDexIntegrity(value) {
         return typeof DexAdapter !== 'undefined' && DexAdapter.resolveSpeciesName
           ? DexAdapter.resolveSpeciesName(value)
@@ -304,7 +343,7 @@
   function patchTypes() {
     try {
       if (typeof types !== 'function' || types.__dexIntegrityGuard) return;
-      const originalTypes = types;
+      originalTypes = types;
       types = function typesWithDexIntegrity(monOrName) {
         const raw = typeof monOrName === 'string' ? monOrName : (monOrName && monOrName.species) || monOrName;
         const species = typeof DexAdapter !== 'undefined' && DexAdapter.getSpecies ? DexAdapter.getSpecies(raw) : getLocalSpeciesData(raw);
@@ -325,7 +364,7 @@
   function patchValidation() {
     try {
       if (typeof validateTeamAdvanced !== 'function' || validateTeamAdvanced.__dexIntegrityGuard) return;
-      const originalValidateTeamAdvanced = validateTeamAdvanced;
+      originalValidateTeamAdvanced = validateTeamAdvanced;
       validateTeamAdvanced = function validateTeamAdvancedWithDexIntegrity(sourceTeam) {
         const inputTeam = sourceTeam || (typeof team !== 'undefined' ? team : []);
         const result = originalValidateTeamAdvanced(inputTeam);
@@ -340,7 +379,7 @@
                 row[key] = row[key].filter(issue => {
                   const text = String(issue || '');
                   if (/unknown or unsupported form/i.test(text)) return false;
-                  if (/ability data unavailable/i.test(text) && Object.values(speciesData.abilities || {}).some(a => id(a) === id(mon.ability))) return false;
+                  if (/ability data unavailable/i.test(text) && Object.values(speciesData.abilities || {}).some(a => slugify(a) === slugify(mon.ability))) return false;
                   return true;
                 });
               });
@@ -351,7 +390,9 @@
             return row;
           });
         };
-        return result && typeof result.then === 'function' ? result.then(normalizeRows) : normalizeRows(result);
+        return result && typeof result.then === 'function'
+          ? result.then(normalizeRows).catch(err => { console.error('[dex-integrity] validation error:', err); return normalizeRows(result); })
+          : normalizeRows(result);
       };
       validateTeamAdvanced.__dexIntegrityGuard = true;
     } catch (err) {
@@ -377,7 +418,7 @@
       }
       typeList.forEach(attackType => {
         const mult = effectiveness(attackType, species.types);
-        if (mult == null) return;
+        if (mult === null) return;
         if (!rows[attackType]) rows[attackType] = {weak: 0, quad: 0, resist: 0, immune: 0};
         if (mult === 0) rows[attackType].immune += 1;
         else if (mult >= 4) { rows[attackType].weak += 1; rows[attackType].quad += 1; }
@@ -415,26 +456,45 @@
 
       const note = document.createElement('div');
       note.className = 'dex-integrity-warning';
-      note.style.cssText = 'margin:10px 0;padding:10px 12px;border:1px solid #ffd166;color:#ffd166;background:rgba(255,209,102,.08);font-size:12px;line-height:1.45';
       note.textContent = message;
       target.prepend(note);
-    } catch (_) {}
+    } catch (err) { console.warn('[dex-integrity] warning render failed:', err); }
   }
 
   function installMutationWarnings() {
     try {
       if (typeof MutationObserver === 'undefined' || typeof document === 'undefined') return;
-      const observer = new MutationObserver(showIntegrityWarning);
+      mutationObserver = new MutationObserver(showIntegrityWarning);
       ['diagnosis', 'archetypeResults', 'synergyResults', 'validationResults'].forEach(idValue => {
         const node = document.getElementById(idValue);
-        if (node) observer.observe(node, {childList: true, subtree: true, characterData: true});
+        if (node) mutationObserver.observe(node, {childList: true, subtree: true, characterData: true});
       });
     } catch (_) {}
   }
 
+  function uninstall() {
+    try {
+      if (originalNorm && typeof originalNorm === 'function') norm = originalNorm;
+      if (originalTypes && typeof originalTypes === 'function') types = originalTypes;
+      if (originalValidateTeamAdvanced && typeof originalValidateTeamAdvanced === 'function') validateTeamAdvanced = originalValidateTeamAdvanced;
+      if (originalResolveSpeciesName && typeof DexAdapter !== 'undefined' && DexAdapter.resolveSpeciesName) DexAdapter.resolveSpeciesName = originalResolveSpeciesName;
+      if (originalGetSpecies && typeof DexAdapter !== 'undefined' && DexAdapter.getSpecies) DexAdapter.getSpecies = originalGetSpecies;
+      if (originalResolveMoveName && typeof DexAdapter !== 'undefined' && DexAdapter.resolveMoveName) DexAdapter.resolveMoveName = originalResolveMoveName;
+      if (originalGetMove && typeof DexAdapter !== 'undefined' && DexAdapter.getMove) DexAdapter.getMove = originalGetMove;
+      if (mutationObserver) { mutationObserver.disconnect(); mutationObserver = null; }
+      if (root.NURSE_JOYLESS_DEX_INTEGRITY_GUARD) delete root.NURSE_JOYLESS_DEX_INTEGRITY_GUARD;
+    } catch (err) {
+      console.warn('[dex-integrity] uninstall failed:', err.message);
+    }
+  }
+
   function install() {
+    rebuildKeyMaps();
     addFallbackData();
-    patchDexAdapter();
+    patchResolveSpeciesName();
+    patchGetSpecies();
+    patchResolveMoveName();
+    patchGetMove();
     patchNorm();
     patchTypes();
     patchValidation();
@@ -446,7 +506,8 @@
       analyzeTypeTriage,
       getSpecies: name => (typeof DexAdapter !== 'undefined' && DexAdapter.getSpecies ? DexAdapter.getSpecies(name) : getLocalSpeciesData(name)),
       isUnknownSpeciesName,
-      showIntegrityWarning
+      showIntegrityWarning,
+      uninstall
     };
   }
 
