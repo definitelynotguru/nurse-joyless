@@ -180,6 +180,62 @@ assert(harvestState.acquiredItem === 'Sitrus Berry', 'Harvest replay events shou
 assert(harvestState.itemGone === false, 'Harvest replay events should clear stale empty-slot state');
 assert(harvestParser.clues.some(entry => /Harvest revealed Sitrus Berry as the new item/i.test(entry.label)), 'Harvest replay events should create an ability-specific clue label');
 
+const thiefParser = new context.ReplayParser();
+thiefParser.extractEvidence({
+  type: '-enditem',
+  target: 'p2a: Hydreigon',
+  item: 'Leftovers',
+  from: 'move: Thief',
+  raw: '|-enditem|p2a: Hydreigon|Leftovers|[from] move: Thief|[of] p1a: Weavile'
+}, 5);
+thiefParser.extractEvidence({
+  type: '-item',
+  target: 'p1a: Weavile',
+  item: 'Leftovers',
+  from: 'move: Thief',
+  raw: '|-item|p1a: Weavile|Leftovers|[from] move: Thief|[of] p2a: Hydreigon'
+}, 5);
+const thiefUserState = thiefParser.ensureState('p1a: Weavile');
+const thiefTargetState = thiefParser.ensureState('p2a: Hydreigon');
+assert(thiefUserState.acquiredItem === 'Leftovers', 'Thief replay events should record the stolen item on the user');
+assert(thiefUserState.revealedItem === 'Leftovers', 'Thief replay events should anchor the stolen item as the user current item');
+assert(thiefUserState.itemGone === false, 'Thief replay events should reopen the user current-item state');
+assert(thiefUserState.itemTransferSource === 'move: Thief', 'Thief replay events should preserve the theft source');
+assert(thiefTargetState.removedItem === 'Leftovers', 'Thief replay events should still preserve the victim removed item historically');
+assert(thiefParser.evidence.some(entry => entry.state === 'Weavile' && /received Leftovers from Thief/i.test(entry.text)), 'Thief replay events should add evidence for the stolen current item');
+assert(thiefParser.clues.some(entry => entry.state === 'Weavile' && /Thief revealed Leftovers as the new item/i.test(entry.label)), 'Thief replay events should create a theft-specific clue label');
+
+const covetRead = context.buildDetectiveRead({
+  itemGone: true,
+  acquiredItem: 'Heavy-Duty Boots',
+  itemTransferSource: 'move: Covet'
+});
+assert(covetRead.input.itemGone === false, 'Covet should reopen an emptied slot once the stolen item arrives');
+assert(covetRead.input.revealedItem === 'Heavy-Duty Boots', 'Covet should anchor the stolen item as the live current item');
+assert(covetRead.summary.notes.some(note => /Covet revealed Heavy-Duty Boots as the current item/i.test(note)), 'Covet should explain the reopened current-item story');
+
+const pickupRead = context.buildDetectiveRead({
+  itemGone: true,
+  acquiredItem: 'Sitrus Berry',
+  itemTransferSource: 'ability: Pickup'
+});
+assert(pickupRead.input.itemGone === false, 'Pickup should reopen an emptied slot once the found item arrives');
+assert(pickupRead.input.revealedItem === 'Sitrus Berry', 'Pickup should anchor the found item as the live current item');
+assert(pickupRead.summary.notes.some(note => /Pickup revealed Sitrus Berry as the current item/i.test(note)), 'Pickup should explain that the old empty-slot story is no longer current');
+
+const pickupParser = new context.ReplayParser();
+pickupParser.extractEvidence({
+  type: '-item',
+  target: 'p2a: Greedent',
+  item: 'Sitrus Berry',
+  from: 'ability: Pickup',
+  raw: '|-item|p2a: Greedent|Sitrus Berry|[from] ability: Pickup'
+}, 14);
+const pickupState = pickupParser.ensureState('p2a: Greedent');
+assert(pickupState.acquiredItem === 'Sitrus Berry', 'Pickup replay events should record the found item');
+assert(pickupState.itemGone === false, 'Pickup replay events should clear stale empty-slot state');
+assert(pickupParser.evidence.some(entry => /received Sitrus Berry from Pickup/i.test(entry.text)), 'Pickup replay events should add evidence for the found current item');
+
 const friskParser = new context.ReplayParser();
 friskParser.extractEvidence({
   type: '-item',
