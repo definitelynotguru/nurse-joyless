@@ -6,6 +6,27 @@
   if(!DexRef)return;
 
   const PRIORITY_BLOCKERS=new Set(['Armor Tail','Dazzling','Queenly Majesty']);
+  const NON_BLOCKABLE_PRIORITY_MOVES=new Set([
+    'Ally Switch',
+    'Baneful Bunker',
+    'Burning Bulwark',
+    'Crafty Shield',
+    'Detect',
+    'Endure',
+    'Follow Me',
+    'Helping Hand',
+    "King's Shield",
+    'Magic Coat',
+    'Mat Block',
+    'Protect',
+    'Quick Guard',
+    'Rage Powder',
+    'Silk Trap',
+    'Snatch',
+    'Spiky Shield',
+    'Spotlight',
+    'Wide Guard'
+  ]);
   const EXTRA_SPECIES={
     Farigiraf:{
       name:'Farigiraf',
@@ -60,16 +81,29 @@
     }
     return 0;
   }
+  function moveCategoryValue(move=''){
+    if(typeof moveCategory==='function'){
+      return String(moveCategory(move)||'');
+    }
+    if(typeof moveMeta==='function'){
+      return String(moveMeta(move)?.[1]||'');
+    }
+    return '';
+  }
   function isPriorityBlockingAbility(ability=''){
     return PRIORITY_BLOCKERS.has(String(ability||'').trim());
   }
-  function isBlockedPriorityMove(move=''){
-    return movePriorityValue(move)>0;
+  function isBlockablePriorityMove(move=''){
+    const name=moveName(move);
+    return movePriorityValue(name)>0&&!NON_BLOCKABLE_PRIORITY_MOVES.has(name);
+  }
+  function isDirectPriorityAttack(move=''){
+    return isBlockablePriorityMove(move)&&moveCategoryValue(move)!=='Status';
   }
   function priorityBlockingAbility(ability='', move=''){
     const name=String(ability||'').trim();
     if(!isPriorityBlockingAbility(name))return '';
-    return isBlockedPriorityMove(move)?name:'';
+    return isBlockablePriorityMove(move)?name:'';
   }
   function detectiveAbilityPool(species=''){
     if(typeof detectiveAbilities==='function')return detectiveAbilities(species)||[];
@@ -80,7 +114,7 @@
     return [...new Set((list||[]).filter(Boolean))];
   }
   function priorityBlockedAbilities(species='', move=''){
-    if(!isBlockedPriorityMove(move))return [];
+    if(!isBlockablePriorityMove(move))return [];
     return detectiveAbilityPool(species).filter(ability=>priorityBlockingAbility(ability,move));
   }
   function normalizeAbilityLabel(raw=''){
@@ -143,7 +177,7 @@
     const originalDmg=dmg;
     dmg=function patchedDmg(att,def,mv,opt={}){
       const roll=originalDmg(att,def,mv,opt);
-      const blocker=priorityBlockingAbility(roll.def?.ability,mv);
+      const blocker=isDirectPriorityAttack(mv)?priorityBlockingAbility(roll.def?.ability,mv):'';
       if(!blocker)return roll;
       return {
         ...roll,
@@ -235,7 +269,7 @@
             ? [...this.turnMoves].reverse().find(entry=>entry?.move&&entry.slot&&entry.slot!==state?.slot)
             : null;
           const moveNameValue=String(moveEvent?.move||'').trim();
-          if(state&&moveNameValue&&isBlockedPriorityMove(moveNameValue)&&typeof this.recordAbilityReveal==='function'){
+          if(state&&moveNameValue&&isBlockablePriorityMove(moveNameValue)&&typeof this.recordAbilityReveal==='function'){
             this.recordAbilityReveal(
               state,
               turn||0,
