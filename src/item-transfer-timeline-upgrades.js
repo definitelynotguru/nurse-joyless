@@ -11,21 +11,27 @@
   const CHOICE_ITEMS=new Set(['Choice Band','Choice Specs','Choice Scarf']);
   const ITEM_TRANSFER_SOURCES=new Set([
     'move: Bestow',
+    'move: Covet',
     'move: Recycle',
     'move: Switcheroo',
+    'move: Thief',
     'move: Trick',
     'ability: Harvest',
     'ability: Magician',
+    'ability: Pickup',
     'ability: Pickpocket',
     'ability: Symbiosis'
   ]);
   const SOURCE_LABEL_OVERRIDES={
     'move: Bestow':'Bestow',
+    'move: Covet':'Covet',
     'move: Recycle':'Recycle',
     'move: Switcheroo':'Switcheroo',
+    'move: Thief':'Thief',
     'move: Trick':'Trick',
     'ability: Harvest':'Harvest',
     'ability: Magician':'Magician',
+    'ability: Pickup':'Pickup',
     'ability: Pickpocket':'Pickpocket',
     'ability: Symbiosis':'Symbiosis'
   };
