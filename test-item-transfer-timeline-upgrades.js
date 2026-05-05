@@ -236,6 +236,30 @@ assert(pickupState.acquiredItem === 'Sitrus Berry', 'Pickup replay events should
 assert(pickupState.itemGone === false, 'Pickup replay events should clear stale empty-slot state');
 assert(pickupParser.evidence.some(entry => /received Sitrus Berry from Pickup/i.test(entry.text)), 'Pickup replay events should add evidence for the found current item');
 
+const refurbishRead = context.buildDetectiveRead({
+  itemGone: true,
+  acquiredItem: 'Sitrus Berry',
+  itemTransferSource: 'move: Refurbish'
+});
+assert(refurbishRead.input.itemGone === false, 'Refurbish should reopen an emptied slot once the restored item arrives');
+assert(refurbishRead.input.revealedItem === 'Sitrus Berry', 'Refurbish should anchor the restored item as the live current item');
+assert(refurbishRead.summary.notes.some(note => /Refurbish revealed Sitrus Berry as the current item/i.test(note)), 'Refurbish should explain that the restored item is now the live current-item story');
+
+const refurbishParser = new context.ReplayParser();
+refurbishParser.extractEvidence({
+  type: '-item',
+  target: 'p2a: Snorlax',
+  item: 'Sitrus Berry',
+  from: 'move: Refurbish',
+  raw: '|-item|p2a: Snorlax|Sitrus Berry|[from] move: Refurbish|[of] p2b: Rabsca'
+}, 15);
+const refurbishState = refurbishParser.ensureState('p2a: Snorlax');
+assert(refurbishState.acquiredItem === 'Sitrus Berry', 'Refurbish replay events should record the restored item');
+assert(refurbishState.revealedItem === 'Sitrus Berry', 'Refurbish replay events should treat the restored item as live current evidence');
+assert(refurbishState.itemTransferSource === 'move: Refurbish', 'Refurbish replay events should keep the authoritative source tag');
+assert(refurbishParser.evidence.some(entry => /received Sitrus Berry from Refurbish/i.test(entry.text)), 'Refurbish replay events should add evidence for the restored current item');
+assert(refurbishParser.clues.some(entry => /Refurbish revealed Sitrus Berry as the new item/i.test(entry.label)), 'Refurbish replay events should create a move-specific clue label');
+
 const friskParser = new context.ReplayParser();
 friskParser.extractEvidence({
   type: '-item',
