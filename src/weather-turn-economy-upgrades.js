@@ -52,6 +52,25 @@
     return 16+Math.max(0,setters-2)*3;
   }
 
+  function fragileSingleRainHandoffShell(profile){
+    if(profile?.drizzle?.length||profile?.weatherConflict)return false;
+    const setters=(profile?.rainSetters||[]).length;
+    const dedicatedPayoffs=(profile?.rainDedicatedPayoffs||[]).length;
+    const externalPayoffs=(profile?.rainExternalPayoffs||[]).length;
+    const handoffSetters=(profile?.rainHandoffSetters||[]).length;
+    const selfSufficientSetters=(profile?.rainSelfSufficientSetters||[]).length;
+    return setters===1
+      && dedicatedPayoffs>=3
+      && externalPayoffs>=3
+      && !handoffSetters
+      && !selfSufficientSetters;
+  }
+
+  function fragileSingleRainHandoffPenalty(profile){
+    if(!fragileSingleRainHandoffShell(profile))return 0;
+    return 14;
+  }
+
   function slowManualSunHandoffShell(profile){
     if(profile?.drought?.length||profile?.weatherConflict)return false;
     const setters=(profile?.sunSetters||[]).length;
@@ -71,6 +90,25 @@
     if(!slowManualSunHandoffShell(profile))return 0;
     const setters=(profile?.sunSetters||[]).length;
     return 14+Math.max(0,setters-2)*3;
+  }
+
+  function fragileSingleSunHandoffShell(profile){
+    if(profile?.drought?.length||profile?.weatherConflict)return false;
+    const setters=(profile?.sunSetters||[]).length;
+    const dedicatedPayoffs=(profile?.sunDedicatedPayoffs||[]).length;
+    const externalPayoffs=(profile?.sunExternalPayoffs||[]).length;
+    const handoffSetters=(profile?.sunHandoffSetters||[]).length;
+    const selfSufficientSetters=(profile?.sunSelfSufficientSetters||[]).length;
+    return setters===1
+      && dedicatedPayoffs>=3
+      && externalPayoffs>=3
+      && !handoffSetters
+      && !selfSufficientSetters;
+  }
+
+  function fragileSingleSunHandoffPenalty(profile){
+    if(!fragileSingleSunHandoffShell(profile))return 0;
+    return 12;
   }
 
   function cloneIdentityRow(row={}){
@@ -96,7 +134,7 @@
   root.detectIdentities=function patchedDetectIdentities(t=root.team,a=root.analysis,p=root.profileTeam(t,a)){
     const profile=p||root.profileTeam(t,a);
     const result=originalDetectIdentities.call(this,t,a,profile);
-    if(!slowManualRainHandoffShell(profile)&&!slowManualSunHandoffShell(profile))return result;
+    if(!slowManualRainHandoffShell(profile)&&!fragileSingleRainHandoffShell(profile)&&!slowManualSunHandoffShell(profile)&&!fragileSingleSunHandoffShell(profile))return result;
 
     const rows=(result?.all||[]).map(cloneIdentityRow);
     const rain=rows.find(row=>row.name==='Rain Offense');
@@ -108,14 +146,28 @@
       addEvidence(rain,'manual rain setters cannot hand weather turns cleanly into the payoff core');
       addEvidence(rain,'the weather plan loses too much tempo because the setters lack pivot or sacrifice handoff tools');
     }
+    if(rain&&fragileSingleRainHandoffShell(profile)){
+      rain.score=root.njCap((rain.score||0)-fragileSingleRainHandoffPenalty(profile),96);
+      addEvidence(rain,'the lone manual rain setter cannot hand weather turns cleanly into the payoff core');
+      addEvidence(rain,'one passive Rain Dance slot is carrying too much of the weather burden by itself');
+    }
     if(sun&&slowManualSunHandoffShell(profile)){
       sun.score=root.njCap((sun.score||0)-slowManualSunHandoffPenalty(profile),92);
       addEvidence(sun,'manual sun setters cannot hand weather turns cleanly into the payoff core');
       addEvidence(sun,'the weather plan loses too much tempo because the setters lack pivot or sacrifice handoff tools');
     }
+    if(sun&&fragileSingleSunHandoffShell(profile)){
+      sun.score=root.njCap((sun.score||0)-fragileSingleSunHandoffPenalty(profile),92);
+      addEvidence(sun,'the lone manual sun setter cannot hand weather turns cleanly into the payoff core');
+      addEvidence(sun,'one passive Sunny Day slot is carrying too much of the weather burden by itself');
+    }
     if(sunRoom&&slowManualSunHandoffShell(profile)){
       sunRoom.score=root.njCap((sunRoom.score||0)-slowManualSunHandoffPenalty(profile),96);
       addEvidence(sunRoom,'manual sun setters cannot hand weather turns cleanly into the payoff core');
+    }
+    if(sunRoom&&fragileSingleSunHandoffShell(profile)){
+      sunRoom.score=root.njCap((sunRoom.score||0)-fragileSingleSunHandoffPenalty(profile),96);
+      addEvidence(sunRoom,'the lone manual sun setter cannot hand weather turns cleanly into the payoff core');
     }
 
     rows.sort((left,right)=>(right.score-left.score)||((priority[right.name]||0)-(priority[left.name]||0)));
@@ -138,12 +190,26 @@
         next.issues.push({severity:'bad',title:'Manual rain turns are hard to hand off',detail:'The team has enough nominal rain payoffs, but its Rain Dance setters do not pivot, sack, or otherwise pass the weather turn cleanly into those abusers. Too many rain turns get spent rebuilding tempo instead of cashing the reward.'});
       }
     }
+    if(fragileSingleRainHandoffShell(profile)){
+      next.scores.winReliability=root.njCap((next.scores.winReliability||0)-6,92);
+      next.scores.roleCompression=root.njCap((next.scores.roleCompression||0)-4,92);
+      if(!next.issues.some(issue=>issue?.title==='Single rain setter cannot hand turns off cleanly')){
+        next.issues.push({severity:'bad',title:'Single rain setter cannot hand turns off cleanly',detail:'The team has real rain payoffs, but one passive Rain Dance slot is carrying the whole plan alone. Without pivot or sacrifice handoff tools, too many rain turns disappear before the abusers actually touch the field.'});
+      }
+    }
 
     if(slowManualSunHandoffShell(profile)){
       next.scores.winReliability=root.njCap((next.scores.winReliability||0)-6,92);
       next.scores.roleCompression=root.njCap((next.scores.roleCompression||0)-5,92);
       if(!next.issues.some(issue=>issue?.title==='Manual sun turns are hard to hand off')){
         next.issues.push({severity:'bad',title:'Manual sun turns are hard to hand off',detail:'The team has enough nominal sun payoffs, but its Sunny Day setters do not pivot, sack, or otherwise pass the weather turn cleanly into those abusers. Too many sun turns get spent regaining board position instead of turning weather into pressure.'});
+      }
+    }
+    if(fragileSingleSunHandoffShell(profile)){
+      next.scores.winReliability=root.njCap((next.scores.winReliability||0)-5,92);
+      next.scores.roleCompression=root.njCap((next.scores.roleCompression||0)-4,92);
+      if(!next.issues.some(issue=>issue?.title==='Single sun setter cannot hand turns off cleanly')){
+        next.issues.push({severity:'bad',title:'Single sun setter cannot hand turns off cleanly',detail:'The team has real sun payoffs, but one passive Sunny Day slot is carrying the whole plan alone. Without pivot or sacrifice handoff tools, too many sun turns disappear before the abusers can convert the weather.'});
       }
     }
     return next;
