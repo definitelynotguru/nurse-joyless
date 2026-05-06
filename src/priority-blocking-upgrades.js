@@ -7,6 +7,7 @@
 
   const PRIORITY_BLOCKERS=new Set(['Armor Tail','Dazzling','Queenly Majesty']);
   const NON_BLOCKABLE_PRIORITY_MOVES=new Set([
+    'After You',
     'Ally Switch',
     'Baneful Bunker',
     'Burning Bulwark',
@@ -18,6 +19,7 @@
     "King's Shield",
     'Magic Coat',
     'Mat Block',
+    'Obstruct',
     'Protect',
     'Quick Guard',
     'Rage Powder',
