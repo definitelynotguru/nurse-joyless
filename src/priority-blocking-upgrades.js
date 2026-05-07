@@ -127,6 +127,35 @@
     if(!blocker||!move)return `${ability} revealed`;
     return `${blocker} blocked ${move}`;
   }
+  function groundedTarget(target){
+    if(typeof grounded!=='function')return false;
+    try{
+      return !!grounded(target);
+    }catch(_error){
+      return false;
+    }
+  }
+  function psychicTerrainPriorityBlock(roll={},move=''){
+    if(roll?.blockedBy)return '';
+    if(String(roll?.battleState?.terrain||'')!=='psychic')return '';
+    if(!isDirectPriorityAttack(move))return '';
+    return groundedTarget(roll?.def)?'Psychic Terrain':'';
+  }
+  function zeroPriorityRoll(roll={}, blocker=''){
+    return {
+      ...roll,
+      blockedBy:blocker,
+      eff:0,
+      rolls:new Array(16).fill(0),
+      min:0,
+      maxd:0,
+      minp:0,
+      maxp:0,
+      ko:0,
+      two:0,
+      three:0
+    };
+  }
 
   const originalGetSpecies=DexRef.getSpecies.bind(DexRef);
   DexRef.getSpecies=function patchedGetSpecies(name){
@@ -180,20 +209,10 @@
     dmg=function patchedDmg(att,def,mv,opt={}){
       const roll=originalDmg(att,def,mv,opt);
       const blocker=isDirectPriorityAttack(mv)?priorityBlockingAbility(roll.def?.ability,mv):'';
-      if(!blocker)return roll;
-      return {
-        ...roll,
-        blockedBy:blocker,
-        eff:0,
-        rolls:new Array(16).fill(0),
-        min:0,
-        maxd:0,
-        minp:0,
-        maxp:0,
-        ko:0,
-        two:0,
-        three:0
-      };
+      if(blocker)return zeroPriorityRoll(roll,blocker);
+      const terrainBlocker=psychicTerrainPriorityBlock(roll,mv);
+      if(terrainBlocker)return zeroPriorityRoll(roll,terrainBlocker);
+      return roll;
     };
   }
 
