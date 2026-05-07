@@ -87,6 +87,30 @@ assert(passiveSynergy.scores.winReliability<81,'passive single-setter room shoul
 assert(passiveSynergy.scores.speedControl<80,'passive single-setter room should lose speed-control confidence');
 assert(passiveSynergy.issues.some(issue=>issue.title==='Single Trick Room setter cannot hand turns off cleanly'),'passive single-setter room should surface a dedicated synergy issue');
 
+const shallowMultiSetterRoomTeam=[
+  mon('Cresselia',{moves:['Trick Room','Moonlight','Ice Beam','Psychic'],offensiveTypes:['Ice','Psychic'],baseSpeed:85,atk:70,spa:75}),
+  mon('Hatterene',{moves:['Trick Room','Psychic Noise','Dazzling Gleam','Healing Wish'],offensiveTypes:['Psychic','Fairy'],baseSpeed:29,atk:90,spa:136}),
+  mon('Uxie',{moves:['Trick Room','Stealth Rock','Memento','U-turn'],offensiveTypes:['Psychic','Bug'],baseSpeed:95,atk:75,spa:75}),
+  mon('Ursaluna',{moves:['Facade','Headlong Rush','Fire Punch','Swords Dance'],offensiveTypes:['Normal','Ground','Fire'],baseSpeed:50,atk:140,spa:45}),
+  mon('Darkrai',{moves:['Dark Pulse','Sludge Bomb','Nasty Plot','Focus Blast'],offensiveTypes:['Dark','Poison','Fighting'],baseSpeed:125,atk:90,spa:135}),
+  mon('Iron Valiant',{moves:['Moonblast','Close Combat','Knock Off','Encore'],offensiveTypes:['Fairy','Fighting','Dark'],baseSpeed:116,atk:130,spa:120}),
+];
+
+const shallowMultiSetterProfile=ctx.profileTeam(shallowMultiSetterRoomTeam,{});
+assert(shallowMultiSetterProfile.trickRoomSetters.length===3,'shallow multi-setter room should have three setters');
+assert(shallowMultiSetterProfile.trickRoomExternalAbusers.length===1,'shallow multi-setter room should only have one outside room abuser');
+assert(shallowMultiSetterProfile.trickRoomSelfSufficientSetters.length===1,'shallow multi-setter room should only have one self-sufficient setter');
+assert(shallowMultiSetterProfile.trickRoomFastPressure.length===2,'shallow multi-setter room should still lean on two fast closers');
+const shallowMultiSetterIdentity=ctx.detectIdentities(shallowMultiSetterRoomTeam,{},shallowMultiSetterProfile);
+const shallowMultiSetterRoomRow=shallowMultiSetterIdentity.all.find(row=>row.name==='Trick Room Offense');
+assert(shallowMultiSetterIdentity.primary.name!=='Trick Room Offense','shallow multi-setter room should not keep Trick Room Offense as the primary read');
+assert(shallowMultiSetterRoomRow.score<78,'shallow multi-setter room should lose enough confidence to fall below balance');
+assert(shallowMultiSetterRoomRow.evidence.some(line=>/too few real room payoffs/i.test(line)),'shallow multi-setter room should explain the missing payoff depth');
+const shallowMultiSetterSynergy=ctx.evaluateSynergy(shallowMultiSetterRoomTeam,{},shallowMultiSetterProfile,shallowMultiSetterIdentity);
+assert(shallowMultiSetterSynergy.scores.winReliability<81,'shallow multi-setter room should lose win reliability');
+assert(shallowMultiSetterSynergy.scores.speedControl<80,'shallow multi-setter room should lose speed-control confidence');
+assert(shallowMultiSetterSynergy.issues.some(issue=>issue.title==='Multi-setter Trick Room shell lacks enough real payoffs'),'shallow multi-setter room should surface a dedicated synergy issue');
+
 const cleanHandoffRoomTeam=[
   mon('Uxie',{moves:['Trick Room','Memento','Stealth Rock','U-turn'],offensiveTypes:['Psychic','Bug'],baseSpeed:95,atk:75,spa:75}),
   mon('Kingambit',{moves:['Kowtow Cleave','Iron Head','Sucker Punch','Low Kick'],offensiveTypes:['Dark','Steel','Fighting'],baseSpeed:50,atk:135,spa:60}),
@@ -103,6 +127,7 @@ assert(cleanHandoffIdentity.primary.name==='Trick Room Offense','clean handoff r
 assert(cleanHandoffIdentity.all.find(row=>row.name==='Trick Room Offense').score===84,'clean handoff room team should keep its base room confidence');
 const cleanHandoffSynergy=ctx.evaluateSynergy(cleanHandoffRoomTeam,{},cleanHandoffProfile,cleanHandoffIdentity);
 assert(!cleanHandoffSynergy.issues.some(issue=>issue.title==='Single Trick Room setter cannot hand turns off cleanly'),'clean handoff room team should avoid the lone-setter issue');
+assert(!cleanHandoffSynergy.issues.some(issue=>issue.title==='Multi-setter Trick Room shell lacks enough real payoffs'),'clean handoff room team should avoid the multi-setter issue');
 
 const selfSufficientSetterRoomTeam=[
   mon('Hatterene',{item:'Room Service',moves:['Trick Room','Draining Kiss','Psychic Noise','Mystical Fire'],offensiveTypes:['Fairy','Psychic','Fire'],baseSpeed:29,atk:90,spa:136}),
@@ -118,5 +143,21 @@ assert(selfSufficientProfile.trickRoomSelfSufficientSetters.length===1,'self-suf
 const selfSufficientIdentity=ctx.detectIdentities(selfSufficientSetterRoomTeam,{},selfSufficientProfile);
 assert(selfSufficientIdentity.primary.name==='Trick Room Offense','self-sufficient setter room team should keep Trick Room Offense as the primary read');
 assert(selfSufficientIdentity.all.find(row=>row.name==='Trick Room Offense').score===84,'self-sufficient setter room team should keep its base room confidence');
+
+const realMultiSetterRoomTeam=[
+  mon('Uxie',{moves:['Trick Room','Memento','Stealth Rock','U-turn'],offensiveTypes:['Psychic','Bug'],baseSpeed:95,atk:75,spa:75}),
+  mon('Hatterene',{item:'Room Service',moves:['Trick Room','Draining Kiss','Psychic Noise','Mystical Fire'],offensiveTypes:['Fairy','Psychic','Fire'],baseSpeed:29,atk:90,spa:136}),
+  mon('Ursaluna',{moves:['Facade','Headlong Rush','Fire Punch','Swords Dance'],offensiveTypes:['Normal','Ground','Fire'],baseSpeed:50,atk:140,spa:45}),
+  mon('Kingambit',{moves:['Kowtow Cleave','Iron Head','Sucker Punch','Low Kick'],offensiveTypes:['Dark','Steel','Fighting'],baseSpeed:50,atk:135,spa:60}),
+  mon('Iron Hands',{moves:['Drain Punch','Wild Charge','Heavy Slam','Swords Dance'],offensiveTypes:['Fighting','Electric','Steel'],baseSpeed:50,atk:140,spa:68}),
+  mon('Torkoal',{moves:['Lava Plume','Rapid Spin','Yawn','Stealth Rock'],offensiveTypes:['Fire'],baseSpeed:20,atk:85,spa:85}),
+];
+
+const realMultiSetterProfile=ctx.profileTeam(realMultiSetterRoomTeam,{});
+assert(realMultiSetterProfile.trickRoomSetters.length===2,'real multi-setter room should have two setters');
+assert(realMultiSetterProfile.trickRoomExternalAbusers.length>=3,'real multi-setter room should have a broad outside abuser core');
+const realMultiSetterIdentity=ctx.detectIdentities(realMultiSetterRoomTeam,{},realMultiSetterProfile);
+assert(realMultiSetterIdentity.primary.name==='Trick Room Offense','real multi-setter room should keep Trick Room Offense as the primary read');
+assert(realMultiSetterIdentity.all.find(row=>row.name==='Trick Room Offense').score===84,'real multi-setter room should keep its base room confidence');
 
 console.log('[OK] trick room identity upgrades passed');
