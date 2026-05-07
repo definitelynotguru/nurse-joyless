@@ -67,11 +67,30 @@
       && fastPressure>=2;
   }
 
-  function fragileTrickRoomPenalty(profile){
-    if(!singleSetterFragileTrickRoomShell(profile))return 0;
+  function multiSetterShallowTrickRoomShell(profile){
+    const setters=(profile?.trickRoomSetters||[]).length;
+    const externalAbusers=(profile?.trickRoomExternalAbusers||[]).length;
+    const selfSufficientSetters=(profile?.trickRoomSelfSufficientSetters||[]).length;
     const fastPressure=(profile?.trickRoomFastPressure||[]).length;
-    const abusers=(profile?.trickRoomAbusers||[]).length;
-    return 14+Math.max(0,fastPressure-2)*3+Math.max(0,abusers-2)*2;
+    const realPayoffs=externalAbusers+selfSufficientSetters;
+    return setters>=2
+      && fastPressure>=2
+      && externalAbusers<=1
+      && realPayoffs<=2;
+  }
+
+  function fragileTrickRoomPenalty(profile){
+    if(singleSetterFragileTrickRoomShell(profile)){
+      const fastPressure=(profile?.trickRoomFastPressure||[]).length;
+      const abusers=(profile?.trickRoomAbusers||[]).length;
+      return 14+Math.max(0,fastPressure-2)*3+Math.max(0,abusers-2)*2;
+    }
+    if(multiSetterShallowTrickRoomShell(profile)){
+      const setters=(profile?.trickRoomSetters||[]).length;
+      const fastPressure=(profile?.trickRoomFastPressure||[]).length;
+      return 13+Math.max(0,setters-2)*3+Math.max(0,fastPressure-2)*2;
+    }
+    return 0;
   }
 
   function cloneIdentityRow(row={}){
@@ -99,7 +118,9 @@
   root.detectIdentities=function patchedDetectIdentities(t=root.team,a=root.analysis,p=root.profileTeam(t,a)){
     const profile=p||root.profileTeam(t,a);
     const result=originalDetectIdentities.call(this,t,a,profile);
-    if(!singleSetterFragileTrickRoomShell(profile))return result;
+    const fragileSingleSetter=singleSetterFragileTrickRoomShell(profile);
+    const shallowMultiSetter=multiSetterShallowTrickRoomShell(profile);
+    if(!fragileSingleSetter&&!shallowMultiSetter)return result;
 
     const rows=(result?.all||[]).map(cloneIdentityRow);
     const trickRoom=rows.find(row=>row.name==='Trick Room Offense');
@@ -107,13 +128,22 @@
 
     if(trickRoom){
       trickRoom.score=root.njCap((trickRoom.score||0)-fragileTrickRoomPenalty(profile),96);
-      addEvidence(trickRoom,'the lone Trick Room setter cannot hand the room turns cleanly into the breaker core');
-      addEvidence(trickRoom,'one passive Trick Room slot is carrying too much of the speed-control burden by itself');
-      addEvidence(trickRoom,'too much of the remaining pressure still plays at normal speed instead of truly cashing the room turns');
+      if(fragileSingleSetter){
+        addEvidence(trickRoom,'the lone Trick Room setter cannot hand the room turns cleanly into the breaker core');
+        addEvidence(trickRoom,'one passive Trick Room slot is carrying too much of the speed-control burden by itself');
+        addEvidence(trickRoom,'too much of the remaining pressure still plays at normal speed instead of truly cashing the room turns');
+      }
+      if(shallowMultiSetter){
+        addEvidence(trickRoom,'multiple Trick Room setters are present, but too few real room payoffs exist outside those support slots');
+        addEvidence(trickRoom,'the team spends several slots setting Trick Room without enough slow breakers to convert those turns');
+        addEvidence(trickRoom,'too much of the remaining pressure still leans on normal-speed play for a true multi-setter room shell');
+      }
     }
     if(sunRoom){
       sunRoom.score=root.njCap((sunRoom.score||0)-Math.max(0,fragileTrickRoomPenalty(profile)-4),96);
-      addEvidence(sunRoom,'the lone Trick Room setter cannot hand the room turns cleanly into the breaker core');
+      if(fragileSingleSetter||shallowMultiSetter){
+        addEvidence(sunRoom,'the Trick Room package is not handing enough clean room turns into real payoff pieces');
+      }
     }
 
     rows.sort((left,right)=>(right.score-left.score)||((priority[right.name]||0)-(priority[left.name]||0)));
@@ -127,17 +157,26 @@
   root.evaluateSynergy=function patchedEvaluateSynergy(t=root.team,a=root.analysis,p=root.profileTeam(t,a),identity=root.detectIdentities(t,a,p)){
     const profile=p||root.profileTeam(t,a);
     const synergy=originalEvaluateSynergy.call(this,t,a,profile,identity);
-    if(!singleSetterFragileTrickRoomShell(profile))return synergy;
+    const fragileSingleSetter=singleSetterFragileTrickRoomShell(profile);
+    const shallowMultiSetter=multiSetterShallowTrickRoomShell(profile);
+    if(!fragileSingleSetter&&!shallowMultiSetter)return synergy;
 
     const next={...synergy,scores:{...(synergy?.scores||{})},issues:[...(synergy?.issues||[])]};
-    next.scores.winReliability=root.njCap((next.scores.winReliability||0)-6,92);
-    next.scores.speedControl=root.njCap((next.scores.speedControl||0)-7,92);
+    next.scores.winReliability=root.njCap((next.scores.winReliability||0)-(fragileSingleSetter?6:5),92);
+    next.scores.speedControl=root.njCap((next.scores.speedControl||0)-(fragileSingleSetter?7:6),92);
     next.scores.roleCompression=root.njCap((next.scores.roleCompression||0)-4,92);
-    if(!next.issues.some(issue=>issue?.title==='Single Trick Room setter cannot hand turns off cleanly')){
+    if(fragileSingleSetter&&!next.issues.some(issue=>issue?.title==='Single Trick Room setter cannot hand turns off cleanly')){
       next.issues.push({
         severity:'bad',
         title:'Single Trick Room setter cannot hand turns off cleanly',
         detail:'The team has some slow breakers on paper, but one passive Trick Room slot is carrying the whole plan alone. Without pivot, sacrifice, or self-contained pressure from that setter, too many room turns disappear before the abusers can actually convert them.'
+      });
+    }
+    if(shallowMultiSetter&&!next.issues.some(issue=>issue?.title==='Multi-setter Trick Room shell lacks enough real payoffs')){
+      next.issues.push({
+        severity:'bad',
+        title:'Multi-setter Trick Room shell lacks enough real payoffs',
+        detail:'The team has multiple Trick Room setters, but too few genuine room abusers outside those support slots. That leaves the room package spending turns on setup while the rest of the roster still expects to win at normal speed.'
       });
     }
     return next;
