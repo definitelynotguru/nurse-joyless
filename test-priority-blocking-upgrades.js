@@ -21,6 +21,7 @@ const context = {
     'Extreme Speed': ['Normal', 'Physical', 2],
     'Helping Hand': ['Normal', 'Status', 5],
     Protect: ['Normal', 'Status', 4],
+    Psychic: ['Psychic', 'Special', 0],
     Quash: ['Dark', 'Status', 1]
   },
   DexAdapter: {
@@ -55,10 +56,14 @@ const context = {
   moveBlockingAbility() {
     return '';
   },
-  dmg(att, def, mv) {
+  grounded(target) {
+    return !target?.airborne;
+  },
+  dmg(att, def, mv, opt = {}) {
     return {
       def,
       mv,
+      battleState: { terrain: String(opt.terrain || 'none') },
       moveType: (context.REPLAY_MOVE_HINTS[mv] || ['Normal'])[0],
       move: [null, (context.REPLAY_MOVE_HINTS[mv] || [null, 'Physical'])[1]],
       rolls: new Array(16).fill(50),
@@ -139,12 +144,13 @@ vm.createContext(context);
 vm.runInContext(
   fs.readFileSync('src/priority-blocking-upgrades.js', 'utf8'),
   context,
-  { filename: 'priority-blocking-upgrades.js', timeout: 10000 }
+  { filename: 'src/priority-blocking-upgrades.js', timeout: 10000 }
 );
 
-const farigiraf = { species: 'Farigiraf', ability: 'Armor Tail' };
-const gyarados = { species: 'Gyarados', ability: 'Intimidate' };
-const tsareena = { species: 'Tsareena', ability: 'Queenly Majesty' };
+const farigiraf = { species: 'Farigiraf', ability: 'Armor Tail', airborne: false };
+const gyarados = { species: 'Gyarados', ability: 'Intimidate', airborne: false };
+const tsareena = { species: 'Tsareena', ability: 'Queenly Majesty', airborne: false };
+const landorus = { species: 'Landorus-Therian', ability: 'Intimidate', airborne: true };
 
 const blockedExtremeSpeed = context.dmg({ species: 'Dragonite' }, farigiraf, 'Extreme Speed');
 assert(blockedExtremeSpeed.blockedBy === 'Armor Tail', 'Armor Tail should blank direct priority attacks in damage math');
@@ -154,13 +160,21 @@ const blockedAquaJet = context.dmg({ species: 'Palafin' }, tsareena, 'Aqua Jet')
 assert(blockedAquaJet.blockedBy === 'Queenly Majesty', 'Queenly Majesty should blank direct priority attacks in damage math');
 assert(blockedAquaJet.maxd === 0, 'Queenly Majesty should zero out priority damage rolls');
 
-const liveThunderbolt = context.dmg({ species: 'Zapdos' }, gyarados, 'Thunderbolt');
+const liveThunderbolt = context.dmg({ species: 'Zapdos' }, gyarados, 'Psychic');
 assert(!liveThunderbolt.blockedBy, 'non-priority moves should stay live');
 assert(liveThunderbolt.maxd > 0, 'non-priority moves should keep their normal damage rolls');
 
 const liveProtect = context.dmg({ species: 'Farigiraf' }, farigiraf, 'Protect');
 assert(!liveProtect.blockedBy, 'self-targeting support priority should not be treated as an Armor Tail damage block');
 assert(liveProtect.maxd > 0, 'self-targeting support priority should keep the normal calculator path');
+
+const terrainBlocked = context.dmg({ species: 'Dragonite' }, gyarados, 'Extreme Speed', { terrain: 'psychic' });
+assert(terrainBlocked.blockedBy === 'Psychic Terrain', 'Psychic Terrain should blank grounded priority attacks in damage math');
+assert(terrainBlocked.maxd === 0, 'Psychic Terrain should zero out grounded priority damage rolls');
+
+const terrainAirborne = context.dmg({ species: 'Dragonite' }, landorus, 'Extreme Speed', { terrain: 'psychic' });
+assert(!terrainAirborne.blockedBy, 'Psychic Terrain should not blank priority into airborne targets');
+assert(terrainAirborne.maxd > 0, 'airborne targets should keep normal damage rolls under Psychic Terrain');
 
 const parser = new context.ReplayParser();
 const farigirafBlocked = parser.moveBlockedAbilities({ species: 'Farigiraf' }, 'Extreme Speed');
@@ -169,7 +183,7 @@ assert(farigirafBlocked.includes('Armor Tail'), 'landed Extreme Speed should rul
 const bruxishBlocked = parser.moveBlockedAbilities({ species: 'Bruxish' }, 'Aqua Jet');
 assert(bruxishBlocked.includes('Dazzling'), 'landed Aqua Jet should rule out Dazzling in replay contradictions');
 
-const nonPriorityBlocked = parser.moveBlockedAbilities({ species: 'Farigiraf' }, 'Thunderbolt');
+const nonPriorityBlocked = parser.moveBlockedAbilities({ species: 'Farigiraf' }, 'Psychic');
 assert(!nonPriorityBlocked.includes('Armor Tail'), 'non-priority moves should not fabricate priority-blocking contradictions');
 
 const supportBlocked = parser.moveBlockedAbilities({ species: 'Farigiraf' }, 'Helping Hand');
@@ -208,7 +222,7 @@ parser.extractEvidence({ type: '-activate', target: 'p2a: Farigiraf', effect: 'a
 assert(parser.revealed.length === 0, 'support priority activate events should not fabricate a priority-blocker reveal');
 
 parser.revealed = [];
-parser.turnMoves = [{ slot: 'p1a', species: 'Zapdos', move: 'Thunderbolt' }];
+parser.turnMoves = [{ slot: 'p1a', species: 'Zapdos', move: 'Psychic' }];
 parser.extractEvidence({ type: '-activate', target: 'p2a: Farigiraf', effect: 'ability: Armor Tail' }, 5);
 assert(parser.revealed.length === 0, 'non-priority activate events should not fabricate a priority-blocker reveal');
 
