@@ -92,6 +92,18 @@
     }
     return '';
   }
+  function abilityBypassMode(ability=''){
+    const name=String(ability||'').trim();
+    if(['Mold Breaker','Teravolt','Turboblaze'].includes(name))return 'all';
+    if(name==='Mycelium Might')return 'status';
+    return '';
+  }
+  function attackerBypassesPriorityBlocker(ability='',move=''){
+    const mode=abilityBypassMode(ability);
+    if(mode==='all')return true;
+    if(mode==='status')return moveCategoryValue(move)==='Status';
+    return false;
+  }
   function isPriorityBlockingAbility(ability=''){
     return PRIORITY_BLOCKERS.has(String(ability||'').trim());
   }
@@ -208,7 +220,7 @@
     const originalDmg=dmg;
     dmg=function patchedDmg(att,def,mv,opt={}){
       const roll=originalDmg(att,def,mv,opt);
-      const blocker=isDirectPriorityAttack(mv)?priorityBlockingAbility(roll.def?.ability,mv):'';
+      const blocker=isDirectPriorityAttack(mv)&&!attackerBypassesPriorityBlocker(roll.att?.ability,mv)?priorityBlockingAbility(roll.def?.ability,mv):'';
       if(blocker)return zeroPriorityRoll(roll,blocker);
       const terrainBlocker=psychicTerrainPriorityBlock(roll,mv);
       if(terrainBlocker)return zeroPriorityRoll(roll,terrainBlocker);
