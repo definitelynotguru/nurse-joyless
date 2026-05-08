@@ -52,6 +52,23 @@
     const data=DexRef.getSpecies?DexRef.getSpecies(species):null;
     return data?.abilities?Object.values(data.abilities).filter(Boolean):[];
   }
+  function abilityBypassMode(ability=''){
+    const name=String(ability||'').trim();
+    if(['Mold Breaker','Teravolt','Turboblaze'].includes(name))return 'all';
+    if(name==='Mycelium Might')return 'status';
+    return '';
+  }
+  function moveCategoryValue(move=''){
+    if(typeof moveCategory==='function')return String(moveCategory(move)||'');
+    if(typeof moveMeta==='function')return String(moveMeta(move)?.[1]||'');
+    return '';
+  }
+  function attackerBypassesMoveImmunity(ability='', move=''){
+    const mode=abilityBypassMode(ability);
+    if(mode==='all')return true;
+    if(mode==='status')return moveCategoryValue(move)==='Status';
+    return false;
+  }
 
   const originalGetSpecies=DexRef.getSpecies.bind(DexRef);
   DexRef.getSpecies=function patchedGetSpecies(name){
@@ -87,7 +104,7 @@
     dmg=function patchedDmg(att, def, mv, opt={}){
       const roll=originalDmg(att,def,mv,opt);
       const blocker=moveBlockingAbility(roll.moveType,roll.move?.[1],roll.def?.ability,mv);
-      if(!blocker)return roll;
+      if(!blocker||attackerBypassesMoveImmunity(roll.att?.ability,mv))return roll;
       return {
         ...roll,
         blockedBy:blocker,
