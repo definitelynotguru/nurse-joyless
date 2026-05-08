@@ -61,6 +61,7 @@ const context = {
   },
   dmg(att, def, mv, opt = {}) {
     return {
+      att,
       def,
       mv,
       battleState: { terrain: String(opt.terrain || 'none') },
@@ -156,6 +157,14 @@ const blockedExtremeSpeed = context.dmg({ species: 'Dragonite' }, farigiraf, 'Ex
 assert(blockedExtremeSpeed.blockedBy === 'Armor Tail', 'Armor Tail should blank direct priority attacks in damage math');
 assert(blockedExtremeSpeed.maxd === 0, 'Armor Tail should zero out priority damage rolls');
 
+const moldBreakerExtremeSpeed = context.dmg({ species: 'Haxorus', ability: 'Mold Breaker' }, farigiraf, 'Extreme Speed');
+assert(!moldBreakerExtremeSpeed.blockedBy, 'Mold Breaker should let Extreme Speed bypass Armor Tail in damage math');
+assert(moldBreakerExtremeSpeed.maxd > 0, 'Mold Breaker should keep live priority damage rolls into Armor Tail');
+
+const teravoltAquaJet = context.dmg({ species: 'Zekrom', ability: 'Teravolt' }, tsareena, 'Aqua Jet');
+assert(!teravoltAquaJet.blockedBy, 'Teravolt should let Aqua Jet bypass Queenly Majesty in damage math');
+assert(teravoltAquaJet.maxd > 0, 'Teravolt should keep live priority damage rolls into Queenly Majesty');
+
 const blockedAquaJet = context.dmg({ species: 'Palafin' }, tsareena, 'Aqua Jet');
 assert(blockedAquaJet.blockedBy === 'Queenly Majesty', 'Queenly Majesty should blank direct priority attacks in damage math');
 assert(blockedAquaJet.maxd === 0, 'Queenly Majesty should zero out priority damage rolls');
@@ -179,6 +188,12 @@ assert(terrainAirborne.maxd > 0, 'airborne targets should keep normal damage rol
 const parser = new context.ReplayParser();
 const farigirafBlocked = parser.moveBlockedAbilities({ species: 'Farigiraf' }, 'Extreme Speed');
 assert(farigirafBlocked.includes('Armor Tail'), 'landed Extreme Speed should rule out Armor Tail in replay contradictions');
+
+const blockedBypass = parser.moveBlockedAbilities({ species: 'Farigiraf', bypassAbility: 'Mold Breaker' }, 'Extreme Speed');
+assert(!blockedBypass.includes('Armor Tail'), 'Mold Breaker replay windows should keep Armor Tail live instead of ruling it out');
+
+const myceliumQuash = parser.moveBlockedAbilities({ species: 'Farigiraf', bypassAbility: 'Mycelium Might' }, 'Quash');
+assert(!myceliumQuash.includes('Armor Tail'), 'Mycelium Might should keep Armor Tail live for blocked priority status windows');
 
 const bruxishBlocked = parser.moveBlockedAbilities({ species: 'Bruxish' }, 'Aqua Jet');
 assert(bruxishBlocked.includes('Dazzling'), 'landed Aqua Jet should rule out Dazzling in replay contradictions');
