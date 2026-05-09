@@ -111,6 +111,31 @@ assert(shallowMultiSetterSynergy.scores.winReliability<81,'shallow multi-setter 
 assert(shallowMultiSetterSynergy.scores.speedControl<80,'shallow multi-setter room should lose speed-control confidence');
 assert(shallowMultiSetterSynergy.issues.some(issue=>issue.title==='Multi-setter Trick Room shell lacks enough real payoffs'),'shallow multi-setter room should surface a dedicated synergy issue');
 
+const fragileMultiSetterRoomTeam=[
+  mon('Cresselia',{moves:['Trick Room','Moonlight','Ice Beam','Psychic'],offensiveTypes:['Ice','Psychic'],baseSpeed:85,atk:70,spa:75}),
+  mon('Porygon2',{moves:['Trick Room','Recover','Ice Beam','Thunderbolt'],offensiveTypes:['Ice'],baseSpeed:60,atk:80,spa:95}),
+  mon('Ursaluna',{moves:['Facade','Headlong Rush','Fire Punch','Swords Dance'],offensiveTypes:['Normal','Ground','Fire'],baseSpeed:50,atk:140,spa:45}),
+  mon('Kingambit',{moves:['Kowtow Cleave','Iron Head','Sucker Punch','Low Kick'],offensiveTypes:['Dark','Steel','Fighting'],baseSpeed:50,atk:135,spa:60}),
+  mon('Darkrai',{moves:['Dark Pulse','Sludge Bomb','Nasty Plot','Focus Blast'],offensiveTypes:['Dark','Poison','Fighting'],baseSpeed:125,atk:90,spa:135}),
+  mon('Iron Valiant',{moves:['Moonblast','Close Combat','Knock Off','Encore'],offensiveTypes:['Fairy','Fighting','Dark'],baseSpeed:116,atk:130,spa:120}),
+];
+
+const fragileMultiSetterProfile=ctx.profileTeam(fragileMultiSetterRoomTeam,{});
+assert(fragileMultiSetterProfile.trickRoomSetters.length===2,'fragile multi-setter room should have two setters');
+assert(fragileMultiSetterProfile.trickRoomExternalAbusers.length===2,'fragile multi-setter room should still advertise two outside abusers');
+assert(fragileMultiSetterProfile.trickRoomHandoffSetters.length===0,'fragile multi-setter room should have no handoff setters');
+assert(fragileMultiSetterProfile.trickRoomSelfSufficientSetters.length===0,'fragile multi-setter room should have no self-sufficient setters');
+assert(fragileMultiSetterProfile.trickRoomFastPressure.length===2,'fragile multi-setter room should still lean on two fast closers');
+const fragileMultiSetterIdentity=ctx.detectIdentities(fragileMultiSetterRoomTeam,{},fragileMultiSetterProfile);
+const fragileMultiSetterRoomRow=fragileMultiSetterIdentity.all.find(row=>row.name==='Trick Room Offense');
+assert(fragileMultiSetterIdentity.primary.name!=='Trick Room Offense','fragile multi-setter room should not keep Trick Room Offense as the primary read');
+assert(fragileMultiSetterRoomRow.score<78,'fragile multi-setter room should lose enough confidence to fall below balance');
+assert(fragileMultiSetterRoomRow.evidence.some(line=>/multiple passive Trick Room setters/i.test(line)),'fragile multi-setter room should explain the failed handoff problem');
+const fragileMultiSetterSynergy=ctx.evaluateSynergy(fragileMultiSetterRoomTeam,{},fragileMultiSetterProfile,fragileMultiSetterIdentity);
+assert(fragileMultiSetterSynergy.scores.winReliability<81,'fragile multi-setter room should lose win reliability');
+assert(fragileMultiSetterSynergy.scores.speedControl<80,'fragile multi-setter room should lose speed-control confidence');
+assert(fragileMultiSetterSynergy.issues.some(issue=>issue.title==='Passive multi-setter Trick Room shell still loses too many handoff turns'),'fragile multi-setter room should surface the new handoff issue');
+
 const cleanHandoffRoomTeam=[
   mon('Uxie',{moves:['Trick Room','Memento','Stealth Rock','U-turn'],offensiveTypes:['Psychic','Bug'],baseSpeed:95,atk:75,spa:75}),
   mon('Kingambit',{moves:['Kowtow Cleave','Iron Head','Sucker Punch','Low Kick'],offensiveTypes:['Dark','Steel','Fighting'],baseSpeed:50,atk:135,spa:60}),
@@ -159,5 +184,7 @@ assert(realMultiSetterProfile.trickRoomExternalAbusers.length>=3,'real multi-set
 const realMultiSetterIdentity=ctx.detectIdentities(realMultiSetterRoomTeam,{},realMultiSetterProfile);
 assert(realMultiSetterIdentity.primary.name==='Trick Room Offense','real multi-setter room should keep Trick Room Offense as the primary read');
 assert(realMultiSetterIdentity.all.find(row=>row.name==='Trick Room Offense').score===84,'real multi-setter room should keep its base room confidence');
+const realMultiSetterSynergy=ctx.evaluateSynergy(realMultiSetterRoomTeam,{},realMultiSetterProfile,realMultiSetterIdentity);
+assert(!realMultiSetterSynergy.issues.some(issue=>issue.title==='Passive multi-setter Trick Room shell still loses too many handoff turns'),'real multi-setter room should avoid the new fragile-handoff issue');
 
 console.log('[OK] trick room identity upgrades passed');
