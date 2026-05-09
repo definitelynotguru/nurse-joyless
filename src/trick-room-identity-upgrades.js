@@ -79,6 +79,19 @@
       && realPayoffs<=2;
   }
 
+  function multiSetterFragileTurnHandoffShell(profile){
+    const setters=(profile?.trickRoomSetters||[]).length;
+    const externalAbusers=(profile?.trickRoomExternalAbusers||[]).length;
+    const handoffSetters=(profile?.trickRoomHandoffSetters||[]).length;
+    const selfSufficientSetters=(profile?.trickRoomSelfSufficientSetters||[]).length;
+    const fastPressure=(profile?.trickRoomFastPressure||[]).length;
+    return setters>=2
+      && externalAbusers>=2
+      && !handoffSetters
+      && !selfSufficientSetters
+      && fastPressure>=2;
+  }
+
   function fragileTrickRoomPenalty(profile){
     if(singleSetterFragileTrickRoomShell(profile)){
       const fastPressure=(profile?.trickRoomFastPressure||[]).length;
@@ -89,6 +102,12 @@
       const setters=(profile?.trickRoomSetters||[]).length;
       const fastPressure=(profile?.trickRoomFastPressure||[]).length;
       return 13+Math.max(0,setters-2)*3+Math.max(0,fastPressure-2)*2;
+    }
+    if(multiSetterFragileTurnHandoffShell(profile)){
+      const setters=(profile?.trickRoomSetters||[]).length;
+      const fastPressure=(profile?.trickRoomFastPressure||[]).length;
+      const externalAbusers=(profile?.trickRoomExternalAbusers||[]).length;
+      return 12+Math.max(0,setters-2)*2+Math.max(0,fastPressure-2)*2+Math.max(0,externalAbusers-2);
     }
     return 0;
   }
@@ -120,7 +139,8 @@
     const result=originalDetectIdentities.call(this,t,a,profile);
     const fragileSingleSetter=singleSetterFragileTrickRoomShell(profile);
     const shallowMultiSetter=multiSetterShallowTrickRoomShell(profile);
-    if(!fragileSingleSetter&&!shallowMultiSetter)return result;
+    const fragileMultiSetter=multiSetterFragileTurnHandoffShell(profile);
+    if(!fragileSingleSetter&&!shallowMultiSetter&&!fragileMultiSetter)return result;
 
     const rows=(result?.all||[]).map(cloneIdentityRow);
     const trickRoom=rows.find(row=>row.name==='Trick Room Offense');
@@ -138,10 +158,15 @@
         addEvidence(trickRoom,'the team spends several slots setting Trick Room without enough slow breakers to convert those turns');
         addEvidence(trickRoom,'too much of the remaining pressure still leans on normal-speed play for a true multi-setter room shell');
       }
+      if(fragileMultiSetter){
+        addEvidence(trickRoom,'multiple passive Trick Room setters still cannot hand the room turns cleanly into the payoff core');
+        addEvidence(trickRoom,'the room package advertises several outside abusers, but none of the setters pivot, sacrifice, or cash their own turns');
+        addEvidence(trickRoom,'too much of the remaining pressure still expects normal-speed play after the room turns are spent getting breakers in');
+      }
     }
     if(sunRoom){
       sunRoom.score=root.njCap((sunRoom.score||0)-Math.max(0,fragileTrickRoomPenalty(profile)-4),96);
-      if(fragileSingleSetter||shallowMultiSetter){
+      if(fragileSingleSetter||shallowMultiSetter||fragileMultiSetter){
         addEvidence(sunRoom,'the Trick Room package is not handing enough clean room turns into real payoff pieces');
       }
     }
@@ -159,7 +184,8 @@
     const synergy=originalEvaluateSynergy.call(this,t,a,profile,identity);
     const fragileSingleSetter=singleSetterFragileTrickRoomShell(profile);
     const shallowMultiSetter=multiSetterShallowTrickRoomShell(profile);
-    if(!fragileSingleSetter&&!shallowMultiSetter)return synergy;
+    const fragileMultiSetter=multiSetterFragileTurnHandoffShell(profile);
+    if(!fragileSingleSetter&&!shallowMultiSetter&&!fragileMultiSetter)return synergy;
 
     const next={...synergy,scores:{...(synergy?.scores||{})},issues:[...(synergy?.issues||[])]};
     next.scores.winReliability=root.njCap((next.scores.winReliability||0)-(fragileSingleSetter?6:5),92);
@@ -177,6 +203,13 @@
         severity:'bad',
         title:'Multi-setter Trick Room shell lacks enough real payoffs',
         detail:'The team has multiple Trick Room setters, but too few genuine room abusers outside those support slots. That leaves the room package spending turns on setup while the rest of the roster still expects to win at normal speed.'
+      });
+    }
+    if(fragileMultiSetter&&!next.issues.some(issue=>issue?.title==='Passive multi-setter Trick Room shell still loses too many handoff turns')){
+      next.issues.push({
+        severity:'bad',
+        title:'Passive multi-setter Trick Room shell still loses too many handoff turns',
+        detail:'The team has several Trick Room setters and enough nominal payoffs on paper, but none of those setters pivot, sacrifice, or threaten enough on their own to hand the room turns off cleanly. Too many Trick Room turns vanish while the team is still trying to bring the real breakers onto the field.'
       });
     }
     return next;
