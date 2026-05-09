@@ -8,7 +8,7 @@
     "serve:static": "python3 -m http.server 8000",
     "check": "node --check src/app.js",
     "server-smoke": "node --check server.js && node test-server.js",
-    "smoke": "node test-smoke.js && node test-ko-spread-move-upgrades.js",
+    "smoke": "node test-smoke.js && node test-ko-spread-move-upgrades.js && node test-ko-defensive-ability-upgrades.js",
     "dom-smoke": "node test-dom-smoke.js",
     "test": "npm run check && npm run server-smoke && npm run smoke && npm run dom-smoke && npm run v33-audit && npm run v35-gauntlet && npm run v35-legacy && npm run weather-identity && npm run hidden-info && npm run validation-fixes && npm run tera-plan && npm run dex-integrity && npm run submission-polish",
     "v33-audit": "node test-v33-reasoner.js",
