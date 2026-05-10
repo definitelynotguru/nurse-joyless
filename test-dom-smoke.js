@@ -35,8 +35,9 @@ ctx.addEventListener = function() {};
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync('src/app.js', 'utf8'), ctx, { filename: 'app.js' });
 vm.runInContext(fs.readFileSync('src/replay-ability-upgrades.js', 'utf8'), ctx, { filename: 'replay-ability-upgrades.js' });
+vm.runInContext(fs.readFileSync('src/battlelog-demo-upgrades.js', 'utf8'), ctx, { filename: 'battlelog-demo-upgrades.js' });
 setTimeout(() => {
-  const required = ['loadDemo','analyze','calcKo','detect','calcArchetypes','openAgent','testDragonSpam','testHazardStack','testSunRoom','suggestPokemon','loadOnlineDex','validateMoves','exportMarkdown','exportJson','testOllama','copyOllamaWorker','ollamaProxyUrl'];
+  const required = ['loadDemo','analyze','calcKo','detect','calcArchetypes','openAgent','testDragonSpam','testHazardStack','testSunRoom','suggestPokemon','loadOnlineDex','validateMoves','exportMarkdown','exportJson','testOllama','copyOllamaWorker','ollamaProxyUrl','loadBattlelogDemo','analyzeReplay'];
   for (const id of required) {
     if (!els[id]) throw new Error(`${id} missing`);
     if (id !== 'ollamaProxyUrl' && typeof els[id]?.onclick !== 'function') throw new Error(`${id} not bound`);
@@ -47,6 +48,9 @@ setTimeout(() => {
   if (!els.teamCards.innerHTML.includes('Gholdengo')) throw new Error('Hazard Stack test team did not load');
   if (!els.identityResults.innerHTML.includes('Identity')) throw new Error('identity panel did not update after analysis');
   if (!els.synergyResults.innerHTML.includes('Structural Scoring')) throw new Error('synergy panel did not update after analysis');
+  els.loadBattlelogDemo.onclick();
+  if (!els.replayInput.value.includes('|move|p2a: Dragapult|Shadow Ball|p1a: Blastoise')) throw new Error('battlelog demo did not populate replay input');
+  if (!els.replayResults.innerHTML.includes('Choice Specs')) throw new Error('battlelog demo did not auto-run the replay observer');
   els.openAgent.onclick();
   console.log('[OK] DOM binding smoke passed');
 }, 20);
