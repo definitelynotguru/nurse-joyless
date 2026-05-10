@@ -13,6 +13,9 @@
   function moveType(roll){
     return String(roll?.moveType||roll?.move?.[0]||'').trim();
   }
+  function moveCategory(roll){
+    return String(roll?.move?.[1]||roll?.moveCategory||'').trim();
+  }
   function fullHpAbilityWindowActive(roll){
     const max=Number(roll?.max)||0;
     const ehp=Number(roll?.ehp)||0;
@@ -59,6 +62,26 @@
     if(ability==='Thick Fat'&&['Fire','Ice'].includes(moveType(roll))){
       multiplier*=0.5;
       notes.push(`Thick Fat reduced the ${moveType(roll)} damage.`);
+    }
+    if(ability==='Heatproof'&&moveType(roll)==='Fire'){
+      multiplier*=0.5;
+      notes.push('Heatproof reduced the Fire damage.');
+    }
+    if(ability==='Dry Skin'&&moveType(roll)==='Fire'){
+      multiplier*=1.25;
+      notes.push('Dry Skin made the Fire hit stronger.');
+    }
+    if(ability==='Water Bubble'&&moveType(roll)==='Fire'){
+      multiplier*=0.5;
+      notes.push('Water Bubble reduced the Fire damage.');
+    }
+    if(ability==='Fur Coat'&&moveCategory(roll)==='Physical'){
+      multiplier*=0.5;
+      notes.push('Fur Coat cut the physical damage in half.');
+    }
+    if(ability==='Ice Scales'&&moveCategory(roll)==='Special'){
+      multiplier*=0.5;
+      notes.push('Ice Scales cut the special damage in half.');
     }
     return { multiplier, notes };
   }
