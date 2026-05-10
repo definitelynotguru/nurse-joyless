@@ -23,7 +23,7 @@ const context = {
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
+      .replace(/\"/g, '&quot;');
   },
   document: {
     getElementById(id) {
@@ -104,6 +104,39 @@ assert(result.defensiveAbilityNotes.some(note => /Thick Fat/.test(note)), 'Thick
 context.__rollTemplate = makeRoll({ def: { ability: 'Thick Fat' }, moveType: 'Electric', move: ['Electric', 'Special'] });
 result = context.dmg({}, context.__rollTemplate.def, 'Thunderbolt', {});
 assert(result.maxd === 100, 'Thick Fat should ignore non-Fire and non-Ice damage');
+
+context.__rollTemplate = makeRoll({ def: { ability: 'Heatproof' }, moveType: 'Fire', move: ['Fire', 'Special'] });
+result = context.dmg({}, context.__rollTemplate.def, 'Flamethrower', {});
+assert(result.maxd === 50, 'Heatproof should halve Fire damage');
+assert(result.defensiveAbilityNotes.some(note => /Heatproof/.test(note)), 'Heatproof should explain the reduction');
+
+context.__rollTemplate = makeRoll({ def: { ability: 'Dry Skin' }, moveType: 'Fire', move: ['Fire', 'Special'] });
+result = context.dmg({}, context.__rollTemplate.def, 'Flamethrower', {});
+assert(result.maxd === 125, 'Dry Skin should amplify Fire damage');
+assert(result.defensiveAbilityNotes.some(note => /Dry Skin/.test(note)), 'Dry Skin should explain the Fire vulnerability');
+
+context.__rollTemplate = makeRoll({ def: { ability: 'Water Bubble' }, moveType: 'Fire', move: ['Fire', 'Special'] });
+result = context.dmg({}, context.__rollTemplate.def, 'Flamethrower', {});
+assert(result.maxd === 50, 'Water Bubble should halve Fire damage');
+assert(result.defensiveAbilityNotes.some(note => /Water Bubble/.test(note)), 'Water Bubble should explain the reduction');
+
+context.__rollTemplate = makeRoll({ def: { ability: 'Fur Coat' }, moveType: 'Normal', move: ['Normal', 'Physical'] });
+result = context.dmg({}, context.__rollTemplate.def, 'Extreme Speed', {});
+assert(result.maxd === 50, 'Fur Coat should halve physical damage');
+assert(result.defensiveAbilityNotes.some(note => /Fur Coat/.test(note)), 'Fur Coat should explain the reduction');
+
+context.__rollTemplate = makeRoll({ def: { ability: 'Ice Scales' }, moveType: 'Ghost', move: ['Ghost', 'Special'] });
+result = context.dmg({}, context.__rollTemplate.def, 'Shadow Ball', {});
+assert(result.maxd === 50, 'Ice Scales should halve special damage');
+assert(result.defensiveAbilityNotes.some(note => /Ice Scales/.test(note)), 'Ice Scales should explain the reduction');
+
+context.__rollTemplate = makeRoll({ def: { ability: 'Fur Coat' }, moveType: 'Ghost', move: ['Ghost', 'Special'] });
+result = context.dmg({}, context.__rollTemplate.def, 'Shadow Ball', {});
+assert(result.maxd === 100, 'Fur Coat should ignore special attacks');
+
+context.__rollTemplate = makeRoll({ def: { ability: 'Ice Scales' }, moveType: 'Normal', move: ['Normal', 'Physical'] });
+result = context.dmg({}, context.__rollTemplate.def, 'Extreme Speed', {});
+assert(result.maxd === 100, 'Ice Scales should ignore physical attacks');
 
 context.__rollTemplate = makeRoll({ def: { ability: 'Shadow Shield' } });
 context.renderKo();
