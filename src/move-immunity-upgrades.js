@@ -21,11 +21,24 @@
   };
   const EXTRA_MOVES={
     'Hyper Voice':['Normal','Special',90,100],
-    'Aura Sphere':['Fighting','Special',80,100]
+    'Aura Sphere':['Fighting','Special',80,100],
+    Boomburst:['Normal','Special',140,100],
+    'Echoed Voice':['Normal','Special',40,100],
+    'Sparkling Aria':['Water','Special',90,100],
+    Round:['Normal','Special',60,100],
+    'Relic Song':['Normal','Special',75,100],
+    'Electro Ball':['Electric','Special',1,100],
+    'Mist Ball':['Psychic','Special',70,100],
+    'Fairy Wind':['Fairy','Special',40,100],
+    'Ominous Wind':['Ghost','Special',60,100],
+    'Petal Blizzard':['Grass','Physical',90,100],
+    'Razor Wind':['Normal','Special',80,100],
+    'Sandsear Storm':['Ground','Special',100,80],
+    'Wildbolt Storm':['Electric','Special',100,80]
   };
-  const SOUND_MOVES=new Set(['Bug Buzz','Clanging Scales','Hyper Voice','Overdrive','Parting Shot','Roar','Snarl','Torch Song']);
-  const BALL_OR_BOMB_MOVES=new Set(['Aura Sphere','Energy Ball','Focus Blast','Gyro Ball','Magnet Bomb','Mud Bomb','Pyro Ball','Seed Bomb','Shadow Ball','Sludge Bomb','Weather Ball']);
-  const WIND_MOVES=new Set(['Air Slash','Bleakwind Storm','Defog','Heat Wave','Hurricane','Icy Wind','Tailwind','Twister','Whirlwind']);
+  const SOUND_MOVES=new Set(['Boomburst','Bug Buzz','Clanging Scales','Echoed Voice','Hyper Voice','Overdrive','Parting Shot','Relic Song','Roar','Round','Snarl','Sparkling Aria','Torch Song']);
+  const BALL_OR_BOMB_MOVES=new Set(['Aura Sphere','Electro Ball','Energy Ball','Focus Blast','Gyro Ball','Magnet Bomb','Mist Ball','Mud Bomb','Pyro Ball','Seed Bomb','Shadow Ball','Sludge Bomb','Weather Ball']);
+  const WIND_MOVES=new Set(['Air Slash','Bleakwind Storm','Defog','Fairy Wind','Heat Wave','Hurricane','Icy Wind','Ominous Wind','Petal Blizzard','Razor Wind','Sandsear Storm','Tailwind','Twister','Whirlwind','Wildbolt Storm']);
   const POWDER_MOVES=new Set(['Cotton Spore','Poison Powder','Powder','Sleep Powder','Spore','Stun Spore']);
   const EXTRA_SPECIES_BY_ID=Object.fromEntries(
     Object.entries(EXTRA_SPECIES).map(([name,data])=>[DexRef.id?DexRef.id(name):String(name||'').toLowerCase(),data])
@@ -88,6 +101,19 @@
   if(typeof REPLAY_MOVE_HINTS!=='undefined'){
     REPLAY_MOVE_HINTS['Hyper Voice']=['Normal','Special',0];
     REPLAY_MOVE_HINTS['Aura Sphere']=['Fighting','Special',0];
+    REPLAY_MOVE_HINTS.Boomburst=['Normal','Special',0];
+    REPLAY_MOVE_HINTS['Echoed Voice']=['Normal','Special',0];
+    REPLAY_MOVE_HINTS['Sparkling Aria']=['Water','Special',0];
+    REPLAY_MOVE_HINTS.Round=['Normal','Special',0];
+    REPLAY_MOVE_HINTS['Relic Song']=['Normal','Special',0];
+    REPLAY_MOVE_HINTS['Electro Ball']=['Electric','Special',0];
+    REPLAY_MOVE_HINTS['Mist Ball']=['Psychic','Special',0];
+    REPLAY_MOVE_HINTS['Fairy Wind']=['Fairy','Special',0];
+    REPLAY_MOVE_HINTS['Ominous Wind']=['Ghost','Special',0];
+    REPLAY_MOVE_HINTS['Petal Blizzard']=['Grass','Physical',0];
+    REPLAY_MOVE_HINTS['Razor Wind']=['Normal','Special',0];
+    REPLAY_MOVE_HINTS['Sandsear Storm']=['Ground','Special',0];
+    REPLAY_MOVE_HINTS['Wildbolt Storm']=['Electric','Special',0];
   }
 
   if(typeof moveBlockingAbility==='function'){
