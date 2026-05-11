@@ -34,12 +34,48 @@
     'Petal Blizzard':['Grass','Physical',90,100],
     'Razor Wind':['Normal','Special',80,100],
     'Sandsear Storm':['Ground','Special',100,80],
-    'Wildbolt Storm':['Electric','Special',100,80]
+    'Wildbolt Storm':['Electric','Special',100,80],
+    'Alluring Voice':['Fairy','Special',80,100],
+    'Air Cutter':['Flying','Special',60,95],
+    'Bullet Seed':['Grass','Physical',25,100],
+    'Disarming Voice':['Fairy','Special',40,100],
+    Gust:['Flying','Special',40,100],
+    'Grass Whistle':['Grass','Status',0,55],
+    'Heal Bell':['Normal','Status',0,100],
+    'Ice Ball':['Ice','Physical',30,90],
+    'Metal Sound':['Steel','Status',0,85],
+    'Noble Roar':['Normal','Status',0,100],
+    Octazooka:['Water','Special',65,85],
+    'Perish Song':['Normal','Status',0,100],
+    'Pollen Puff':['Bug','Special',90,100],
+    'Psychic Noise':['Psychic','Special',75,100],
+    'Rage Powder':['Bug','Status',0,100],
+    'Rock Wrecker':['Rock','Physical',150,90],
+    Screech:['Normal','Status',0,85],
+    Sing:['Normal','Status',0,55],
+    Snore:['Normal','Special',50,100],
+    'Springtide Storm':['Fairy','Special',100,80],
+    Supersonic:['Normal','Status',0,55],
+    Uproar:['Normal','Special',90,100],
+    'Zap Cannon':['Electric','Special',120,50]
   };
-  const SOUND_MOVES=new Set(['Boomburst','Bug Buzz','Clanging Scales','Echoed Voice','Hyper Voice','Overdrive','Parting Shot','Relic Song','Roar','Round','Snarl','Sparkling Aria','Torch Song']);
-  const BALL_OR_BOMB_MOVES=new Set(['Aura Sphere','Electro Ball','Energy Ball','Focus Blast','Gyro Ball','Magnet Bomb','Mist Ball','Mud Bomb','Pyro Ball','Seed Bomb','Shadow Ball','Sludge Bomb','Weather Ball']);
-  const WIND_MOVES=new Set(['Air Slash','Bleakwind Storm','Defog','Fairy Wind','Heat Wave','Hurricane','Icy Wind','Ominous Wind','Petal Blizzard','Razor Wind','Sandsear Storm','Tailwind','Twister','Whirlwind','Wildbolt Storm']);
-  const POWDER_MOVES=new Set(['Cotton Spore','Poison Powder','Powder','Sleep Powder','Spore','Stun Spore']);
+  const SOUND_MOVES=new Set([
+    'Alluring Voice','Boomburst','Bug Buzz','Clanging Scales','Disarming Voice','Echoed Voice',
+    'Grass Whistle','Heal Bell','Hyper Voice','Metal Sound','Noble Roar','Overdrive','Parting Shot',
+    'Perish Song','Psychic Noise','Relic Song','Roar','Round','Screech','Sing','Snarl','Snore',
+    'Sparkling Aria','Supersonic','Torch Song','Uproar'
+  ]);
+  const BALL_OR_BOMB_MOVES=new Set([
+    'Aura Sphere','Bullet Seed','Electro Ball','Energy Ball','Focus Blast','Gyro Ball','Ice Ball',
+    'Magnet Bomb','Mist Ball','Mud Bomb','Octazooka','Pollen Puff','Pyro Ball','Rock Wrecker',
+    'Seed Bomb','Shadow Ball','Sludge Bomb','Weather Ball','Zap Cannon'
+  ]);
+  const WIND_MOVES=new Set([
+    'Air Cutter','Air Slash','Bleakwind Storm','Defog','Fairy Wind','Gust','Heat Wave','Hurricane',
+    'Icy Wind','Ominous Wind','Petal Blizzard','Razor Wind','Sandsear Storm','Springtide Storm',
+    'Tailwind','Twister','Whirlwind','Wildbolt Storm'
+  ]);
+  const POWDER_MOVES=new Set(['Cotton Spore','Poison Powder','Powder','Rage Powder','Sleep Powder','Spore','Stun Spore']);
   const EXTRA_SPECIES_BY_ID=Object.fromEntries(
     Object.entries(EXTRA_SPECIES).map(([name,data])=>[DexRef.id?DexRef.id(name):String(name||'').toLowerCase(),data])
   );
@@ -114,6 +150,29 @@
     REPLAY_MOVE_HINTS['Razor Wind']=['Normal','Special',0];
     REPLAY_MOVE_HINTS['Sandsear Storm']=['Ground','Special',0];
     REPLAY_MOVE_HINTS['Wildbolt Storm']=['Electric','Special',0];
+    REPLAY_MOVE_HINTS['Alluring Voice']=['Fairy','Special',0];
+    REPLAY_MOVE_HINTS['Air Cutter']=['Flying','Special',0];
+    REPLAY_MOVE_HINTS['Bullet Seed']=['Grass','Physical',0];
+    REPLAY_MOVE_HINTS['Disarming Voice']=['Fairy','Special',0];
+    REPLAY_MOVE_HINTS.Gust=['Flying','Special',0];
+    REPLAY_MOVE_HINTS['Grass Whistle']=['Grass','Status',0];
+    REPLAY_MOVE_HINTS['Heal Bell']=['Normal','Status',0];
+    REPLAY_MOVE_HINTS['Ice Ball']=['Ice','Physical',0];
+    REPLAY_MOVE_HINTS['Metal Sound']=['Steel','Status',0];
+    REPLAY_MOVE_HINTS['Noble Roar']=['Normal','Status',0];
+    REPLAY_MOVE_HINTS.Octazooka=['Water','Special',0];
+    REPLAY_MOVE_HINTS['Perish Song']=['Normal','Status',0];
+    REPLAY_MOVE_HINTS['Pollen Puff']=['Bug','Special',0];
+    REPLAY_MOVE_HINTS['Psychic Noise']=['Psychic','Special',0];
+    REPLAY_MOVE_HINTS['Rage Powder']=['Bug','Status',0];
+    REPLAY_MOVE_HINTS['Rock Wrecker']=['Rock','Physical',0];
+    REPLAY_MOVE_HINTS.Screech=['Normal','Status',0];
+    REPLAY_MOVE_HINTS.Sing=['Normal','Status',0];
+    REPLAY_MOVE_HINTS.Snore=['Normal','Special',0];
+    REPLAY_MOVE_HINTS['Springtide Storm']=['Fairy','Special',0];
+    REPLAY_MOVE_HINTS.Supersonic=['Normal','Status',0];
+    REPLAY_MOVE_HINTS.Uproar=['Normal','Special',0];
+    REPLAY_MOVE_HINTS['Zap Cannon']=['Electric','Special',0];
   }
 
   if(typeof moveBlockingAbility==='function'){
