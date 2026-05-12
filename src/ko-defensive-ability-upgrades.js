@@ -7,6 +7,25 @@
   const byId=id=>doc?.getElementById?.(id);
   const safeHtml=typeof html==='function'?html:(s=>String(s??''));
   const hitChance=()=>typeof root.nHitChance==='function'?root.nHitChance:(typeof host.nHitChance==='function'?host.nHitChance:null);
+  const SOUND_MOVES=new Set([
+    'Alluring Voice',
+    'Boomburst',
+    'Bug Buzz',
+    'Clanging Scales',
+    'Disarming Voice',
+    'Echoed Voice',
+    'Hyper Voice',
+    'Overdrive',
+    'Parting Shot',
+    'Psychic Noise',
+    'Relic Song',
+    'Round',
+    'Snarl',
+    'Snore',
+    'Sparkling Aria',
+    'Torch Song',
+    'Uproar'
+  ]);
 
   if(typeof legacyDmg!=='function')return;
 
@@ -15,6 +34,12 @@
   }
   function moveCategory(roll){
     return String(roll?.move?.[1]||roll?.moveCategory||'').trim();
+  }
+  function moveName(move=''){
+    return String(move||'').trim();
+  }
+  function isSoundMove(move=''){
+    return SOUND_MOVES.has(moveName(move));
   }
   function fullHpAbilityWindowActive(roll){
     const max=Number(roll?.max)||0;
@@ -44,7 +69,7 @@
     if(n<=0)return 0;
     return Math.max(1,Math.floor(n*multiplier));
   }
-  function defensiveAbilityAdjustments(roll){
+  function defensiveAbilityAdjustments(roll,mv=''){
     const ability=String(roll?.def?.ability||'').trim();
     const notes=[];
     let multiplier=1;
@@ -75,6 +100,14 @@
       multiplier*=0.5;
       notes.push('Water Bubble reduced the Fire damage.');
     }
+    if(ability==='Purifying Salt'&&moveType(roll)==='Ghost'){
+      multiplier*=0.5;
+      notes.push('Purifying Salt reduced the Ghost damage.');
+    }
+    if(ability==='Punk Rock'&&isSoundMove(mv)){
+      multiplier*=0.5;
+      notes.push(`Punk Rock reduced the sound-based damage from ${moveName(mv)}.`);
+    }
     if(ability==='Fur Coat'&&moveCategory(roll)==='Physical'){
       multiplier*=0.5;
       notes.push('Fur Coat cut the physical damage in half.');
@@ -85,8 +118,8 @@
     }
     return { multiplier, notes };
   }
-  function applyDefensiveAbilityAdjustments(roll){
-    const adjustment=defensiveAbilityAdjustments(roll);
+  function applyDefensiveAbilityAdjustments(roll,mv=''){
+    const adjustment=defensiveAbilityAdjustments(roll,mv);
     if(adjustment.multiplier===1){
       return {
         ...roll,
@@ -116,7 +149,7 @@
   }
 
   root.dmg=function patchedKoDefensiveAbilityDmg(att,def,mv,opt={}){
-    return storeLastKoRoll(applyDefensiveAbilityAdjustments(legacyDmg(att,def,mv,opt)));
+    return storeLastKoRoll(applyDefensiveAbilityAdjustments(legacyDmg(att,def,mv,opt),mv));
   };
   if(host!==root)host.dmg=root.dmg;
 
