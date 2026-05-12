@@ -19,6 +19,7 @@ const context = {
   REPLAY_MOVE_HINTS: {
     'Aqua Jet': ['Water', 'Physical', 1],
     'Extreme Speed': ['Normal', 'Physical', 2],
+    'Grassy Glide': ['Grass', 'Physical', 0],
     'Helping Hand': ['Normal', 'Status', 5],
     Protect: ['Normal', 'Status', 4],
     Psychic: ['Psychic', 'Special', 0],
@@ -86,6 +87,7 @@ const context = {
       this.turnMoves = [];
       this.revealed = [];
       this.states = {};
+      this.replayTerrainState = { current: '' };
     }
     moveBlockedAbilities() {
       return [];
@@ -169,6 +171,18 @@ const blockedAquaJet = context.dmg({ species: 'Palafin' }, tsareena, 'Aqua Jet')
 assert(blockedAquaJet.blockedBy === 'Queenly Majesty', 'Queenly Majesty should blank direct priority attacks in damage math');
 assert(blockedAquaJet.maxd === 0, 'Queenly Majesty should zero out priority damage rolls');
 
+const grassyGlideLive = context.dmg({ species: 'Rillaboom' }, farigiraf, 'Grassy Glide');
+assert(!grassyGlideLive.blockedBy, 'Grassy Glide should stay non-priority without Grassy Terrain');
+assert(grassyGlideLive.maxd > 0, 'Grassy Glide should keep normal damage when terrain is absent');
+
+const grassyGlideBlocked = context.dmg({ species: 'Rillaboom' }, farigiraf, 'Grassy Glide', { terrain: 'grassy' });
+assert(grassyGlideBlocked.blockedBy === 'Armor Tail', 'Armor Tail should blank Grassy Glide when Grassy Terrain makes it priority');
+assert(grassyGlideBlocked.maxd === 0, 'Armor Tail should zero out Grassy Glide rolls when Grassy Terrain is active');
+
+const grassyGlideBypass = context.dmg({ species: 'Rillaboom', ability: 'Mold Breaker' }, farigiraf, 'Grassy Glide', { terrain: 'grassy' });
+assert(!grassyGlideBypass.blockedBy, 'Mold Breaker should let Grassy Glide bypass Armor Tail under Grassy Terrain');
+assert(grassyGlideBypass.maxd > 0, 'Mold Breaker should keep live Grassy Glide rolls under Grassy Terrain');
+
 const liveThunderbolt = context.dmg({ species: 'Zapdos' }, gyarados, 'Psychic');
 assert(!liveThunderbolt.blockedBy, 'non-priority moves should stay live');
 assert(liveThunderbolt.maxd > 0, 'non-priority moves should keep their normal damage rolls');
@@ -210,8 +224,19 @@ assert(!protectBlocked.includes('Armor Tail'), 'Protect should not count as bloc
 const quashBlocked = parser.moveBlockedAbilities({ species: 'Farigiraf' }, 'Quash');
 assert(quashBlocked.includes('Armor Tail'), 'foe-targeting priority status like Quash should still count as blocked by Armor Tail');
 
-const bypassProtected = parser.moveAbilityBypassProtectedAbilities({ species: 'Farigiraf', bypassAbility: 'Mold Breaker' }, 'Extreme Speed');
-assert(bypassProtected.includes('Armor Tail'), 'bypass notes should still know Armor Tail was the ignored protection');
+const grassyGlideReplayOff = parser.moveBlockedAbilities({ species: 'Farigiraf' }, 'Grassy Glide');
+assert(!grassyGlideReplayOff.includes('Armor Tail'), 'Grassy Glide should not rule out Armor Tail without Grassy Terrain in replay logic');
+
+parser.extractEvidence({ type: '-fieldstart', effect: 'move: Grassy Terrain' }, 2);
+const grassyGlideReplayOn = parser.moveBlockedAbilities({ species: 'Farigiraf' }, 'Grassy Glide');
+assert(grassyGlideReplayOn.includes('Armor Tail'), 'Grassy Glide should rule out Armor Tail once Grassy Terrain makes it priority');
+
+const grassyBypassProtected = parser.moveAbilityBypassProtectedAbilities({ species: 'Farigiraf', bypassAbility: 'Mold Breaker' }, 'Grassy Glide');
+assert(grassyBypassProtected.includes('Armor Tail'), 'bypass notes should still know Armor Tail was the ignored Grassy Glide protection');
+
+parser.extractEvidence({ type: '-fieldend', effect: 'move: Grassy Terrain' }, 3);
+const grassyGlideReplayCleared = parser.moveBlockedAbilities({ species: 'Farigiraf' }, 'Grassy Glide');
+assert(!grassyGlideReplayCleared.includes('Armor Tail'), 'ending Grassy Terrain should stop treating Grassy Glide as priority');
 
 const reward = parser.abilityRewardText('Armor Tail');
 assert(/priority/i.test(reward), 'priority blockers should explain their actual tactical reward');
@@ -222,6 +247,7 @@ assert(farigirafSpecies?.abilities?.[1] === 'Armor Tail', 'Farigiraf fallback da
 assert(parser.abilityTriggeredByMove('Armor Tail', 'Extreme Speed'), 'priority blockers should count as move-triggered reveals for replay clue labeling');
 assert(parser.abilityClueLabel('Dazzling', 'Aqua Jet') === 'Dazzling blocked Aqua Jet', 'priority blockers should keep move-specific replay clue labels');
 assert(parser.abilityClueLabelWithProof('Queenly Majesty', 'Extreme Speed', true) === 'Queenly Majesty blocked Extreme Speed', 'proof-backed priority blocker labels should stay move-specific');
+assert(parser.abilityClueLabelWithProof('Armor Tail', 'Grassy Glide', true) === 'Armor Tail blocked Grassy Glide', 'proof-backed labels should keep the exact conditional-priority move');
 assert(parser.reactiveAbilityProof('Armor Tail'), 'priority blockers should count as hard reactive replay proof');
 
 parser.turnMoves = [{ slot: 'p1a', species: 'Dragonite', move: 'Extreme Speed' }];
@@ -232,13 +258,21 @@ assert(parser.revealed[0].label === 'Armor Tail blocked Extreme Speed', 'blocked
 assert(parser.revealed[0].state.abilityHints.includes('Armor Tail'), 'blocked-priority replay events should anchor the live ability hint');
 
 parser.revealed = [];
-parser.turnMoves = [{ slot: 'p1a', species: 'Farigiraf', move: 'Helping Hand' }];
+parser.extractEvidence({ type: '-fieldstart', effect: 'move: Grassy Terrain' }, 4);
+parser.turnMoves = [{ slot: 'p1a', species: 'Rillaboom', move: 'Grassy Glide' }];
 parser.extractEvidence({ type: '-activate', target: 'p2a: Farigiraf', effect: 'ability: Armor Tail' }, 4);
+assert(parser.revealed.length === 1, 'explicit Grassy Glide blocks should create an ability reveal under Grassy Terrain');
+assert(parser.revealed[0].label === 'Armor Tail blocked Grassy Glide', 'Grassy Glide replay reveals should preserve the blocked move in the clue label');
+
+parser.revealed = [];
+parser.extractEvidence({ type: '-fieldend', effect: 'move: Grassy Terrain' }, 5);
+parser.turnMoves = [{ slot: 'p1a', species: 'Farigiraf', move: 'Helping Hand' }];
+parser.extractEvidence({ type: '-activate', target: 'p2a: Farigiraf', effect: 'ability: Armor Tail' }, 5);
 assert(parser.revealed.length === 0, 'support priority activate events should not fabricate a priority-blocker reveal');
 
 parser.revealed = [];
 parser.turnMoves = [{ slot: 'p1a', species: 'Zapdos', move: 'Psychic' }];
-parser.extractEvidence({ type: '-activate', target: 'p2a: Farigiraf', effect: 'ability: Armor Tail' }, 5);
+parser.extractEvidence({ type: '-activate', target: 'p2a: Farigiraf', effect: 'ability: Armor Tail' }, 6);
 assert(parser.revealed.length === 0, 'non-priority activate events should not fabricate a priority-blocker reveal');
 
 console.log('[OK] priority blocking upgrades passed');
