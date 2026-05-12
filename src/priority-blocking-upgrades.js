@@ -56,6 +56,7 @@
     'Extreme Speed':['Normal','Physical',80,100,2],
     'Fake Out':['Normal','Physical',40,100,3],
     'First Impression':['Bug','Physical',90,100,2],
+    'Grassy Glide':['Grass','Physical',70,100,0],
     'Ice Shard':['Ice','Physical',40,100,1],
     'Jet Punch':['Water','Physical',60,100,1],
     'Mach Punch':['Fighting','Physical',40,100,1],
@@ -71,17 +72,32 @@
   function moveName(move=''){
     return DexRef.resolveMoveName?DexRef.resolveMoveName(move):String(move||'').trim();
   }
-  function movePriorityValue(move=''){
+  function normalizedTerrain(raw=''){
+    const label=String(raw||'').replace(/^(move|ability): /,'').trim().toLowerCase();
+    if(!label||label==='none')return '';
+    if(label.includes('electric'))return 'electric';
+    if(label.includes('grassy'))return 'grassy';
+    if(label.includes('misty'))return 'misty';
+    if(label.includes('psychic'))return 'psychic';
+    return '';
+  }
+  function priorityContextTerrain(context){
+    return normalizedTerrain(context?.terrain||context?.battleState?.terrain);
+  }
+  function movePriorityValue(move='',context=null){
+    let priority=0;
     if(typeof movePriority==='function'){
-      const priority=Number(movePriority(move));
-      if(Number.isFinite(priority))return priority;
-    }
-    if(typeof moveMeta==='function'){
+      const value=Number(movePriority(move));
+      if(Number.isFinite(value))priority=value;
+    }else if(typeof moveMeta==='function'){
       const meta=moveMeta(move);
-      const priority=Number(meta?.[4]);
-      if(Number.isFinite(priority))return priority;
+      const value=Number(meta?.[4]);
+      if(Number.isFinite(value))priority=value;
     }
-    return 0;
+    if(moveName(move)==='Grassy Glide'&&priorityContextTerrain(context)==='grassy'){
+      priority=Math.max(priority,1);
+    }
+    return priority;
   }
   function moveCategoryValue(move=''){
     if(typeof moveCategory==='function'){
@@ -107,17 +123,17 @@
   function isPriorityBlockingAbility(ability=''){
     return PRIORITY_BLOCKERS.has(String(ability||'').trim());
   }
-  function isBlockablePriorityMove(move=''){
+  function isBlockablePriorityMove(move='',context=null){
     const name=moveName(move);
-    return movePriorityValue(name)>0&&!NON_BLOCKABLE_PRIORITY_MOVES.has(name);
+    return movePriorityValue(name,context)>0&&!NON_BLOCKABLE_PRIORITY_MOVES.has(name);
   }
-  function isDirectPriorityAttack(move=''){
-    return isBlockablePriorityMove(move)&&moveCategoryValue(move)!=='Status';
+  function isDirectPriorityAttack(move='',context=null){
+    return isBlockablePriorityMove(move,context)&&moveCategoryValue(move)!=='Status';
   }
-  function priorityBlockingAbility(ability='', move=''){
+  function priorityBlockingAbility(ability='',move='',context=null){
     const name=String(ability||'').trim();
     if(!isPriorityBlockingAbility(name))return '';
-    return isBlockablePriorityMove(move)?name:'';
+    return isBlockablePriorityMove(move,context)?name:'';
   }
   function detectiveAbilityPool(species=''){
     if(typeof detectiveAbilities==='function')return detectiveAbilities(species)||[];
@@ -127,15 +143,15 @@
   function addUnique(list=[]){
     return [...new Set((list||[]).filter(Boolean))];
   }
-  function priorityBlockedAbilities(species='', move=''){
-    if(!isBlockablePriorityMove(move))return [];
-    return detectiveAbilityPool(species).filter(ability=>priorityBlockingAbility(ability,move));
+  function priorityBlockedAbilities(species='',move='',context=null){
+    if(!isBlockablePriorityMove(move,context))return [];
+    return detectiveAbilityPool(species).filter(ability=>priorityBlockingAbility(ability,move,context));
   }
   function normalizeAbilityLabel(raw=''){
     return String(raw||'').replace(/^(ability|move): /,'').trim();
   }
-  function priorityBlockerClueLabel(ability='', move=''){
-    const blocker=priorityBlockingAbility(ability,move);
+  function priorityBlockerClueLabel(ability='',move='',context=null,assumeTriggered=false){
+    const blocker=assumeTriggered?String(ability||'').trim():priorityBlockingAbility(ability,move,context);
     if(!blocker||!move)return `${ability} revealed`;
     return `${blocker} blocked ${move}`;
   }
@@ -149,8 +165,8 @@
   }
   function psychicTerrainPriorityBlock(roll={},move=''){
     if(roll?.blockedBy)return '';
-    if(String(roll?.battleState?.terrain||'')!=='psychic')return '';
-    if(!isDirectPriorityAttack(move))return '';
+    if(priorityContextTerrain(roll)!=='psychic')return '';
+    if(!isDirectPriorityAttack(move,roll?.battleState))return '';
     return groundedTarget(roll?.def)?'Psychic Terrain':'';
   }
   function zeroPriorityRoll(roll={}, blocker=''){
@@ -197,6 +213,7 @@
       'Extreme Speed':['Normal','Physical',2],
       'Fake Out':['Normal','Physical',3],
       'First Impression':['Bug','Physical',2],
+      'Grassy Glide':['Grass','Physical',0],
       'Ice Shard':['Ice','Physical',1],
       'Jet Punch':['Water','Physical',1],
       'Mach Punch':['Fighting','Physical',1],
@@ -209,8 +226,8 @@
 
   if(typeof moveBlockingAbility==='function'){
     const originalMoveBlockingAbility=moveBlockingAbility;
-    moveBlockingAbility=function patchedMoveBlockingAbility(moveType,category,ability,move=''){
-      const blocker=priorityBlockingAbility(ability,move);
+    moveBlockingAbility=function patchedMoveBlockingAbility(moveType,category,ability,move='',context=null){
+      const blocker=priorityBlockingAbility(ability,move,context);
       if(blocker)return blocker;
       return originalMoveBlockingAbility(moveType,category,ability,move);
     };
@@ -218,18 +235,38 @@
 
   if(typeof dmg==='function'){
     const originalDmg=dmg;
-    dmg=function patchedDmg(att,def,mv,opt={}){
+    root.dmg=function patchedDmg(att,def,mv,opt={}){
       const roll=originalDmg(att,def,mv,opt);
-      const blocker=isDirectPriorityAttack(mv)&&!attackerBypassesPriorityBlocker(roll.att?.ability,mv)?priorityBlockingAbility(roll.def?.ability,mv):'';
+      const blocker=isDirectPriorityAttack(mv,roll?.battleState)&&!attackerBypassesPriorityBlocker(roll.att?.ability,mv)
+        ? priorityBlockingAbility(roll.def?.ability,mv,roll?.battleState)
+        : '';
       if(blocker)return zeroPriorityRoll(roll,blocker);
       const terrainBlocker=psychicTerrainPriorityBlock(roll,mv);
       if(terrainBlocker)return zeroPriorityRoll(roll,terrainBlocker);
       return roll;
     };
+    if(host!==root)host.dmg=root.dmg;
+    try{dmg=root.dmg}catch(_error){}
   }
 
   const proto=ReplayParserRef?.prototype;
   if(!proto)return;
+
+  proto.ensureReplayTerrainState=function ensureReplayTerrainState(){
+    if(!this.replayTerrainState)this.replayTerrainState={current:''};
+    return this.replayTerrainState;
+  };
+  proto.recordReplayTerrain=function recordReplayTerrain(effect=''){
+    const terrain=normalizedTerrain(effect);
+    if(terrain)this.ensureReplayTerrainState().current=terrain;
+  };
+  proto.clearReplayTerrain=function clearReplayTerrain(effect=''){
+    const terrain=normalizedTerrain(effect);
+    if(!terrain||this.currentReplayTerrain()===terrain)this.ensureReplayTerrainState().current='';
+  };
+  proto.currentReplayTerrain=function currentReplayTerrain(){
+    return this.ensureReplayTerrainState().current||'';
+  };
 
   if(typeof proto.moveBlockedAbilities==='function'){
     const originalMoveBlockedAbilities=proto.moveBlockedAbilities;
@@ -237,7 +274,7 @@
       const base=originalMoveBlockedAbilities.call(this,state,move)||[];
       if(typeof this.abilitySuppressionActive==='function'&&this.abilitySuppressionActive(state))return base;
       if(typeof this.moveAbilityBypass==='function'&&this.moveAbilityBypass(state,move))return base;
-      return addUnique([...base,...priorityBlockedAbilities(state?.species,move)]);
+      return addUnique([...base,...priorityBlockedAbilities(state?.species,move,{terrain:this.currentReplayTerrain()})]);
     };
   }
 
@@ -245,7 +282,7 @@
     const originalMoveAbilityBypassProtectedAbilities=proto.moveAbilityBypassProtectedAbilities;
     proto.moveAbilityBypassProtectedAbilities=function patchedMoveAbilityBypassProtectedAbilities(state,move='',status=''){
       const base=originalMoveAbilityBypassProtectedAbilities.call(this,state,move,status)||[];
-      return addUnique([...base,...priorityBlockedAbilities(state?.species,move)]);
+      return addUnique([...base,...priorityBlockedAbilities(state?.species,move,{terrain:this.currentReplayTerrain()})]);
     };
   }
 
@@ -268,7 +305,7 @@
   if(typeof proto.abilityClueLabel==='function'){
     const originalAbilityClueLabel=proto.abilityClueLabel;
     proto.abilityClueLabel=function patchedAbilityClueLabel(ability,move=''){
-      if(priorityBlockingAbility(ability,move))return priorityBlockerClueLabel(ability,move);
+      if(priorityBlockingAbility(ability,move,{terrain:this.currentReplayTerrain()}))return priorityBlockerClueLabel(ability,move,{terrain:this.currentReplayTerrain()});
       return originalAbilityClueLabel.call(this,ability,move);
     };
   }
@@ -276,8 +313,8 @@
   if(typeof proto.abilityClueLabelWithProof==='function'){
     const originalAbilityClueLabelWithProof=proto.abilityClueLabelWithProof;
     proto.abilityClueLabelWithProof=function patchedAbilityClueLabelWithProof(ability,move='',assumeTriggered=false){
-      if(move&&(assumeTriggered||priorityBlockingAbility(ability,move))){
-        const label=priorityBlockerClueLabel(ability,move);
+      if(move&&(assumeTriggered||priorityBlockingAbility(ability,move,{terrain:this.currentReplayTerrain()}))){
+        const label=priorityBlockerClueLabel(ability,move,{terrain:this.currentReplayTerrain()},assumeTriggered);
         if(label!==`${ability} revealed`)return label;
       }
       return originalAbilityClueLabelWithProof.call(this,ability,move,assumeTriggered);
@@ -294,6 +331,11 @@
   if(typeof proto.extractEvidence==='function'){
     const originalExtractEvidence=proto.extractEvidence;
     proto.extractEvidence=function patchedExtractEvidence(event,turn){
+      if(event?.type==='-fieldstart'){
+        this.recordReplayTerrain(event.condition||event.effect||event.from);
+      }else if(event?.type==='-fieldend'){
+        this.clearReplayTerrain(event.condition||event.effect||event.from);
+      }
       if(event?.type==='-activate'&&event.target){
         const ability=normalizeAbilityLabel(event.effect||event.from||'');
         if(isPriorityBlockingAbility(ability)&&typeof this.ensureState==='function'){
@@ -302,14 +344,14 @@
             ? [...this.turnMoves].reverse().find(entry=>entry?.move&&entry.slot&&entry.slot!==state?.slot)
             : null;
           const moveNameValue=String(moveEvent?.move||'').trim();
-          if(state&&moveNameValue&&isBlockablePriorityMove(moveNameValue)&&typeof this.recordAbilityReveal==='function'){
+          if(state&&moveNameValue&&isBlockablePriorityMove(moveNameValue,{terrain:this.currentReplayTerrain()})&&typeof this.recordAbilityReveal==='function'){
             this.recordAbilityReveal(
               state,
               turn||0,
               ability,
               moveEvent,
               `${state.species} revealed ${ability} by blocking ${moveNameValue}`,
-              priorityBlockerClueLabel(ability,moveNameValue),
+              priorityBlockerClueLabel(ability,moveNameValue,{terrain:this.currentReplayTerrain()},true),
               {assumeReactiveMove:true}
             );
           }
