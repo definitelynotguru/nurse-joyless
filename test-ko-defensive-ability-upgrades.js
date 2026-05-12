@@ -120,6 +120,24 @@ result = context.dmg({}, context.__rollTemplate.def, 'Flamethrower', {});
 assert(result.maxd === 50, 'Water Bubble should halve Fire damage');
 assert(result.defensiveAbilityNotes.some(note => /Water Bubble/.test(note)), 'Water Bubble should explain the reduction');
 
+context.__rollTemplate = makeRoll({ def: { ability: 'Purifying Salt' }, moveType: 'Ghost', move: ['Ghost', 'Special'] });
+result = context.dmg({}, context.__rollTemplate.def, 'Shadow Ball', {});
+assert(result.maxd === 50, 'Purifying Salt should halve Ghost damage');
+assert(result.defensiveAbilityNotes.some(note => /Purifying Salt/.test(note)), 'Purifying Salt should explain the Ghost reduction');
+
+context.__rollTemplate = makeRoll({ def: { ability: 'Purifying Salt' }, moveType: 'Water', move: ['Water', 'Special'] });
+result = context.dmg({}, context.__rollTemplate.def, 'Surf', {});
+assert(result.maxd === 100, 'Purifying Salt should ignore non-Ghost hits');
+
+context.__rollTemplate = makeRoll({ def: { ability: 'Punk Rock' }, moveType: 'Normal', move: ['Normal', 'Special'] });
+result = context.dmg({}, context.__rollTemplate.def, 'Hyper Voice', {});
+assert(result.maxd === 50, 'Punk Rock should halve sound-move damage');
+assert(result.defensiveAbilityNotes.some(note => /Punk Rock/.test(note)), 'Punk Rock should explain the sound reduction');
+
+context.__rollTemplate = makeRoll({ def: { ability: 'Punk Rock' }, moveType: 'Fairy', move: ['Fairy', 'Special'] });
+result = context.dmg({}, context.__rollTemplate.def, 'Moonblast', {});
+assert(result.maxd === 100, 'Punk Rock should ignore non-sound moves');
+
 context.__rollTemplate = makeRoll({ def: { ability: 'Fur Coat' }, moveType: 'Normal', move: ['Normal', 'Physical'] });
 result = context.dmg({}, context.__rollTemplate.def, 'Extreme Speed', {});
 assert(result.maxd === 50, 'Fur Coat should halve physical damage');
