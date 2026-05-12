@@ -130,6 +130,10 @@
   function isDirectPriorityAttack(move='',context=null){
     return isBlockablePriorityMove(move,context)&&moveCategoryValue(move)!=='Status';
   }
+  function canBePriorityBlockedWithProof(move='',context=null){
+    if(isBlockablePriorityMove(move,context))return true;
+    return moveName(move)==='Grassy Glide';
+  }
   function priorityBlockingAbility(ability='',move='',context=null){
     const name=String(ability||'').trim();
     if(!isPriorityBlockingAbility(name))return '';
@@ -262,7 +266,7 @@
   };
   proto.clearReplayTerrain=function clearReplayTerrain(effect=''){
     const terrain=normalizedTerrain(effect);
-    if(!terrain||this.currentReplayTerrain()===terrain)this.ensureReplayTerrainState().current='';
+    if(terrain&&this.currentReplayTerrain()===terrain)this.ensureReplayTerrainState().current='';
   };
   proto.currentReplayTerrain=function currentReplayTerrain(){
     return this.ensureReplayTerrainState().current||'';
@@ -297,7 +301,7 @@
   if(typeof proto.abilityTriggeredByMove==='function'){
     const originalAbilityTriggeredByMove=proto.abilityTriggeredByMove;
     proto.abilityTriggeredByMove=function patchedAbilityTriggeredByMove(ability,move=''){
-      if(priorityBlockingAbility(ability,move))return true;
+      if(priorityBlockingAbility(ability,move,{terrain:this.currentReplayTerrain()}))return true;
       return originalAbilityTriggeredByMove.call(this,ability,move);
     };
   }
@@ -313,8 +317,10 @@
   if(typeof proto.abilityClueLabelWithProof==='function'){
     const originalAbilityClueLabelWithProof=proto.abilityClueLabelWithProof;
     proto.abilityClueLabelWithProof=function patchedAbilityClueLabelWithProof(ability,move='',assumeTriggered=false){
-      if(move&&(assumeTriggered||priorityBlockingAbility(ability,move,{terrain:this.currentReplayTerrain()}))){
-        const label=priorityBlockerClueLabel(ability,move,{terrain:this.currentReplayTerrain()},assumeTriggered);
+      const context={terrain:this.currentReplayTerrain()};
+      const triggered=priorityBlockingAbility(ability,move,context)||(assumeTriggered&&canBePriorityBlockedWithProof(move,context)&&isPriorityBlockingAbility(ability));
+      if(move&&triggered){
+        const label=priorityBlockerClueLabel(ability,move,context,assumeTriggered);
         if(label!==`${ability} revealed`)return label;
       }
       return originalAbilityClueLabelWithProof.call(this,ability,move,assumeTriggered);
