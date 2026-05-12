@@ -245,9 +245,11 @@ const farigirafSpecies = context.DexAdapter.getSpecies('Farigiraf');
 assert(farigirafSpecies?.abilities?.[1] === 'Armor Tail', 'Farigiraf fallback data should expose Armor Tail offline');
 
 assert(parser.abilityTriggeredByMove('Armor Tail', 'Extreme Speed'), 'priority blockers should count as move-triggered reveals for replay clue labeling');
+assert(!parser.abilityTriggeredByMove('Armor Tail', 'Grassy Glide'), 'Grassy Glide should not count as a triggered priority block without Grassy Terrain');
 assert(parser.abilityClueLabel('Dazzling', 'Aqua Jet') === 'Dazzling blocked Aqua Jet', 'priority blockers should keep move-specific replay clue labels');
 assert(parser.abilityClueLabelWithProof('Queenly Majesty', 'Extreme Speed', true) === 'Queenly Majesty blocked Extreme Speed', 'proof-backed priority blocker labels should stay move-specific');
 assert(parser.abilityClueLabelWithProof('Armor Tail', 'Grassy Glide', true) === 'Armor Tail blocked Grassy Glide', 'proof-backed labels should keep the exact conditional-priority move');
+assert(parser.abilityClueLabelWithProof('Armor Tail', 'Psychic', true) === 'Armor Tail revealed', 'proof-backed labels should fall back when the move was never blockable');
 assert(parser.reactiveAbilityProof('Armor Tail'), 'priority blockers should count as hard reactive replay proof');
 
 parser.turnMoves = [{ slot: 'p1a', species: 'Dragonite', move: 'Extreme Speed' }];
@@ -269,6 +271,12 @@ parser.extractEvidence({ type: '-fieldend', effect: 'move: Grassy Terrain' }, 5)
 parser.turnMoves = [{ slot: 'p1a', species: 'Farigiraf', move: 'Helping Hand' }];
 parser.extractEvidence({ type: '-activate', target: 'p2a: Farigiraf', effect: 'ability: Armor Tail' }, 5);
 assert(parser.revealed.length === 0, 'support priority activate events should not fabricate a priority-blocker reveal');
+
+parser.extractEvidence({ type: '-fieldstart', effect: 'move: Grassy Terrain' }, 5);
+parser.extractEvidence({ type: '-fieldend', effect: 'move: Trick Room' }, 5);
+assert(parser.moveBlockedAbilities({ species: 'Farigiraf' }, 'Grassy Glide').includes('Armor Tail'), 'non-terrain fieldend events should not clear active Grassy Terrain reasoning');
+assert(parser.abilityTriggeredByMove('Armor Tail', 'Grassy Glide'), 'terrain-aware trigger checks should honor active Grassy Terrain for Grassy Glide');
+parser.extractEvidence({ type: '-fieldend', effect: 'move: Grassy Terrain' }, 5);
 
 parser.revealed = [];
 parser.turnMoves = [{ slot: 'p1a', species: 'Zapdos', move: 'Psychic' }];
