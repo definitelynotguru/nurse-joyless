@@ -69,11 +69,23 @@
     if(n<=0)return 0;
     return Math.max(1,Math.floor(n*multiplier));
   }
+  function abilityBypassMode(ability=''){
+    const name=String(ability||'').trim();
+    if(['Mold Breaker','Teravolt','Turboblaze'].includes(name))return 'all';
+    if(name==='Mycelium Might')return 'status';
+    return '';
+  }
+  function attackerBypassesDefensiveAbility(roll,mv=''){
+    const mode=abilityBypassMode(roll?.att?.ability);
+    if(mode==='all')return true;
+    if(mode==='status')return moveCategory(roll)==='Status'||!mv;
+    return false;
+  }
   function defensiveAbilityAdjustments(roll,mv=''){
     const ability=String(roll?.def?.ability||'').trim();
     const notes=[];
     let multiplier=1;
-    if(!ability||roll?.blockedBy||Number(roll?.eff)===0){
+    if(!ability||roll?.blockedBy||Number(roll?.eff)===0||attackerBypassesDefensiveAbility(roll,mv)){
       return { multiplier, notes };
     }
     if(['Multiscale','Shadow Shield'].includes(ability)&&fullHpAbilityWindowActive(roll)){
