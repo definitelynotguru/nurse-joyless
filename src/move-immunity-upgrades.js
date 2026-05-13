@@ -56,6 +56,7 @@
     Snore:['Normal','Special',50,100],
     'Springtide Storm':['Fairy','Special',100,80],
     Supersonic:['Normal','Status',0,55],
+    Tailwind:['Flying','Status',0,100],
     Uproar:['Normal','Special',90,100],
     'Zap Cannon':['Electric','Special',120,50]
   };
@@ -75,6 +76,7 @@
     'Icy Wind','Ominous Wind','Petal Blizzard','Razor Wind','Sandsear Storm','Springtide Storm',
     'Tailwind','Twister','Whirlwind','Wildbolt Storm'
   ]);
+  const WIND_RIDER_TRIGGER_ONLY_MOVES=new Set(['Tailwind']);
   const POWDER_MOVES=new Set(['Cotton Spore','Poison Powder','Powder','Rage Powder','Sleep Powder','Spore','Stun Spore']);
   const EXTRA_SPECIES_BY_ID=Object.fromEntries(
     Object.entries(EXTRA_SPECIES).map(([name,data])=>[DexRef.id?DexRef.id(name):String(name||'').toLowerCase(),data])
@@ -86,13 +88,18 @@
   function isSoundMove(move=''){return SOUND_MOVES.has(moveName(move))}
   function isBallOrBombMove(move=''){return BALL_OR_BOMB_MOVES.has(moveName(move))}
   function isWindMove(move=''){return WIND_MOVES.has(moveName(move))}
+  function isWindImmunityMove(move=''){
+    const name=moveName(move);
+    return WIND_MOVES.has(name)&&!WIND_RIDER_TRIGGER_ONLY_MOVES.has(name);
+  }
   function isPowderMove(move=''){return POWDER_MOVES.has(moveName(move))}
   function addUnique(list=[]){return [...new Set((list||[]).filter(Boolean))]}
-  function moveSpecificImmunityAbility(ability='', move=''){
+  function moveSpecificImmunityAbility(ability='', move='') {
     const name=String(ability||'').trim();
     if(name==='Soundproof'&&isSoundMove(move))return 'Soundproof';
     if(name==='Bulletproof'&&isBallOrBombMove(move))return 'Bulletproof';
-    if(name==='Wind Rider'&&isWindMove(move))return 'Wind Rider';
+    // Tailwind can reveal Wind Rider by starting on a side, but it should not count as a landed immunity contradiction.
+    if(name==='Wind Rider'&&isWindImmunityMove(move))return 'Wind Rider';
     if(name==='Overcoat'&&isPowderMove(move))return 'Overcoat';
     return '';
   }
@@ -171,6 +178,7 @@
     REPLAY_MOVE_HINTS.Snore=['Normal','Special',0];
     REPLAY_MOVE_HINTS['Springtide Storm']=['Fairy','Special',0];
     REPLAY_MOVE_HINTS.Supersonic=['Normal','Status',0];
+    REPLAY_MOVE_HINTS.Tailwind=['Flying','Status',0];
     REPLAY_MOVE_HINTS.Uproar=['Normal','Special',0];
     REPLAY_MOVE_HINTS['Zap Cannon']=['Electric','Special',0];
   }
