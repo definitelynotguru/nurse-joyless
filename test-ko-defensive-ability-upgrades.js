@@ -72,6 +72,7 @@ function makeRoll(overrides = {}) {
     blockedBy: '',
     move: ['Dragon', 'Special'],
     moveType: 'Dragon',
+    att: { ability: '' },
     def: { ability: '' },
     ...overrides,
   };
@@ -155,6 +156,24 @@ assert(result.maxd === 100, 'Fur Coat should ignore special attacks');
 context.__rollTemplate = makeRoll({ def: { ability: 'Ice Scales' }, moveType: 'Normal', move: ['Normal', 'Physical'] });
 result = context.dmg({}, context.__rollTemplate.def, 'Extreme Speed', {});
 assert(result.maxd === 100, 'Ice Scales should ignore physical attacks');
+
+context.__rollTemplate = makeRoll({ att: { ability: 'Mold Breaker' }, def: { ability: 'Multiscale' } });
+result = context.dmg({}, context.__rollTemplate.def, 'Dragon Pulse', {});
+assert(result.maxd === 100, 'Mold Breaker should bypass Multiscale in KO math');
+assert(result.defensiveAbilityNotes.length === 0, 'Mold Breaker should suppress Multiscale explanation text');
+
+context.__rollTemplate = makeRoll({ att: { ability: 'Teravolt' }, def: { ability: 'Filter' }, eff: 2, moveType: 'Fighting', move: ['Fighting', 'Special'] });
+result = context.dmg({}, context.__rollTemplate.def, 'Aura Sphere', {});
+assert(result.maxd === 100, 'Teravolt should bypass Filter in KO math');
+assert(result.defensiveAbilityMultiplier === 1, 'Teravolt should leave no defender ability multiplier behind');
+
+context.__rollTemplate = makeRoll({ att: { ability: 'Turboblaze' }, def: { ability: 'Fur Coat' }, moveType: 'Normal', move: ['Normal', 'Physical'] });
+result = context.dmg({}, context.__rollTemplate.def, 'Extreme Speed', {});
+assert(result.maxd === 100, 'Turboblaze should bypass Fur Coat in KO math');
+
+context.__rollTemplate = makeRoll({ att: { ability: 'Mycelium Might' }, def: { ability: 'Heatproof' }, moveType: 'Fire', move: ['Fire', 'Special'] });
+result = context.dmg({}, context.__rollTemplate.def, 'Flamethrower', {});
+assert(result.maxd === 50, 'Mycelium Might should not bypass defender damage-reduction on attacking moves');
 
 context.__rollTemplate = makeRoll({ def: { ability: 'Shadow Shield' } });
 context.renderKo();
