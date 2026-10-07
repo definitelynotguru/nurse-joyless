@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
   runClinic, parseTeam, SAMPLE, encodeTeamLink, decodeTeamLink,
   type ClinicResult,
@@ -20,16 +20,11 @@ import Exports from './components/Exports';
 import AgentConsole from './components/AgentConsole';
 
 export default function App() {
-  const [teamText, setTeamText] = useState('');
+  // share-link boot: #team=... in the URL loads a team instantly
+  const [teamText, setTeamText] = useState(() => decodeTeamLink(window.location.hash) || '');
   const [clinic, setClinic] = useState<ClinicResult | null>(null);
   const [agentOpen, setAgentOpen] = useState(false);
   const [error, setError] = useState('');
-
-  // share-link boot: #team=... in the URL loads a team instantly
-  useEffect(() => {
-    const t = decodeTeamLink(window.location.hash);
-    if (t) { setTeamText(t); }
-  }, []);
 
   const analyze = useCallback((text: string) => {
     setError('');

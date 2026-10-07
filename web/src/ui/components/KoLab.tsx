@@ -14,7 +14,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export default function KoLab({ clinic }: { clinic: ClinicResult | null }) {
-  const team = clinic?.team ?? [];
+  const team = useMemo(() => clinic?.team ?? [], [clinic]);
   const [att, setAtt] = useState(0);
   const [def, setDef] = useState(1);
   const [mv, setMv] = useState('');
@@ -35,21 +35,24 @@ export default function KoLab({ clinic }: { clinic: ClinicResult | null }) {
 
   const result: KoRoll | null = useMemo(() => {
     if (!attacker || !defender || !move) return null;
-    const opt = normalizeBattleState(state) as BattleStateInput & { hp?: number };
-    opt.extraEndSteps = state.extraEndSteps ?? 0;
-    (opt as Record<string, unknown>).defenderHpPct = hp;
-    (opt as Record<string, unknown>).hazards = hazards;
-    const a = attTera ? { ...attacker, tera: attTeraType } : attacker;
-    const d = defTera ? { ...defender, _defensiveTera: defTeraType } : defender;
+    const opt = {
+      ...normalizeBattleState(state),
+      extraEndSteps: state.extraEndSteps ?? 0,
+      defenderHpPct: hp,
+      hazards,
+    } as BattleStateInput & { hp?: number };
+    // shallow clones: the ported dmg() may annotate fields on the mons it receives
+    const a = { ...attacker, ...(attTera ? { tera: attTeraType } : {}) };
+    const d = { ...defender, ...(defTera ? { _defensiveTera: defTeraType } : {}) };
     return dmg(a, d, move, opt);
   }, [attacker, defender, move, state, hp, hazards, attTera, defTera, attTeraType, defTeraType]);
 
   const sd = useMemo(() => {
     if (!attacker || !defender || !move) return null;
-    return smogonCalcRange(attacker, defender, move);
+    return smogonCalcRange({ ...attacker }, { ...defender }, move);
   }, [attacker, defender, move]);
 
-  const matrix = useMemo(() => (team.length >= 2 ? survivalMatrix(team) : null), [team]);
+  const matrix = useMemo(() => (team.length >= 2 ? survivalMatrix(team.map(m => ({ ...m }))) : null), [team]);
 
   const koOdds = result ? nHitChance(result, Math.max(1, result.ko)) : null;
 

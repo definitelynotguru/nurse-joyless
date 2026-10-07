@@ -8,7 +8,7 @@ export default function Prescription({ clinic, onApply }: { clinic: ClinicResult
   const [prescription, setPrescription] = useState('');
 
   const toggle = (i: number) => setFavorites((f) => {
-    const n = new Set(f); n.has(i) ? n.delete(i) : n.add(i); return n;
+    const n = new Set(f); if (n.has(i)) n.delete(i); else n.add(i); return n;
   });
 
   const rebuild = () => {
