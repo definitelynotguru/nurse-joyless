@@ -119,10 +119,7 @@ export interface AnalysisResult {
 
 // Identity-owned contracts: canonical definitions live in ./identity (the module
 // that produces them); re-exported here so every module speaks one type language.
-import type {
-  TeamProfile, IdentityRow, IdentityResult, FieldControl,
-  SynergyIssue, SynergyResult, MatchupRow,
-} from './identity';
+import type { TeamProfile, IdentityResult, SynergyResult, MatchupRow } from './identity';
 export type {
   TeamProfile, IdentityRow, IdentityResult, FieldControl,
   SynergyIssue, SynergyResult, MatchupRow,

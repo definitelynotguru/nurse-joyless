@@ -6,14 +6,11 @@
  * battlelog-demo-upgrades → item-transfer-timeline-upgrades →
  * move-immunity-upgrades. DOM-free.
  */
-import { unique, toId } from './types';
+import { unique } from './types';
 import {
   getSpecies,
   moveMeta,
-  moveCategory,
   movePriority,
-  resolveMoveName,
-  resolveSpeciesName,
   id as dexId,
 } from './dex';
 import {

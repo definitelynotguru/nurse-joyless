@@ -5,13 +5,7 @@ import type {
 } from './types';
 import { parseTeam } from './team';
 import { analyze } from './analysis';
-import { profileTeam, detectIdentities, evaluateSynergy, evaluateMatchups } from './identity';
-import { validateTeamAdvanced } from './validate';
-import { suggestAdditions, diversifySuggestions, needsForReport, swapOptionsFor, fetchSmogonSets, mergeSuggestSets } from './suggest';
-import { buildTeraPlan } from './tera';
 import { buildReasoningReport, buildMarkdownReport } from './report';
-import { analyzeReplay } from './replay';
-import { buildDetectiveRead } from './detective';
 
 export * from './index';
 export { parseTeam, monBlock, teamToText } from './team';
@@ -87,8 +81,8 @@ export function typeIconUrl(type: string): string {
 // Speed tiers, coverage matrix, survival matrix — engine additions on top
 // of the ported modules.
 
-import { getSpecies, types as speciesTypes } from './dex';
-import { stats as calcStats, moveCategory, moveData, parseEV } from './dex';
+import { getSpecies } from './dex';
+import { stats as calcStats, moveData } from './dex';
 import { CHART, TYPES } from './types';
 import { dmg } from './ko';
 import type { KoMon } from './ko';

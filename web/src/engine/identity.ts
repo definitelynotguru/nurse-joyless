@@ -11,8 +11,8 @@
 // never populate; this port honors those overrides when present and otherwise falls
 // back to dex-derived data, which is the production-correct behavior.
 
-import type { Stats, StatKey, TeamMon } from './types';
-import { clamp, unique, mult, emptyStats } from './types';
+import type { StatKey, TeamMon } from './types';
+import { clamp, unique, mult } from './types';
 import {
   types, stats, boostedSpeedNature, loweredSpeedNature, hasMove,
   offensiveMoveTypes, dominantOffense, movePriority,
@@ -215,7 +215,6 @@ export type IdentityMon = TeamMon & {
 
 type Mon = IdentityMon;
 
-const BASE_STAT_INDEX: Record<StatKey, number> = { hp: 0, atk: 1, def: 2, spa: 3, spd: 4, spe: 5 };
 
 /** weather-identity-upgrades baseSpeed: finite override or null — reads the
  * mon's own baseStats field only (no dex fallback); parsed mons lack it, so
@@ -295,10 +294,6 @@ function addEvidence(row: IdentityRow | undefined | null, label = ''): void {
 
 function isGhost(p: Mon): boolean {
   return types(p).includes('Ghost');
-}
-
-function isSteel(p: Mon): boolean {
-  return types(p).includes('Steel');
 }
 
 export function isDefensiveAnchor(p: Mon): boolean {

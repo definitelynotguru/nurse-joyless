@@ -3,7 +3,7 @@
 import { Dex } from '@pkmn/dex';
 import { Generations } from '@pkmn/data';
 import type { TeamMon, SpeciesInfo, MoveData, Stats } from './types';
-import { toId, keys, unique, emptyStats, natureModifier, CHART, mult } from './types';
+import { toId, keys, unique, emptyStats, natureModifier, mult } from './types';
 import { P, FALLBACK_ABILITIES } from './data-species';
 import { MOVES, REPLAY_MOVE_HINTS } from './data-moves';
 import {

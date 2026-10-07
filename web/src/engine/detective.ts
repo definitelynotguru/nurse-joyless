@@ -15,12 +15,10 @@ import type { Stats, TeamMon, MoveData } from './types';
 import {
   getSpecies,
   moveData,
-  moveMeta,
   moveCategory,
   resolveMoveName,
   stats,
   parseEV,
-  grounded,
   hazardPct,
   moveBlockingAbility as moveBlockingAbilityByType,
   types as monTypes,

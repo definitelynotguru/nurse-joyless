@@ -1,7 +1,7 @@
 // Showdown importable parsing and serialization.
 // Merges the validation-fixes behavior: bogus tera tokens are scrubbed and
 // nickname/gender syntax is handled by norm().
-import type { TeamMon, Stats } from './types';
+import type { TeamMon } from './types';
 import { norm, moveName, parseEV } from './dex';
 import { emptyStats } from './types';
 
