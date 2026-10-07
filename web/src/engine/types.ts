@@ -78,3 +78,181 @@ export interface ScoreEntry {
   ev: Evidence[];
   plan?: string;
 }
+
+// ----- shared analysis contracts (consumed across engine modules + UI) -----
+
+export interface TriageRow {
+  tp: string;
+  weak: number;
+  four: number;
+  res: number;
+  imm: number;
+  score: number;
+  sev: 'crit' | 'bad' | 'warn' | 'good';
+}
+
+export interface Roles {
+  hazards: string[];
+  removal: string[];
+  speed: string[];
+  priority: string[];
+  pivot: string[];
+  recovery: string[];
+  status: string[];
+  setup: string[];
+  trickRoom: string[];
+  physicalWall: string[];
+  specialWall: string[];
+  wallbreaker: string[];
+}
+
+export interface AnalysisResult {
+  rows: TriageRow[];
+  roles: Roles;
+  missing: string[];
+  red: string[];
+  issue: number;
+  status: string;
+  typeCounts: Record<string, number>;
+}
+
+/** Team profile produced by profileTeam(); identity/weather patches extend it. */
+export interface TeamProfile {
+  typeCounts: Record<string, number>;
+  fast: string[];
+  slow: string[];
+  priority: string[];
+  scarf: string[];
+  choice: string[];
+  offensiveItems: string[];
+  setup: string[];
+  recovery: string[];
+  hazards: string[];
+  layers: string[];
+  removal: string[];
+  bounce: string[];
+  goodAsGold: string[];
+  spinblock: string[];
+  taunt: string[];
+  removalDenial: string[];
+  pivot: string[];
+  status: string[];
+  trickRoom: string[];
+  drought: string[];
+  drizzle: string[];
+  sunAbuse: string[];
+  rainAbuse: string[];
+  wallbreakers: string[];
+  fastBreakers: string[];
+  physicalAttackers: string[];
+  specialAttackers: string[];
+  mixedAttackers: string[];
+  boots: string[];
+  leftovers: string[];
+  defensiveWalls: string[];
+  defensiveAnchors: string[];
+  wincons: string[];
+  attackingTypes: string[];
+  roles: Roles;
+  forcedSwitch: string[];
+  progressTools: string[];
+  overloaded: string[];
+  // extension fields added by identity upgrades (weather/screens/tailwind/etc.)
+  [key: string]: unknown;
+}
+
+export interface IdentityRow {
+  name: string;
+  score: number;
+  evidence: string[];
+  plan: string;
+}
+
+export interface IdentityResult {
+  primary: IdentityRow;
+  secondary: IdentityRow[];
+  all: IdentityRow[];
+}
+
+export interface FieldControl {
+  hazardSetting: number;
+  hazardRemoval: number;
+  removalDenial: number;
+  chipAbuse: number;
+  pivotAbuse: number;
+  setterOverload: number;
+  score: number;
+}
+
+export interface SynergyIssue {
+  severity: 'critical' | 'bad' | 'warn';
+  title: string;
+  detail: string;
+}
+
+export interface SynergyResult {
+  scores: {
+    typeSynergy: number;
+    roleCompression: number;
+    offensiveCoverage: number;
+    defensiveBackbone: number;
+    fieldControl: number;
+    speedControl: number;
+    winReliability: number;
+  };
+  fieldControl: FieldControl;
+  roleQualityOverloads: string[];
+  issues: SynergyIssue[];
+}
+
+export interface MatchupRow {
+  name: string;
+  score: number;
+  class: string;
+  reason: string;
+  advice: string;
+}
+
+export interface ValidationRow {
+  species: string;
+  status: string;
+  confidence?: string;
+  issues: string[];
+  warnings: string[];
+  valid: string[];
+  mon?: Partial<TeamMon>;
+  [key: string]: unknown;
+}
+
+export interface Suggestion {
+  species: string;
+  score: number;
+  roles: string[];
+  why: string[];
+  set: string;
+  source?: string;
+  lane?: string;
+  laneScore?: number;
+  swapOptions?: { teamIndex: number; species: string; score: number; reasons: string[] }[];
+}
+
+export interface ReasoningReport {
+  generatedAt: string;
+  team: (Partial<TeamMon> & { types: string[] })[];
+  identity: IdentityResult;
+  synergy: SynergyResult;
+  matchups: MatchupRow[];
+  validation: ValidationRow[];
+  diagnosis: {
+    status: string;
+    topWeaknesses: TriageRow[];
+    missingRoles: string[];
+    redundancy: string[];
+  };
+  profile: TeamProfile;
+  suggestions: Suggestion[];
+  suggestionPool: Suggestion[];
+  suggestionSource?: string;
+  needs: { label: string; why: string }[];
+  [key: string]: unknown;
+}

@@ -202,15 +202,15 @@ export function buildMarkdownReport(r: ReasoningReport | null | undefined): stri
   const monNotes = (r.team || [])
     .map(
       (p) => `### ${p.species}\n- Item: ${p.item || 'None'}\n- Typing: ${(p.types || []).join('/')}\n- Main role read: ${
-        profile.defensiveAnchors?.includes(p.species)
+        profile.defensiveAnchors?.includes(p.species || '')
           ? 'defensive anchor'
-          : profile.wallbreakers?.includes(p.species)
+          : profile.wallbreakers?.includes(p.species || '')
             ? 'breaker / win pressure'
-            : profile.pivot?.includes(p.species)
+            : profile.pivot?.includes(p.species || '')
               ? 'pivot / tempo tool'
               : 'role compression'
       }\n- Overload note: ${
-        (r.synergy?.roleQualityOverloads || profile.overloaded || []).includes(p.species)
+        (r.synergy?.roleQualityOverloads || profile.overloaded || []).includes(p.species || '')
           ? 'Overloaded or matchup-overworked; avoid asking it to solve too many jobs.'
           : 'No major overload flag.'
       }`,

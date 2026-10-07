@@ -15,7 +15,7 @@ import { LOCAL_LEARNSETS } from './data-content';
 
 const dex = Dex.forGen(9);
 const gens = new Generations(Dex);
-const gen9 = gens.get(9);
+export const gen9 = gens.get(9);
 
 // Local tables merged with the patch-file additions.
 const LOCAL_P: Record<string, [string[], number[]]> = { ...(P as Record<string, [string[], number[]]>), ...(EXTRA_P as Record<string, [string[], number[]]>), ...EXTRA_P2 };
