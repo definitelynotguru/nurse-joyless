@@ -5,45 +5,11 @@ import { TYPES, mult, clamp, unique } from './types';
 import { types, stats, movePriority, moveData } from './dex';
 import type { IdentityResult, SynergyResult, MatchupRow } from './identity';
 
-// ---------- contracts ----------
+// ---------- contracts (shared shape lives in ./types) ----------
 
-export type Severity = 'crit' | 'bad' | 'warn' | 'good';
-
-export interface TriageRow {
-  tp: string;
-  weak: number;
-  four: number;
-  res: number;
-  imm: number;
-  score: number;
-  sev: Severity | string;
-}
-
-export interface Roles {
-  hazards: string[];
-  removal: string[];
-  speed: string[];
-  priority: string[];
-  pivot: string[];
-  recovery: string[];
-  status: string[];
-  setup: string[];
-  trickRoom: string[];
-  physicalWall: string[];
-  specialWall: string[];
-  wallbreaker: string[];
-  [key: string]: string[];
-}
-
-export interface AnalysisResult {
-  rows: TriageRow[];
-  roles: Roles;
-  missing: string[];
-  red: string[];
-  issue: number;
-  status: string;
-  typeCounts: Record<string, number>;
-}
+import type { TriageRow, Roles, AnalysisResult } from './types';
+export type { TriageRow, Roles, AnalysisResult };
+export type Severity = TriageRow['sev'];
 
 export interface TeamSignals {
   count: number;
@@ -104,7 +70,7 @@ export function analyze(t: TeamMon[]): AnalysisResult {
     const res = ms.filter((x) => x > 0 && x < 1).length;
     const imm = ms.filter((x) => x === 0).length;
     const score = weak * 2 + four * 3 - res - imm * 1.5;
-    const sev = score >= 7 ? 'crit' : score >= 4 ? 'bad' : score >= 2 ? 'warn' : 'good';
+    const sev: Severity = score >= 7 ? 'crit' : score >= 4 ? 'bad' : score >= 2 ? 'warn' : 'good';
     return { tp, weak, four, res, imm, score, sev };
   }).sort((a, b) => b.score - a.score);
   const roles: Roles = { hazards: [], removal: [], speed: [], priority: [], pivot: [], recovery: [], status: [], setup: [], trickRoom: [], physicalWall: [], specialWall: [], wallbreaker: [] };
