@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import type { ClinicResult } from '../../engine/api';
 import { buildDetectiveRead, speciesNames, moveNames } from '../../engine/api';
+import type { DetectiveRead } from '../../engine/detective';
 import Panel from './Panel';
 
 interface Observation {
   oppSpecies: string;
-  evidence: 'they_hit_me' | 'i_hit_them';
+  evidence: 'they_hit_me' | 'i_hit_them' | 'clue_only';
   obsMove: string;
   obsPct: number;
   statusMove: boolean;
@@ -19,14 +20,24 @@ export default function DetectivePanel({ clinic }: { clinic: ClinicResult | null
     oppSpecies: '', evidence: 'they_hit_me', obsMove: '', obsPct: 43,
     statusMove: false, hazardTell: true, repeatTell: false, speedTell: false,
   });
-  const [reads, setReads] = useState<unknown[]>([]);
+  const [reads, setReads] = useState<(DetectiveRead | { error: string })[]>([]);
   const set = (p: Partial<Observation>) => setObs((o) => ({ ...o, ...p }));
   const species = speciesNames().slice(0, 400);
   const moves = moveNames().slice(0, 400);
 
   const runDetective = () => {
     try {
-      const read = buildDetectiveRead({ ...obs, team: clinic?.team ?? [] });
+      const read = buildDetectiveRead({
+        species: obs.oppSpecies,
+        evidence: obs.evidence,
+        move: obs.obsMove || undefined,
+        observedDamage: obs.evidence === 'clue_only' ? null : obs.obsPct,
+        usedStatusMove: obs.statusMove,
+        tookHazardDamage: obs.hazardTell,
+        repeatedDamagingMove: obs.repeatTell,
+        movedFirst: obs.speedTell,
+        team: clinic?.team ?? [],
+      });
       setReads((r) => [read, ...r].slice(0, 8));
     } catch (e) {
       setReads((r) => [{ error: String(e) }, ...r]);
@@ -47,6 +58,7 @@ export default function DetectivePanel({ clinic }: { clinic: ClinicResult | null
           <select value={obs.evidence} onChange={(e) => set({ evidence: e.target.value as Observation['evidence'] })}>
             <option value="they_hit_me">They hit me</option>
             <option value="i_hit_them">I hit them</option>
+            <option value="clue_only">Clues only</option>
           </select>
         </label>
         <label>Move
@@ -71,21 +83,22 @@ export default function DetectivePanel({ clinic }: { clinic: ClinicResult | null
   );
 }
 
-function DetectiveReadCard({ read }: { read: unknown }) {
-  const r = read as Record<string, unknown>;
-  if (r?.error) return <div className="empty" style={{ marginTop: 12 }}>Detective module pending: {String(r.error)}</div>;
-  if (!r) return null;
-  const items = (r.reads || r.observations || r.results || []) as { label?: string; detail?: string; confidence?: string }[];
+function DetectiveReadCard({ read }: { read: DetectiveRead | { error: string } }) {
+  if ('error' in read) return <div className="empty" style={{ marginTop: 12 }}>{read.error}</div>;
+  const { summary, top, eliminated } = read;
   return (
     <div className="box" style={{ marginTop: 12 }}>
-      <strong>{String(r.title || r.species || 'Detective read')}</strong>
-      {items.length > 0 ? (
-        <ul>
-          {items.map((it, i) => <li key={i}><strong>{it.label}</strong> {it.detail} {it.confidence && <em className="meta">{it.confidence}</em>}</li>)}
-        </ul>
-      ) : (
-        <pre className="code">{JSON.stringify(r, null, 2).slice(0, 2000)}</pre>
-      )}
+      <strong>{read.input.species || 'Detective read'} — <span className={summary.confidence.label === 'High' ? 'good' : summary.confidence.label === 'Blocked' ? 'bad' : 'warn'}>{summary.confidence.label}</span></strong>
+      <p>{summary.verdict}</p>
+      {top.slice(0, 4).map((c, i) => (
+        <div className="set" key={i} style={{ marginTop: 8 }}>
+          <h3>{Math.round(c.prob * 100)}% — {c.item} · {c.ability}</h3>
+          <p className="meta">{c.nature} {c.profile}</p>
+          {c.reasons.slice(0, 3).map((r, j) => <p key={j} className="meta">· {r}</p>)}
+        </div>
+      ))}
+      {eliminated.length > 0 && <p className="meta" style={{ marginTop: 8 }}>Eliminated: {eliminated.slice(0, 5).map(c => `${c.item} ${c.ability}`).join(' · ')}</p>}
+      {summary.notes.slice(0, 3).map((n, i) => <p key={i} className="meta">· {n}</p>)}
     </div>
   );
 }

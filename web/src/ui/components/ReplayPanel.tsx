@@ -1,27 +1,23 @@
 import { useState } from 'react';
-import { analyzeReplay, BATTLELOG_DEMO } from '../../engine/api';
+import { analyzeReplay, buildReplaySummary, BATTLELOG_DEMO } from '../../engine/api';
+import type { ReplayAnalysis, ReplayEvidence, ReplayTarget } from '../../engine/replay';
 import Panel from './Panel';
-
-interface TurnEvidence { turn?: number; label?: string; detail?: string; kind?: string; }
-interface ReplayResult {
-  summary?: string;
-  turns?: { turn: number; evidence: TurnEvidence[] }[];
-  targets?: { species: string; notes: string[] }[];
-  [k: string]: unknown;
-}
 
 export default function ReplayPanel() {
   const [text, setText] = useState('');
-  const [result, setResult] = useState<ReplayResult | null>(null);
+  const [result, setResult] = useState<ReplayAnalysis | null>(null);
   const [err, setErr] = useState('');
 
   const run = () => {
     setErr('');
     try {
-      const r = analyzeReplay(text) as ReplayResult;
-      setResult(r);
+      setResult(analyzeReplay(text));
     } catch (e) { setErr(String(e)); }
   };
+
+  const turns = result ? Object.entries(result.evidenceByTurn).sort((a, b) => +a[0] - +b[0]) : [];
+  const targets = result?.read?.targets ?? [];
+  const summary = result ? buildReplaySummary(result.read) : null;
 
   return (
     <Panel id="observer-section" num="06" title="Replay Observer" blurb="Battle log autopsy" art="observer.png"
@@ -36,36 +32,29 @@ export default function ReplayPanel() {
             placeholder="|turn|3&#10;|move|p2a: Dragapult|Shadow Ball|p1a: Great Tusk&#10;|-damage|p1a: Great Tusk|43/100&#10;|upkeep&#10;|-damage|p2a: Dragapult|88/100|[from] Stealth Rock&#10;..." />
         </div>
         <div id="replayResults" className="replay-results">
-          {err && <div className="empty">Replay module pending: {err}</div>}
+          {err && <div className="empty">Could not analyze that log: {err}</div>}
           {!err && !result && <div className="empty">Paste a replay log to see turn-by-turn evidence.</div>}
           {result && (
             <>
               <div className="timeline">
-                {(result.turns ?? []).map((t, i) => (
-                  <div className="turn-card" key={i}>
-                    <h4>Turn {t.turn}</h4>
+                {turns.map(([t, evs]) => (
+                  <div className="turn-card" key={t}>
+                    <h4>Turn {t}</h4>
                     <div className="evidence-list">
-                      {t.evidence.map((ev, j) => (
-                        <div className={`evidence-item ${ev.kind || ''}`} key={j}>
-                          <span className="evidence-icon">{evIcon(ev.kind)}</span>
-                          <div><p><strong>{ev.label}</strong> {ev.detail}</p></div>
-                        </div>
-                      ))}
+                      {evs.map((ev, j) => <EvidenceItem key={j} ev={ev} />)}
                     </div>
                   </div>
                 ))}
+                {turns.length === 0 && <div className="empty">No evidence parsed from that log.</div>}
               </div>
-              {result.targets && result.targets.length > 0 && (
+              {targets.length > 0 && (
                 <div className="replay-target-grid">
-                  {result.targets.map((t, i) => (
-                    <div className="replay-target-card box" key={i}>
-                      <strong>{t.species}</strong>
-                      <ul>{t.notes.map((n, j) => <li key={j}>{n}</li>)}</ul>
-                    </div>
-                  ))}
+                  {targets.map((t, i) => <TargetCard key={i} t={t} strongest={result.strongest === t} />)}
                 </div>
               )}
-              {result.summary && <div className="replay-summary"><h4>Summary</h4><p>{result.summary}</p></div>}
+              {summary && summary.text && (
+                <div className="replay-summary"><h4>Summary</h4><p>{summary.text}</p></div>
+              )}
             </>
           )}
         </div>
@@ -74,6 +63,32 @@ export default function ReplayPanel() {
   );
 }
 
-function evIcon(kind?: string): string {
-  return ({ hazard: '▲', status: '◆', damage: '✚', reveal: '★' } as Record<string, string>)[kind || ''] || '•';
+function EvidenceItem({ ev }: { ev: ReplayEvidence }) {
+  const kind = ev.hard ? 'hazard' : ev.source.includes('status') || ev.source.includes('item') ? 'status' : ev.source.includes('damage') ? 'damage' : 'reveal';
+  const icon = ({ hazard: '▲', status: '◆', damage: '✚', reveal: '★' } as Record<string, string>)[kind] || '•';
+  return (
+    <div className={`evidence-item ${kind}`}>
+      <span className="evidence-icon">{icon}</span>
+      <div>
+        <p><strong>{ev.species}</strong> {ev.text}</p>
+        {ev.conclusion && <p className="meta">{ev.conclusion}{ev.hard ? ' · hard evidence' : ''}</p>}
+      </div>
+    </div>
+  );
+}
+
+function TargetCard({ t, strongest }: { t: ReplayTarget; strongest: boolean }) {
+  return (
+    <div className="replay-target-card box">
+      <strong>{t.displaySpecies || t.species}{strongest ? ' — primary suspect' : ''}</strong>
+      <p className="meta">score {t.score} · {t.evidenceCount} clues</p>
+      <ul>
+        {t.revealedItem && <li>Revealed item: <strong>{t.revealedItem}</strong></li>}
+        {t.removedItem && <li>Lost item: <strong>{t.removedItem}</strong></li>}
+        {t.revealedAbility && <li>Revealed ability: <strong>{t.revealedAbility}</strong></li>}
+        {t.ruledOutAbilities.length > 0 && <li>Ruled out: {t.ruledOutAbilities.join(', ')}</li>}
+        {t.notes.map((n, j) => <li key={j}>{n}</li>)}
+      </ul>
+    </div>
+  );
 }

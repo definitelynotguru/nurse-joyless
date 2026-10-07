@@ -24,7 +24,7 @@ export { buildTeraPlan, teraPlanMarkdown } from './tera';
 export type { TeraPlan, TeraPlanRow } from './tera';
 export { buildReasoningReport, buildMarkdownReport, teamReasoner, verdict, scoreGroupSummary, scoreDisplayName, v35ActiveReport } from './report';
 export type { ReasoningOptions } from './report';
-export { ReplayParser, parseReplay, analyzeReplay, BATTLELOG_DEMO } from './replay';
+export { ReplayParser, parseReplay, analyzeReplay, buildReplaySummary, BATTLELOG_DEMO } from './replay';
 export { buildDetectiveRead } from './detective';
 export { dmg, nHitChance, normalizeBattleState, battleStateSummary, swapBattleState, clampStage, stageMultiplier, spreadDamageApplies, getAgentFacts, detectPriorityBlockReveal, PriorityTerrainTracker } from './ko';
 export type { BattleStateInput, BattleState, KoRoll, KoMon, KoHitInput } from './ko';
