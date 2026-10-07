@@ -1,6 +1,6 @@
 {
   "name": "nurse-joyless",
-  "version": "0.1.0",
+  "version": "4.0.0",
   "private": true,
   "description": "Competitive Pokemon Showdown team clinic: structure analysis, matchup diagnosis, KO risk, replay evidence, and hidden-information reasoning.",
   "scripts": {
