@@ -8,3 +8,9 @@ dist/
 coverage/
 .factory/
 .devin/skills/
+
+# Web app build artifacts (explicit; the bare patterns above already match these)
+web/node_modules/
+web/dist/
+web/dist-ssr/
+web/*.local
