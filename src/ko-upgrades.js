@@ -1,7 +1,6 @@
 (function(){
   const root=typeof window!=='undefined'?window:globalThis;
   const host=typeof globalThis!=='undefined'?globalThis:root;
-  const legacyDmg=root.dmg||host.dmg;
   const legacyGetAgentFacts=root.getAgentFacts||host.getAgentFacts;
   const doc=(root.document||host.document||(typeof document!=='undefined'?document:null));
   const byId=id=>doc?.getElementById?.(id);

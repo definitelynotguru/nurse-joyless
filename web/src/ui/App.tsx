@@ -100,7 +100,8 @@ export default function App() {
           onWipe={() => { setTeamText(''); setClinic(null); setError(''); }} />
         {error && <div className="panel" style={{ borderColor: 'var(--bad)' }}><p style={{ color: 'var(--bad)' }}>{error}</p></div>}
         <TeamClinic teamText={teamText} setTeamText={setTeamText} clinic={clinic}
-          onAnalyze={() => analyze(teamText)} onShare={share} />
+          onAnalyze={() => analyze(teamText)} onShare={share}
+          onRemoveMon={(i) => adoptTeam(teamToText(parseTeam(teamText).filter((_, j) => j !== i)))} />
         <Diagnosis clinic={clinic} />
         <KoLab clinic={clinic} />
         <DetectivePanel clinic={clinic} />

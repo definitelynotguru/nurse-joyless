@@ -8,20 +8,12 @@ import { analyze } from './analysis';
 import { buildReasoningReport, buildMarkdownReport } from './report';
 
 export * from './index';
-export { parseTeam, monBlock, teamToText } from './team';
-export { analyze } from './analysis';
-export { profileTeam, detectIdentities, evaluateSynergy, evaluateMatchups, isDefensiveAnchor, isDefensiveWall } from './identity';
-export { validateTeam, validateTeamAdvanced } from './validate';
-export { suggestAdditions, diversifySuggestions, needsForReport, swapOptionsFor, enrichSuggestionSwaps, fetchSmogonSets, mergeSuggestSets, SmogonProvider, smogonSetToText } from './suggest';
-export type { SuggestReport, LaneSuggestion, SmogonData, SmogonSetsData, SwapOption, TeamNeed } from './suggest';
-export { buildTeraPlan, teraPlanMarkdown } from './tera';
-export type { TeraPlan, TeraPlanRow } from './tera';
-export { buildReasoningReport, buildMarkdownReport, teamReasoner, verdict, scoreGroupSummary, scoreDisplayName, v35ActiveReport } from './report';
-export type { ReasoningOptions } from './report';
-export { ReplayParser, parseReplay, analyzeReplay, buildReplaySummary, BATTLELOG_DEMO } from './replay';
+export { parseTeam, teamToText } from './team';
+export { fetchSmogonSets, mergeSuggestSets } from './suggest';
+export { analyzeReplay, buildReplaySummary, BATTLELOG_DEMO } from './replay';
 export { buildDetectiveRead } from './detective';
-export { dmg, nHitChance, normalizeBattleState, battleStateSummary, swapBattleState, clampStage, stageMultiplier, spreadDamageApplies, getAgentFacts, detectPriorityBlockReveal, PriorityTerrainTracker } from './ko';
-export type { BattleStateInput, BattleState, KoRoll, KoMon, KoHitInput, KoOptions, AgentFactsContext } from './ko';
+export { dmg, nHitChance, normalizeBattleState, battleStateSummary, swapBattleState, getAgentFacts } from './ko';
+export type { BattleStateInput, KoRoll, KoOptions, AgentFactsContext } from './ko';
 
 /** Full clinic pipeline in one call. Returns everything the UI renders. */
 export interface ClinicResult {

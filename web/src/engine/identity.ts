@@ -303,16 +303,6 @@ export function isDefensiveAnchor(p: Mon): boolean {
       'Skarmory', 'Blissey', 'Clodsire', 'Slowking-Galar', 'Zapdos', 'Weezing-Galar'].includes(p.species);
 }
 
-/**
- * The wall check analyze() uses for roles.physicalWall / roles.specialWall.
- * Not a named legacy function — surfaced here because the port contract requires it.
- */
-export function isDefensiveWall(p: Mon): boolean {
-  const st = stats(p);
-  const phys = st.hp + st.def > 650 || (st.def > 300 && (p.evs?.hp || 0) > 100);
-  const spec = st.hp + st.spd > 650 || (st.spd > 300 && (p.evs?.hp || 0) > 100) || p.item === 'Assault Vest';
-  return phys || spec;
-}
 
 function isFastBreaker(p: Mon): boolean {
   const st = stats(p);

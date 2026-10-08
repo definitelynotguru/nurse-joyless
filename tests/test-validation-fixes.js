@@ -52,8 +52,8 @@ context.addEventListener = function(){};
 
 vm.createContext(context);
 const source = [
-  fs.readFileSync(path.join(__dirname, 'src/app.js'), 'utf8'),
-  fs.readFileSync(path.join(__dirname, 'src/validation-fixes.js'), 'utf8'),
+  fs.readFileSync(path.join(__dirname, '..', 'src/app.js'), 'utf8'),
+  fs.readFileSync(path.join(__dirname, '..', 'src/validation-fixes.js'), 'utf8'),
 ].join('\n');
 vm.runInContext(source, context, { filename: 'validation-runtime.js', timeout: 10000 });
 

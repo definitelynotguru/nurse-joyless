@@ -2,9 +2,9 @@ const fs = require('fs');
 const vm = require('vm');
 const path = require('path');
 const source = [
-  fs.readFileSync(path.join(__dirname, 'src/app.js'), 'utf8'),
-  fs.readFileSync(path.join(__dirname, 'src/replay-ability-upgrades.js'), 'utf8'),
-  fs.readFileSync(path.join(__dirname, 'src/ko-upgrades.js'), 'utf8'),
+  fs.readFileSync(path.join(__dirname, '..', 'src/app.js'), 'utf8'),
+  fs.readFileSync(path.join(__dirname, '..', 'src/replay-ability-upgrades.js'), 'utf8'),
+  fs.readFileSync(path.join(__dirname, '..', 'src/ko-upgrades.js'), 'utf8'),
 ].join('\n');
 
 function makeFakeElement(value = '') {

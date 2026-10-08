@@ -41,7 +41,6 @@ export const labelize = (s: string): string =>
   s.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
 export const toId = (s: unknown): string =>
   String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
-export const capitalize = (s: string): string => s.replace(/\b\w/g, (c) => c.toUpperCase());
 
 /** Defensive type effectiveness of an attacking type vs defender types. */
 export function mult(atkType: string, defTypes: string[]): number {
@@ -56,10 +55,6 @@ export function natureModifier(nature: string, stat: StatKey): number {
   return n.up === stat ? 1.1 : n.down === stat ? 0.9 : 1;
 }
 
-export function speedNatureDir(nature: string): 'up' | 'down' | 'neutral' {
-  const n = (NATURE as Record<string, { up?: string; down?: string }>)[nature] || {};
-  return n.up === 'spe' ? 'up' : n.down === 'spe' ? 'down' : 'neutral';
-}
 
 export const emptyStats = (fill: number): Stats => ({
   hp: fill, atk: fill, def: fill, spa: fill, spd: fill, spe: fill,
@@ -71,13 +66,6 @@ export interface Evidence {
 }
 export const evidence = (label: string, detail: string): Evidence => ({ label, detail });
 
-export interface ScoreEntry {
-  name: string;
-  score: number;
-  tags: string[];
-  ev: Evidence[];
-  plan?: string;
-}
 
 // ----- shared analysis contracts (consumed across engine modules + UI) -----
 

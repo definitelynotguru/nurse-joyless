@@ -164,7 +164,7 @@
   const UNKNOWN_TYPE = 'Unknown';
   const unknownSpeciesSet = new Set();
 
-  // Original references for uninstall
+  // Originals captured before patching; the patched wrappers delegate to them.
   let originalNorm = null;
   let originalTypes = null;
   let originalValidateTeamAdvanced = null;
@@ -472,21 +472,6 @@
     } catch (_) {}
   }
 
-  function uninstall() {
-    try {
-      if (originalNorm && typeof originalNorm === 'function') norm = originalNorm;
-      if (originalTypes && typeof originalTypes === 'function') types = originalTypes;
-      if (originalValidateTeamAdvanced && typeof originalValidateTeamAdvanced === 'function') validateTeamAdvanced = originalValidateTeamAdvanced;
-      if (originalResolveSpeciesName && typeof DexAdapter !== 'undefined' && DexAdapter.resolveSpeciesName) DexAdapter.resolveSpeciesName = originalResolveSpeciesName;
-      if (originalGetSpecies && typeof DexAdapter !== 'undefined' && DexAdapter.getSpecies) DexAdapter.getSpecies = originalGetSpecies;
-      if (originalResolveMoveName && typeof DexAdapter !== 'undefined' && DexAdapter.resolveMoveName) DexAdapter.resolveMoveName = originalResolveMoveName;
-      if (originalGetMove && typeof DexAdapter !== 'undefined' && DexAdapter.getMove) DexAdapter.getMove = originalGetMove;
-      if (mutationObserver) { mutationObserver.disconnect(); mutationObserver = null; }
-      if (root.NURSE_JOYLESS_DEX_INTEGRITY_GUARD) delete root.NURSE_JOYLESS_DEX_INTEGRITY_GUARD;
-    } catch (err) {
-      console.warn('[dex-integrity] uninstall failed:', err.message);
-    }
-  }
 
   function install() {
     rebuildKeyMaps();
@@ -506,8 +491,7 @@
       analyzeTypeTriage,
       getSpecies: name => (typeof DexAdapter !== 'undefined' && DexAdapter.getSpecies ? DexAdapter.getSpecies(name) : getLocalSpeciesData(name)),
       isUnknownSpeciesName,
-      showIntegrityWarning,
-      uninstall
+      showIntegrityWarning
     };
   }
 

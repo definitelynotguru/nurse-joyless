@@ -123,7 +123,6 @@
   function patchSpeciesNormalizer(){
     try {
       const originalNorm = typeof norm === 'function' ? norm : null;
-      root.NURSE_ORIGINAL_NORM = originalNorm;
       norm = function patchedNorm(value){
         let raw = String(value || '').trim();
         if (!raw) return '';
@@ -148,7 +147,6 @@
     try {
       if (typeof parseTeam !== 'function') return;
       const originalParseTeam = parseTeam;
-      root.NURSE_ORIGINAL_PARSE_TEAM = originalParseTeam;
       parseTeam = function patchedParseTeam(text){
         const parsed = originalParseTeam(text);
         if (Array.isArray(parsed)) {
@@ -229,7 +227,6 @@
     try {
       if (typeof validateTeamAdvanced !== 'function') return;
       const originalValidateTeamAdvanced = validateTeamAdvanced;
-      root.NURSE_ORIGINAL_VALIDATE_TEAM_ADVANCED = originalValidateTeamAdvanced;
       validateTeamAdvanced = function patchedValidateTeamAdvanced(sourceTeam){
         const inputTeam = sourceTeam || (typeof team !== 'undefined' ? team : []);
         const result = originalValidateTeamAdvanced(inputTeam);

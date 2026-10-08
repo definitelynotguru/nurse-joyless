@@ -20,7 +20,6 @@ import {
   moveData,
   resolveMoveName,
   resolveSpeciesName,
-  warmLearnset,
 } from './dex';
 import { TRUSTED_FALLBACK_LEARNSETS } from './data-extra';
 
@@ -354,11 +353,3 @@ export function validateTeam(t: Partial<TeamMon>[]): ValidationRow[] {
   return validateTeamAdvanced(t);
 }
 
-/**
- * Optional async pre-warm: fetch learnset data for each species so a later
- * synchronous validateTeamAdvanced call upgrades 'learnset data not loaded'
- * warnings into definitive OK/illegal checks.
- */
-export async function warmTeamLearnsets(t: Partial<TeamMon>[]): Promise<void> {
-  await Promise.all((t || []).map((mon) => warmLearnset(mon?.species || '').catch(() => undefined)));
-}

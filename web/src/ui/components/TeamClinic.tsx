@@ -9,6 +9,7 @@ interface Props {
   clinic: ClinicResult | null;
   onAnalyze: () => void;
   onShare: () => void;
+  onRemoveMon?: (i: number) => void;
 }
 
 function pokepasteRawUrl(input: string): string | null {
@@ -16,7 +17,7 @@ function pokepasteRawUrl(input: string): string | null {
   return m ? `https://pokepast.es/${m[1]}/raw` : null;
 }
 
-export default function TeamClinic({ teamText, setTeamText, clinic, onAnalyze, onShare }: Props) {
+export default function TeamClinic({ teamText, setTeamText, clinic, onAnalyze, onShare, onRemoveMon }: Props) {
   const [pasteUrl, setPasteUrl] = useState('');
   const [pasteErr, setPasteErr] = useState('');
   const [loading, setLoading] = useState(false);
@@ -60,7 +61,7 @@ export default function TeamClinic({ teamText, setTeamText, clinic, onAnalyze, o
           {pasteErr && <p className="meta" style={{ color: 'var(--bad)' }}>{pasteErr}</p>}
         </div>
         <div id="teamCards" className="cards">
-          {clinic ? clinic.team.map((m, i) => <MonCard key={i} mon={m} />) : (
+          {clinic ? clinic.team.map((m, i) => <MonCard key={i} mon={m} onRemove={onRemoveMon ? () => onRemoveMon(i) : undefined} />) : (
             <div className="empty">No patient on the chart yet. Paste a team or load the demo.</div>
           )}
         </div>
