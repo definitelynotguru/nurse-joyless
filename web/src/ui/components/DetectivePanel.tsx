@@ -22,8 +22,8 @@ export default function DetectivePanel({ clinic }: { clinic: ClinicResult | null
   });
   const [reads, setReads] = useState<(DetectiveRead | { error: string })[]>([]);
   const set = (p: Partial<Observation>) => setObs((o) => ({ ...o, ...p }));
-  const species = speciesNames().slice(0, 400);
-  const moves = moveNames().slice(0, 400);
+  const species = speciesNames();
+  const moves = moveNames();
 
   const runDetective = () => {
     try {

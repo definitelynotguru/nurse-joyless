@@ -87,9 +87,9 @@ import { CHART, TYPES } from './types';
 import { dmg } from './ko';
 import type { KoMon } from './ko';
 
-/** Rough Spe stat of a species at a given nature bias, Lv50 Showdown defaults. */
-function rawSpeed(base: number, plus: boolean, iv = 31, ev = 252): number {
-  const s = Math.floor((Math.floor(((2 * base + iv + Math.floor(ev / 4)) * 50) / 100) + 5) * (plus ? 1.1 : 1.0));
+/** Rough Spe stat of a species at a given nature bias; Showdown singles default Lv100. */
+function rawSpeed(base: number, plus: boolean, iv = 31, ev = 252, level = 100): number {
+  const s = Math.floor((Math.floor(((2 * base + iv + Math.floor(ev / 4)) * level) / 100) + 5) * (plus ? 1.1 : 1.0));
   return s;
 }
 
@@ -126,7 +126,7 @@ export function speedTiers(team: TeamMon[]): SpeedTierRow[] {
       name: m.species || '???',
       speed: s.spe,
       side: 'team' as const,
-      note: `${m.nature || 'neutral'}${invested ? ' · invested' : ' · uninvested'}`,
+      note: `${m.nature || 'neutral'}${invested ? ' · invested' : ' · uninvested'} · Lv${m.level || 100}`,
     };
   });
   for (const b of META_SPEED_BENCHMARKS) {
@@ -134,9 +134,9 @@ export function speedTiers(team: TeamMon[]): SpeedTierRow[] {
     if (!sp) continue;
     rows.push({
       name: b.name,
-      speed: rawSpeed(sp.baseStats[5] ?? 0, !!b.plus),
+      speed: rawSpeed(sp.baseStats[5] ?? 0, !!b.plus, 31, 252, 100),
       side: 'meta',
-      note: b.plus ? '252+ meta benchmark' : '252 meta benchmark',
+      note: `${b.plus ? '252+' : '252'} meta benchmark · Lv100`,
     });
   }
   rows.sort((a, b) => b.speed - a.speed || a.name.localeCompare(b.name));
@@ -169,7 +169,7 @@ export function coverageMatrix(team: TeamMon[]): CoverageRow[] {
   });
 }
 
-export interface SurvivalCell { ko: number; minp: number; maxp: number; bestMove: string; }
+export interface SurvivalCell { ko: number; hko: number; minp: number; maxp: number; bestMove: string; }
 export interface SurvivalMatrix { attackers: string[]; defenders: string[]; cells: SurvivalCell[][]; }
 
 /** Every attacker's strongest move vs every defender (team-internal grid). */
@@ -177,12 +177,15 @@ export function survivalMatrix(team: TeamMon[]): SurvivalMatrix {
   const names = team.map((m) => m.species || '???');
   const cells: SurvivalCell[][] = team.map((att) =>
     team.map((def) => {
-      let best: SurvivalCell = { ko: 0, minp: 0, maxp: 0, bestMove: '—' };
+      let best: SurvivalCell = { ko: 0, hko: 0, minp: 0, maxp: 0, bestMove: '—' };
       for (const mv of att.moves || []) {
         const md = moveData(mv);
         if (!md || (md[2] || 0) <= 0) continue;
         const r = dmg(att as KoMon, def as KoMon, mv, {});
-        if (r.max > best.maxp) best = { ko: r.ko, minp: r.minp, maxp: r.max, bestMove: mv };
+        if (r.maxp > best.maxp) {
+          const hko = r.ko >= 1 ? 1 : Math.ceil(100 / Math.max(r.maxp, 0.01));
+          best = { ko: r.ko, hko, minp: r.minp, maxp: r.maxp, bestMove: mv };
+        }
       }
       return best;
     }),
@@ -202,7 +205,7 @@ export interface SmogonCalcResult {
   koChance?: string;
 }
 
-function toCalcMon(m: Partial<TeamMon>): CalcPokemon | null {
+function toCalcMon(m: Partial<TeamMon>, teraType?: string): CalcPokemon | null {
   const species = m.species ? String(m.species) : '';
   if (!species) return null;
   const evs = m.evs || ({} as Stats);
@@ -212,7 +215,7 @@ function toCalcMon(m: Partial<TeamMon>): CalcPokemon | null {
       ability: m.ability || undefined,
       nature: m.nature || undefined,
       level: m.level || 50,
-      teraType: m.tera || undefined,
+      teraType: teraType || undefined,
       evs: {
         hp: evs.hp || 0, atk: evs.atk || 0, def: evs.def || 0,
         spa: evs.spa || 0, spd: evs.spd || 0, spe: evs.spe || 0,
@@ -221,9 +224,13 @@ function toCalcMon(m: Partial<TeamMon>): CalcPokemon | null {
   } catch { return null; }
 }
 
-export function smogonCalcRange(att: Partial<TeamMon>, def: Partial<TeamMon>, mv: string): SmogonCalcResult | null {
-  const a = toCalcMon(att);
-  const d = toCalcMon(def);
+/** Cross-check vs the real Showdown calc. `tera` mirrors the KO Lab toggles:
+ * a mon only terastallizes here when its corresponding flag is on — matching
+ * dmg()'s opt.attackerTera/defenderTera semantics, so the two rows agree. */
+export function smogonCalcRange(att: Partial<TeamMon>, def: Partial<TeamMon>, mv: string,
+  tera: { attackerTeraType?: string; defenderTeraType?: string } = {}): SmogonCalcResult | null {
+  const a = toCalcMon(att, tera.attackerTeraType);
+  const d = toCalcMon(def, tera.defenderTeraType);
   if (!a || !d) return null;
   try {
     const result = calculate(calcGen9, a, d, new CalcMove(calcGen9, mv), new Field());

@@ -3,7 +3,11 @@ import type { ClinicResult, Suggestion } from '../../engine/api';
 import { spriteUrl, fetchSmogonSets, mergeSuggestSets } from '../../engine/api';
 import Panel from './Panel';
 
-export default function Assistant({ clinic, onApply }: { clinic: ClinicResult | null; onApply: (setText: string) => void }) {
+export default function Assistant({ clinic, onApply, onReplace }: {
+  clinic: ClinicResult | null;
+  onApply: (setText: string) => void;
+  onReplace: (teamIndex: number, setText: string) => void;
+}) {
   const [online, setOnline] = useState(false);
   const [loading, setLoading] = useState(false);
   const suggs = clinic?.suggestions ?? [];
@@ -22,7 +26,7 @@ export default function Assistant({ clinic, onApply }: { clinic: ClinicResult | 
       action={<button className="ghost small" onClick={goOnline} disabled={loading}>{loading ? 'Loading…' : online ? 'Online dex ✓' : 'Use Online Pokédex'}</button>}>
       {!clinic ? <div className="empty">Run Sparring Lab or analyze a team to receive targeted additions.</div> : (
         <div className="suggest-grid">
-          {suggs.slice(0, 6).map((s) => <SuggestCard key={s.species} s={s} onApply={onApply} />)}
+          {suggs.slice(0, 6).map((s) => <SuggestCard key={s.species} s={s} onApply={onApply} onReplace={onReplace} />)}
           {suggs.length === 0 && <div className="empty">No targeted additions — the team is already covering its bases.</div>}
         </div>
       )}
@@ -30,7 +34,11 @@ export default function Assistant({ clinic, onApply }: { clinic: ClinicResult | 
   );
 }
 
-function SuggestCard({ s, onApply }: { s: Suggestion; onApply: (setText: string) => void }) {
+function SuggestCard({ s, onApply, onReplace }: {
+  s: Suggestion;
+  onApply: (setText: string) => void;
+  onReplace: (teamIndex: number, setText: string) => void;
+}) {
   const [menuOpen, setMenuOpen] = useState(false);
   return (
     <div className={`suggest-card ${menuOpen ? 'menu-open' : ''}`}>
@@ -53,7 +61,7 @@ function SuggestCard({ s, onApply }: { s: Suggestion; onApply: (setText: string)
         <p className="suggest-menu-title">Actions</p>
         <button className="suggest-menu-item" onClick={() => onApply(s.set)}>Add to team</button>
         {s.swapOptions?.slice(0, 3).map((sw, i) => (
-          <button key={i} className="suggest-menu-item" onClick={() => onApply(s.set)}
+          <button key={i} className="suggest-menu-item" onClick={() => onReplace(sw.teamIndex, s.set)}
             title={sw.reasons?.join(', ')}>
             Replace {sw.species} ({sw.score})
           </button>

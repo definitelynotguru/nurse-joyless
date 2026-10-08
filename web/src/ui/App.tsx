@@ -1,7 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
-  runClinic, parseTeam, SAMPLE, encodeTeamLink, decodeTeamLink,
-  type ClinicResult,
+  runClinic, parseTeam, teamToText, SAMPLE, encodeTeamLink, decodeTeamLink,
+  warmLearnsetsFor, type ClinicResult,
 } from '../engine/api';
 import Sidebar from './components/Sidebar';
 import Hero from './components/Hero';
@@ -19,10 +19,15 @@ import ValidationPanel from './components/ValidationPanel';
 import Exports from './components/Exports';
 import AgentConsole from './components/AgentConsole';
 
+const initialTeamText = decodeTeamLink(window.location.hash) || '';
+
 export default function App() {
-  // share-link boot: #team=... in the URL loads a team instantly
-  const [teamText, setTeamText] = useState(() => decodeTeamLink(window.location.hash) || '');
-  const [clinic, setClinic] = useState<ClinicResult | null>(null);
+  // share-link boot: #team=... loads a team instantly AND runs the clinic
+  const [teamText, setTeamText] = useState(() => initialTeamText);
+  const [clinic, setClinic] = useState<ClinicResult | null>(() => {
+    if (!initialTeamText) return null;
+    try { return runClinic(initialTeamText); } catch { return null; }
+  });
   const [agentOpen, setAgentOpen] = useState(false);
   const [error, setError] = useState('');
 
@@ -31,11 +36,28 @@ export default function App() {
     try {
       const team = parseTeam(text);
       if (!team.length) { setError('Could not parse a team — paste a Showdown importable.'); return; }
-      setClinic(runClinic(text));
+      const result = runClinic(text);
+      setClinic(result);
+      // warm learnsets in the background, then re-run so validation shows real
+      // legality verdicts instead of "learnset data not loaded" warnings
+      void warmLearnsetsFor(team.map((m) => m.species || '')).then(() => {
+        setClinic((cur) => (cur === result ? runClinic(text) : cur));
+      });
     } catch (e) {
       setError(`Analysis failed: ${String(e).slice(0, 200)}`);
       setClinic(null);
     }
+  }, []);
+
+  // boot-time learnset warm for share-link teams (async re-check, same as analyze)
+  useEffect(() => {
+    if (!initialTeamText) return;
+    let cancelled = false;
+    const species = parseTeam(initialTeamText).map((m) => m.species || '');
+    void warmLearnsetsFor(species).then(() => {
+      if (!cancelled) setClinic(runClinic(initialTeamText));
+    });
+    return () => { cancelled = true; };
   }, []);
 
   const share = async () => {
@@ -46,6 +68,15 @@ export default function App() {
 
   const appendSet = (setText: string) => {
     const next = teamText.trimEnd() + '\n\n' + setText;
+    setTeamText(next);
+    analyze(next);
+  };
+
+  const replaceSet = (index: number, setText: string) => {
+    const team = parseTeam(teamText);
+    const add = parseTeam(setText)[0];
+    if (!add || !team[index]) { appendSet(setText); return; }
+    const next = teamToText(team.map((m, i) => (i === index ? add : m)));
     setTeamText(next);
     analyze(next);
   };
@@ -69,7 +100,7 @@ export default function App() {
         <SparringLab clinic={clinic} />
         <IdentityPanel clinic={clinic} />
         <SynergyPanel clinic={clinic} />
-        <Assistant clinic={clinic} onApply={appendSet} />
+        <Assistant clinic={clinic} onApply={appendSet} onReplace={replaceSet} />
         <ValidationPanel clinic={clinic} />
         <Exports clinic={clinic} />
         <footer>

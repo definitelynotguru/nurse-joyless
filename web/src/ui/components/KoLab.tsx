@@ -40,21 +40,27 @@ export default function KoLab({ clinic }: { clinic: ClinicResult | null }) {
       extraEndSteps: state.extraEndSteps ?? 0,
       defenderHpPct: hp,
       hazards,
+      attackerTera: attTera,
+      attackerTeraType: attTeraType,
+      defenderTera: defTera,
+      defenderTeraType: defTeraType,
     } as BattleStateInput & { hp?: number };
     // shallow clones: the ported dmg() may annotate fields on the mons it receives
-    const a = { ...attacker, ...(attTera ? { tera: attTeraType } : {}) };
-    const d = { ...defender, ...(defTera ? { _defensiveTera: defTeraType } : {}) };
-    return dmg(a, d, move, opt);
+    return dmg({ ...attacker }, { ...defender }, move, opt);
   }, [attacker, defender, move, state, hp, hazards, attTera, defTera, attTeraType, defTeraType]);
 
   const sd = useMemo(() => {
     if (!attacker || !defender || !move) return null;
-    return smogonCalcRange({ ...attacker }, { ...defender }, move);
-  }, [attacker, defender, move]);
+    return smogonCalcRange({ ...attacker }, { ...defender }, move, {
+      attackerTeraType: attTera ? attTeraType : undefined,
+      defenderTeraType: defTera ? defTeraType : undefined,
+    });
+  }, [attacker, defender, move, attTera, attTeraType, defTera, defTeraType]);
 
   const matrix = useMemo(() => (team.length >= 2 ? survivalMatrix(team.map(m => ({ ...m }))) : null), [team]);
 
-  const koOdds = result ? nHitChance(result, Math.max(1, result.ko)) : null;
+  const koTwo = result ? nHitChance(result, 2) : null;
+  const koThree = result ? nHitChance(result, 3) : null;
 
   return (
     <Panel id="ko-section" num="03" title="KO Lab" blurb="Damage, odds, survival"
@@ -155,12 +161,13 @@ export default function KoLab({ clinic }: { clinic: ClinicResult | null }) {
           <div id="ko">
             {!result ? <div className="empty">No KO read yet.</div> : (
               <div className="metric-grid" style={{ marginTop: 16 }}>
-                <div className={`metric-card ${result.ko === 1 ? 'bad' : result.ko === 2 ? 'warn' : 'good'}`}>
-                  <span>Damage range</span><strong>{result.minp}–{result.maxp}%</strong>
+                <div className={`metric-card ${result.ko >= 1 ? 'bad' : (koTwo ?? 0) >= 1 ? 'warn' : 'good'}`}>
+                  <span>Damage range</span><strong>{result.minp.toFixed(1)}–{result.maxp.toFixed(1)}%</strong>
                 </div>
-                <div className="metric-card"><span>KO hits</span><strong>{result.ko || '—'}</strong></div>
-                <div className="metric-card"><span>Hit chance</span><strong>{result.hit}%</strong></div>
-                {koOdds !== null && <div className="metric-card"><span>Odds to KO in {Math.max(1, result.ko)}</span><strong>{koOdds}%</strong></div>}
+                <div className="metric-card"><span>OHKO</span><strong>{(result.ko * 100).toFixed(1)}%</strong></div>
+                {koTwo !== null && <div className="metric-card"><span>2HKO</span><strong>{(koTwo * 100).toFixed(1)}%</strong></div>}
+                {koThree !== null && <div className="metric-card"><span>3HKO</span><strong>{(koThree * 100).toFixed(1)}%</strong></div>}
+                <div className="metric-card"><span>Accuracy</span><strong>{(result.hit * 100).toFixed(0)}%</strong></div>
                 {result.blockedBy && <div className="metric-card bad"><span>Priority blocked by</span><strong style={{ fontSize: 16 }}>{result.blockedBy}</strong></div>}
               </div>
             )}
@@ -183,9 +190,9 @@ export default function KoLab({ clinic }: { clinic: ClinicResult | null }) {
                       <tr key={a}>
                         <td><strong>{a}</strong></td>
                         {matrix.cells[i].map((c, j) => (
-                          <td key={j} className={c.ko === 1 ? 'bad' : c.ko === 2 ? 'warn' : c.maxp > 0 ? '' : 'muted'}
-                            title={c.bestMove !== '—' ? `${c.bestMove}: ${c.minp}–${c.maxp}%` : 'no damaging move'}>
-                            {c.maxp > 0 ? `${c.minp}–${c.maxp}%` : '—'}{c.ko ? ` (${c.ko}HKO)` : ''}
+                          <td key={j} className={c.ko >= 1 ? 'bad' : c.hko > 0 && c.hko <= 2 ? 'warn' : c.maxp > 0 ? '' : 'muted'}
+                            title={c.bestMove !== '—' ? `${c.bestMove}: ${c.minp.toFixed(1)}–${c.maxp.toFixed(1)}%` : 'no damaging move'}>
+                            {c.maxp > 0 ? `${c.minp.toFixed(0)}–${c.maxp.toFixed(0)}%` : '—'}{c.hko ? ` (${c.hko}HKO)` : ''}
                           </td>
                         ))}
                       </tr>
