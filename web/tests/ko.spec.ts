@@ -12,7 +12,7 @@
 // detectPriorityBlockReveal, PriorityTerrainTracker).
 import { describe, expect, it } from 'vitest';
 import type { Stats } from '../src/engine/types';
-import { parseEV } from '../src/engine/dex';
+import { parseEV, hazardPct } from '../src/engine/dex';
 import { getSpecies } from '../src/engine/dex';
 import {
   applyDefensiveAbilityAdjustments,
@@ -875,5 +875,61 @@ describe('getAgentFacts', () => {
     expect(String(replayFacts.verdict)).toContain('3 structured clue(s) on Dragapult');
     expect(String(replayFacts.verdict)).toContain('2 detective-ready branches');
     expect(String(replayFacts.verdict)).toContain('1 other replay-backed target');
+  });
+});
+
+describe('hazard chip vs grounded (zeus-review pins)', () => {
+  const gholdBalloon = preset('Gholdengo', 'Air Balloon', 'Timid',
+    parseEV('4 Def / 252 SpA / 252 Spe', 0), ['Make It Rain', 'Shadow Ball'], 'Good as Gold');
+  const gholdBoots = preset('Gholdengo', 'Leftovers', 'Timid',
+    parseEV('4 Def / 252 SpA / 252 Spe', 0), ['Make It Rain', 'Shadow Ball'], 'Good as Gold');
+  const tusk = preset('Great Tusk', 'Leftovers', 'Jolly',
+    parseEV('4 HP / 252 Atk / 252 Spe', 0), ['Headlong Rush'], 'Protosynthesis');
+  const torn = preset('Tornadus-Therian', 'Assault Vest', 'Timid',
+    parseEV('4 Def / 252 SpA / 252 Spe', 0), ['Bleakwind Storm'], 'Regenerator');
+
+  it('spikes/toxic spikes skip ungrounded defenders; Stealth Rock still chips', () => {
+    expect(hazardPct(gholdBalloon, 'spikes1')).toBe(0); // Air Balloon
+    expect(hazardPct(torn, 'spikes1')).toBe(0); // Flying
+    expect(hazardPct(tusk, 'spikes1')).toBe(12.5);
+    expect(hazardPct(tusk, 'spikes2')).toBeCloseTo(16.67);
+    expect(hazardPct(torn, 'rocks')).toBe(25); // Flying ×2 vs Rock
+    expect(hazardPct(gholdBoots, 'none')).toBe(0);
+  });
+
+  it('dmg() folds hazard chip into ehp only for grounded defenders', () => {
+    const att = preset('Gholdengo', 'Choice Specs', 'Timid',
+      parseEV('4 Def / 252 SpA / 252 Spe', 0), ['Make It Rain'], 'Good as Gold');
+    const ungrounded = dmg(att, gholdBalloon, 'Make It Rain', { hazards: 'spikes1', hpPct: 90 });
+    const groundedRoll = dmg(att, gholdBoots, 'Make It Rain', { hazards: 'spikes1', hpPct: 90 });
+    expect(ungrounded.hz).toBe(0);
+    expect(groundedRoll.hz).toBe(12.5);
+    // same species → same max HP; the grounded one loses 12.5% to spikes first
+    expect(groundedRoll.ehp).toBeLessThan(ungrounded.ehp);
+    expect(groundedRoll.ehp).toBe(Math.floor(groundedRoll.max * (90 - 12.5) / 100));
+  });
+});
+
+describe('defensive Tera typing (zeus-review pins)', () => {
+  const kyurem = preset('Kyurem', 'Choice Specs', 'Modest',
+    parseEV('4 Def / 252 SpA / 252 Spe', 0), ['Ice Beam'], 'Pressure');
+  const lando = preset('Landorus-Therian', 'Soft Sand', 'Jolly',
+    parseEV('4 HP / 252 Atk / 252 Spe', 0), ['Earthquake'], 'Intimidate');
+
+  it('Tera Water resists Ice; Tera Stellar keeps original typing', () => {
+    const neutral = dmg(kyurem, lando, 'Ice Beam', {});
+    const water = dmg(kyurem, lando, 'Ice Beam', { defenderTera: true, defenderTeraType: 'Water' });
+    const stellar = dmg(kyurem, lando, 'Ice Beam', { defenderTera: true, defenderTeraType: 'Stellar' });
+    // Ground/Flying is 4x weak to Ice; pure Water takes neutral Ice
+    expect(water.maxd).toBeLessThan(neutral.maxd * 0.6);
+    // Stellar is not a defensive type — typing is unchanged
+    expect(stellar.maxd).toBe(neutral.maxd);
+    expect(stellar.eff).toBe(neutral.eff);
+  });
+
+  it('attacker Tera Stellar keeps STAB instead of losing it', () => {
+    const noTera = dmg(kyurem, lando, 'Ice Beam', {});
+    const stellar = dmg(kyurem, lando, 'Ice Beam', { attackerTera: true, attackerTeraType: 'Stellar' });
+    expect(stellar.maxd).toBe(noTera.maxd);
   });
 });

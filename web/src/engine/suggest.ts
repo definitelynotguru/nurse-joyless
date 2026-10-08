@@ -138,11 +138,17 @@ export const SmogonProvider = {
       this.json(`/sets/${format}.json`),
       this.json(`/analyses/${format}.json`),
       this.json(`/stats/${format}.json`),
-    ]).then(([sets, analyses, stats]) => ({
-      sets: sets.status === 'fulfilled' ? (sets.value as SmogonSetsData) : null,
-      analyses: analyses.status === 'fulfilled' ? analyses.value : null,
-      stats: stats.status === 'fulfilled' ? (stats.value as Record<string, unknown>) : null,
-    }));
+    ]).then(([sets, analyses, stats]) => {
+      const data = {
+        sets: sets.status === 'fulfilled' ? (sets.value as SmogonSetsData) : null,
+        analyses: analyses.status === 'fulfilled' ? analyses.value : null,
+        stats: stats.status === 'fulfilled' ? (stats.value as Record<string, unknown>) : null,
+      };
+      // don't cache a total failure — a transient outage shouldn't poison
+      // every later load() in this isolate
+      if (!data.sets && !data.analyses && !data.stats) smogonCache.delete(format);
+      return data;
+    });
     smogonCache.set(format, promise);
     return promise;
   },

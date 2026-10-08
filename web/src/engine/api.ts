@@ -62,8 +62,13 @@ export function encodeTeamLink(teamText: string): string {
 }
 export function decodeTeamLink(hash: string): string {
   const m = /[#&]team=([A-Za-z0-9_-]+)/.exec(hash);
-  if (!m) return '';
-  try { return decodeURIComponent(escape(atob(m[1].replace(/-/g, '+').replace(/_/g, '/')))); } catch { return ''; }
+  // cap attacker-controlled payloads: the decoded text is parsed at boot
+  if (!m || m[1].length > 10000) return '';
+  try {
+    const b64 = m[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
+    return decodeURIComponent(escape(atob(padded)));
+  } catch { return ''; }
 }
 
 // ---- sprite URLs (Showdown public CDN) ----

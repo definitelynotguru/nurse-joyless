@@ -954,3 +954,12 @@ describe('module API', () => {
     expect(empty.lines[0]).toBe('No replay evidence parsed.');
   });
 });
+
+describe('attacker-controlled input caps', () => {
+  it('parse truncates oversized logs instead of processing them fully', () => {
+    const parser = new ReplayParser();
+    const huge = `${'|turn|1\n'.repeat(60_000)}|turn|2\n|move|p1a: X|Tackle|p2a: Y\n`;
+    expect(() => parser.parse(huge)).not.toThrow();
+    expect(parser.turns.length).toBeLessThanOrEqual(50_000);
+  });
+});

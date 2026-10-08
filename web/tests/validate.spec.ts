@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseTeam } from '../src/engine/team';
 import { validateTeam, validateTeamAdvanced } from '../src/engine/validate';
-import { getSpecies, moveData } from '../src/engine/dex';
+import { getSpecies, moveData, canLearn, warmLearnset } from '../src/engine/dex';
 
 const TEAM = `Queenmaker (Kingambit) (F) @ Leftovers
 Ability: Supreme Overlord
@@ -289,5 +289,17 @@ IVs: 0 Atk / 0 Spe
 - Lunar Dance`);
     expect(validateTeamAdvanced(sunRoom).length).toBe(6);
     expect(validateTeam(sunRoom).length).toBe(6);
+  });
+});
+
+describe('learnset warm/cold transition (zeus-review pin)', () => {
+  it('canLearn answers null before warm, real verdict after', async () => {
+    // species absent from TRUSTED_FALLBACK_LEARNSETS and LOCAL_LEARNSETS —
+    // only the warmed dex can answer
+    expect(canLearn('Pikachu', 'Thunderbolt')).toBeNull();
+    await warmLearnset('Pikachu');
+    expect(canLearn('Pikachu', 'Thunderbolt')).toBe(true);
+    expect(canLearn('Pikachu', 'Spacial Rend')).toBe(false);
+    expect(canLearn('Pikachu', 'Extreme Evoboost')).toBe(false);
   });
 });

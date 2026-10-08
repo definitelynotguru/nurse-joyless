@@ -57,7 +57,7 @@ const statLabel = (k: string) => ({ hp: 'HP', spa: 'SpA', spd: 'SpD', spe: 'Spe'
 export function monBlock(mon: Partial<TeamMon>): string {
   const evs = Object.entries(mon.evs || {}).filter(([, v]) => +v).map(([k, v]) => `${v} ${statLabel(k)}`);
   const ivs = Object.entries(mon.ivs || {}).filter(([, v]) => +v !== 31).map(([k, v]) => `${v} ${statLabel(k)}`);
-  return `${mon.species} @ ${mon.item || 'No Item'}\nAbility: ${mon.ability || 'Unknown'}\n${mon.tera ? `Tera Type: ${mon.tera}\n` : ''}${evs.length ? `EVs: ${evs.join(' / ')}\n` : ''}${mon.nature || 'Hardy'} Nature\n${ivs.length ? `IVs: ${ivs.join(' / ')}\n` : ''}${(mon.moves || []).map((m) => `- ${m}`).join('\n')}`.trim();
+  return `${mon.species} @ ${mon.item || 'No Item'}\nAbility: ${mon.ability || 'Unknown'}\n${mon.level && mon.level !== 100 ? `Level: ${mon.level}\n` : ''}${mon.shiny ? 'Shiny: Yes\n' : ''}${mon.tera ? `Tera Type: ${mon.tera}\n` : ''}${evs.length ? `EVs: ${evs.join(' / ')}\n` : ''}${mon.nature || 'Hardy'} Nature\n${ivs.length ? `IVs: ${ivs.join(' / ')}\n` : ''}${(mon.moves || []).map((m) => `- ${m}`).join('\n')}`.trim();
 }
 
 export function teamToText(list: Partial<TeamMon>[]): string {

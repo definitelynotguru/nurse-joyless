@@ -23,6 +23,17 @@ describe('api facade', () => {
     expect(decodeTeamLink('#team=not-base64!!!')).toBe('');
   });
 
+  it('share-link decode tolerates stripped padding and rejects overlong payloads', () => {
+    // every encode output is unpadded base64url — decode must re-pad
+    for (let len = 10; len < 400; len += 7) {
+      const text = SAMPLE.slice(0, len);
+      expect(decodeTeamLink(encodeTeamLink(text))).toBe(text);
+    }
+    // attacker-controlled hash: refuse to decode huge payloads
+    expect(decodeTeamLink(`#team=${'A'.repeat(10001)}`)).toBe('');
+    expect(decodeTeamLink(`#team=${'A'.repeat(9999)}`)).not.toBeNull();
+  });
+
   it('sprite helpers emit Showdown CDN URLs', () => {
     expect(spriteUrl('Garchomp')).toBe('https://play.pokemonshowdown.com/sprites/gen5/garchomp.png');
     expect(itemIconUrl('Rocky Helmet')).toBe('https://play.pokemonshowdown.com/sprites/itemicons/rockyhelmet.png');
@@ -42,6 +53,14 @@ describe('api facade', () => {
     const m = coverageMatrix(parseTeam(SAMPLE));
     expect(m).toHaveLength(18);
     expect(m.some(r => r.hitters.length > 0)).toBe(true);
+  });
+
+  it('coverageMatrix indexes attacking type vs defending type (not reversed)', () => {
+    const m = coverageMatrix(parseTeam('Charizard @ Leftovers\nAbility: Blaze\n- Flamethrower'));
+    const grass = m.find((r) => r.type === 'Grass')!;
+    const water = m.find((r) => r.type === 'Water')!;
+    expect(grass.hitters).toContain('Charizard');
+    expect(water.hitters).toHaveLength(0);
   });
 
   it('survivalMatrix produces a cell per team pair', () => {

@@ -233,6 +233,10 @@ export interface ReplayRead {
   strongest: ReplayTarget | null;
 }
 
+/** Caps on attacker-controlled replay logs (a URL fetch or paste can be huge). */
+export const MAX_REPLAY_LOG_BYTES = 2_000_000;
+export const MAX_REPLAY_LINES = 50_000;
+
 export interface ReplayParseResult {
   turns: ReplayTurn[];
   evidence: ReplayEvidence[];
@@ -284,7 +288,8 @@ export class ReplayParser {
   }
 
   parse(log: string): ReplayTurn[] {
-    const lines = String(log || '').split(/\r?\n/);
+    // attacker-controlled input guard: cap size before splitting/processing
+    const lines = String(log || '').slice(0, MAX_REPLAY_LOG_BYTES).split(/\r?\n/).slice(0, MAX_REPLAY_LINES);
     let currentTurn = 0;
     this.reset();
     lines.forEach((line) => {

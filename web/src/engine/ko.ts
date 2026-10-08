@@ -711,8 +711,13 @@ function baseDamage(att: KoMon, def: KoMon, mv: string, opt: KoOptions = {}): Ko
   if (moveId === 'facade' && battle.attackerStatus !== 'none') bp *= 2;
   if (battle.terrain === 'grassy' && defenderGrounded && ['earthquake', 'bulldoze', 'magnitude'].includes(moveId)) bp *= 0.5;
   const base = Math.floor(Math.floor(Math.floor(((2 * (aa.level || 100)) / 5 + 2) * bp * A / D) / 50) + 2);
-  const atkTypes = opt.attackerTera ? [opt.attackerTeraType || aa.tera || types(aa)[0]] : types(aa);
-  const defTypes = opt.defenderTera ? [opt.defenderTeraType || dd.tera || types(dd)[0]] : types(dd);
+  const aTera = opt.attackerTeraType || aa.tera || types(aa)[0];
+  const dTera = opt.defenderTeraType || dd.tera || types(dd)[0];
+  // Stellar keeps the mon's original typing (defensively it's not a type at
+  // all; offensively it keeps STAB — the one-time 1.2×/2× per-type bonus isn't
+  // modeled by this single-call engine)
+  const atkTypes = opt.attackerTera && aTera !== 'Stellar' ? [aTera] : types(aa);
+  const defTypes = opt.defenderTera && dTera !== 'Stellar' ? [dTera] : types(dd);
   const blockedBy = typeBlockingAbility(moveType, cat, dd.ability || '');
   const eff = blockedBy ? 0 : mult(moveType, defTypes);
   const stab = atkTypes.includes(moveType) ? 1.5 : 1;
