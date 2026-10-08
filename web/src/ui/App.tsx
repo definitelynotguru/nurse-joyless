@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   runClinic, parseTeam, teamToText, SAMPLE, encodeTeamLink, decodeTeamLink,
   warmLearnsetsFor, type ClinicResult,
@@ -30,6 +30,9 @@ export default function App() {
   });
   const [agentOpen, setAgentOpen] = useState(false);
   const [error, setError] = useState('');
+  // the text the currently displayed clinic was built from — lets refresh
+  // actions re-run that snapshot without touching unsubmitted textarea edits
+  const analyzedTextRef = useRef<string | null>(initialTeamText || null);
 
   const analyze = useCallback((text: string) => {
     setError('');
@@ -37,6 +40,7 @@ export default function App() {
       const team = parseTeam(text);
       if (!team.length) { setError('Could not parse a team — paste a Showdown importable.'); return; }
       const result = runClinic(text);
+      analyzedTextRef.current = text;
       setClinic(result);
       // warm learnsets in the background, then re-run so validation shows real
       // legality verdicts instead of "learnset data not loaded" warnings
@@ -64,9 +68,11 @@ export default function App() {
   }, []);
 
   const share = async () => {
-    const url = `${location.origin}${location.pathname}${encodeTeamLink(teamText)}`;
+    const link = encodeTeamLink(teamText);
+    if (!link) { setError('Team too large to share via link (48KB limit).'); return; }
+    const url = `${location.origin}${location.pathname}${link}`;
     try { await navigator.clipboard.writeText(url); } catch { /* clipboard blocked */ }
-    window.location.hash = encodeTeamLink(teamText);
+    window.location.hash = link;
   };
 
   const appendSet = (setText: string) => {
@@ -103,7 +109,8 @@ export default function App() {
         <SparringLab clinic={clinic} />
         <IdentityPanel clinic={clinic} />
         <SynergyPanel clinic={clinic} />
-        <Assistant clinic={clinic} onApply={appendSet} onReplace={replaceSet} onRefresh={() => analyze(teamText)} />
+        <Assistant clinic={clinic} onApply={appendSet} onReplace={replaceSet}
+          onRefresh={() => { const t = analyzedTextRef.current; if (t) analyze(t); }} />
         <ValidationPanel clinic={clinic} />
         <Exports clinic={clinic} />
         <footer>

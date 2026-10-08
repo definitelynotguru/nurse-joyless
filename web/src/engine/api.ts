@@ -57,13 +57,20 @@ export function runClinic(teamText: string): ClinicResult {
 }
 
 // ---- shareable team links ----
+/** Documented bound shared by encode and decode so links always round-trip
+ * within it: 48KB of team text (far beyond any real 6-mon importable),
+ * 64KB of base64url. */
+export const MAX_TEAM_TEXT_BYTES = 48_000;
+const MAX_TEAM_TOKEN_CHARS = 64_000;
+
 export function encodeTeamLink(teamText: string): string {
+  if (teamText.length > MAX_TEAM_TEXT_BYTES) return '';
   return `#team=${btoa(unescape(encodeURIComponent(teamText))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`;
 }
 export function decodeTeamLink(hash: string): string {
   const m = /[#&]team=([A-Za-z0-9_-]+)/.exec(hash);
   // cap attacker-controlled payloads: the decoded text is parsed at boot
-  if (!m || m[1].length > 10000) return '';
+  if (!m || m[1].length > MAX_TEAM_TOKEN_CHARS) return '';
   try {
     const b64 = m[1].replace(/-/g, '+').replace(/_/g, '/');
     const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);

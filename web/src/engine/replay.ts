@@ -242,6 +242,9 @@ export interface ReplayParseResult {
   evidence: ReplayEvidence[];
   read: ReplayRead;
   parser: ReplayParser;
+  /** true when the input exceeded MAX_REPLAY_LOG_BYTES / MAX_REPLAY_LINES —
+   * later turns were dropped and the read is partial. */
+  truncated: boolean;
 }
 
 export interface ReplayAnalysis extends ReplayParseResult {
@@ -273,6 +276,7 @@ export class ReplayParser {
   replayRead: ReplayRead = { targets: [], strongest: null };
   replayWeatherState: { current: string } = { current: '' };
   fieldAbilitySuppressionSlots: Record<string, string> = {};
+  truncated = false;
 
   reset(): void {
     this.turns = [];
@@ -285,14 +289,19 @@ export class ReplayParser {
     this.replayRead = { targets: [], strongest: null };
     this.replayWeatherState = { current: '' };
     this.fieldAbilitySuppressionSlots = {};
+    this.truncated = false;
   }
 
   parse(log: string): ReplayTurn[] {
-    // attacker-controlled input guard: cap size before splitting/processing
-    const lines = String(log || '').slice(0, MAX_REPLAY_LOG_BYTES).split(/\r?\n/).slice(0, MAX_REPLAY_LINES);
-    let currentTurn = 0;
+    // attacker-controlled input guard: cap size before splitting/processing,
+    // and flag truncation so callers can warn that later turns were dropped
+    const raw = String(log || '');
+    const lines = raw.slice(0, MAX_REPLAY_LOG_BYTES).split(/\r?\n/);
     this.reset();
-    lines.forEach((line) => {
+    this.truncated = raw.length > MAX_REPLAY_LOG_BYTES || lines.length > MAX_REPLAY_LINES;
+    const capped = lines.slice(0, MAX_REPLAY_LINES);
+    let currentTurn = 0;
+    capped.forEach((line) => {
       const trimmed = line.trim();
       if (!trimmed) return;
       if (trimmed.startsWith('|turn|')) {
@@ -1972,7 +1981,7 @@ export class ReplayParser {
 export function parseReplay(log: string): ReplayParseResult {
   const parser = new ReplayParser();
   const turns = parser.parse(log);
-  return { turns, evidence: parser.evidence, read: parser.replayRead, parser };
+  return { turns, evidence: parser.evidence, read: parser.replayRead, parser, truncated: parser.truncated };
 }
 
 /** Convenience wrapper: parsed turns, evidence grouped by turn, and the read. */

@@ -30,8 +30,11 @@ describe('api facade', () => {
       expect(decodeTeamLink(encodeTeamLink(text))).toBe(text);
     }
     // attacker-controlled hash: refuse to decode huge payloads
-    expect(decodeTeamLink(`#team=${'A'.repeat(10001)}`)).toBe('');
-    expect(decodeTeamLink(`#team=${'A'.repeat(9999)}`)).not.toBeNull();
+    expect(decodeTeamLink(`#team=${'A'.repeat(64_001)}`)).toBe('');
+    expect(() => decodeTeamLink(`#team=${'A'.repeat(63_999)}`)).not.toThrow();
+    // encode and decode share the documented bound: over-limit text can't encode
+    expect(encodeTeamLink('x'.repeat(48_001))).toBe('');
+    expect(encodeTeamLink('x'.repeat(48_000))).toMatch(/^#team=/);
   });
 
   it('sprite helpers emit Showdown CDN URLs', () => {

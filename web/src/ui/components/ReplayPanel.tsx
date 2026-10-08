@@ -36,6 +36,11 @@ export default function ReplayPanel() {
           {!err && !result && <div className="empty">Paste a replay log to see turn-by-turn evidence.</div>}
           {result && (
             <>
+              {result.truncated && (
+                <div className="empty" style={{ color: 'var(--warn)' }}>
+                  Log exceeded the replay size limit — later turns were dropped, evidence below is partial.
+                </div>
+              )}
               <div className="timeline">
                 {turns.map(([t, evs]) => (
                   <div className="turn-card" key={t}>
