@@ -1115,9 +1115,10 @@ export class ReplayParser {
       return !!entry.slot && entry.slot !== state.slot;
     }) || null;
   }
-  moveAbilityBypass(state: SpeciesState | { slot?: string } | null, move = ''): string {
+  moveAbilityBypass(state: SpeciesState | { slot?: string; bypassAbility?: string } | null, move = ''): string {
+    const direct = String((state as { bypassAbility?: string } | null)?.bypassAbility || '').trim();
     const moveEvent = this.findRecentOpponentMoveEvent(state as SpeciesState, move);
-    const ability = String(moveEvent?.abilityBypass || '').trim();
+    const ability = direct || String(moveEvent?.abilityBypass || '').trim();
     const mode = abilityBypassMode(ability);
     if (!mode) return '';
     if (mode === 'all') return ability;
