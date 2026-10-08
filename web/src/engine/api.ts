@@ -8,7 +8,7 @@ import { analyze } from './analysis';
 import { buildReasoningReport, buildMarkdownReport } from './report';
 
 export * from './index';
-export { parseTeam, teamToText } from './team';
+export { parseTeam, teamToText, removeMonFromText } from './team';
 export { fetchSmogonSets, mergeSuggestSets } from './suggest';
 export { analyzeReplay, buildReplaySummary, BATTLELOG_DEMO } from './replay';
 export { buildDetectiveRead } from './detective';
