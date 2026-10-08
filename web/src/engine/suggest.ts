@@ -173,14 +173,6 @@ export const SmogonProvider = {
     }
   },
 
-  async suggest(report: SuggestReport): Promise<ScoredCandidate[]> {
-    const data = await this.load('gen9ou');
-    return smogonCandidatePool(report)
-      .map((c) => scoreSmogonCandidate(c, report, data))
-      .filter((x): x is ScoredCandidate => Boolean(x))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 6);
-  },
 };
 
 function resolveKey(sets: SmogonSetsData | null | undefined, name: string): string {
@@ -585,31 +577,5 @@ export function swapOptionsFor(s: { roles?: string[] }, report: SuggestReport): 
       return { teamIndex: i, species: mon.species, score, reasons: unique(reasons).slice(0, 3) };
     })
     .sort((a, b) => b.score - a.score);
-}
-
-/** Attach swapOptions to every suggestion in a report (legacy render glue). */
-export function enrichSuggestionSwaps(report: SuggestReport): SuggestReport {
-  (report.suggestionPool || report.suggestions || []).forEach((s) => {
-    if (!(s as Suggestion & { swapOptions?: SwapOption[] }).swapOptions) {
-      (s as Suggestion & { swapOptions?: SwapOption[] }).swapOptions = swapOptionsFor(s, report);
-    }
-  });
-  return report;
-}
-
-/** Refresh a report's suggestions from the Smogon data layer when reachable. */
-export async function enrichSuggestionsFromApi(report: SuggestReport): Promise<boolean> {
-  let data: SmogonData = {};
-  try {
-    data = (await SmogonProvider.load('gen9ou')) || {};
-  } catch (e) {
-    report.suggestionSource = `V3.5 local lane ranking (${e instanceof Error ? e.message : 'Smogon unavailable'})`;
-  }
-  const pool = diversifySuggestions(report, data).map((s) => ({ ...s, swapOptions: swapOptionsFor(s, report) }));
-  report.suggestionPool = pool.slice(0, 18) as Suggestion[];
-  report.suggestions = report.suggestionPool.slice(0, 6);
-  report.suggestionSource = data?.sets ? 'Smogon OU sets/stats + V3.5 lane ranking' : report.suggestionSource || 'V3.5 lane-diverse local metagame brain';
-  report.needs = needsForReport(report);
-  return true;
 }
 

@@ -30,30 +30,6 @@ import type { ReplayRead } from './replay';
 // move-immunity upgrades). The parser in replay.ts uses these too.
 // ---------------------------------------------------------------------------
 
-export const REACTIVE_PROOF_ABILITIES = new Set([
-  'Water Absorb',
-  'Volt Absorb',
-  'Dry Skin',
-  'Storm Drain',
-  'Lightning Rod',
-  'Motor Drive',
-  'Sap Sipper',
-  'Earth Eater',
-  'Well-Baked Body',
-  'Flash Fire',
-  'Good as Gold',
-  'Magic Bounce',
-  // replay-status-control-upgrades
-  'Aroma Veil',
-  'Oblivious',
-  'Own Tempo',
-  // move-immunity-upgrades
-  'Soundproof',
-  'Bulletproof',
-  'Wind Rider',
-  'Overcoat',
-]);
-
 export const CONTROL_STATUS_BLOCKERS: Record<string, Set<string>> = {
   'Aroma Veil': new Set(['Attract', 'Disable', 'Encore', 'Heal Block', 'Taunt', 'Torment']),
   Oblivious: new Set(['Attract', 'Taunt']),
@@ -139,11 +115,6 @@ export function attackerBypassesMoveImmunity(ability = '', move = ''): boolean {
  * move-immunity-patched moveBlockingAbility: move-specific families first
  * (they need the move name), then the type/category immunity table.
  */
-export function immunityBlockingAbility(moveType: string, category: string, ability: string, move = ''): string {
-  const blocker = moveSpecificImmunityAbility(ability, move);
-  if (blocker) return blocker;
-  return moveBlockingAbilityByType(moveType, category, ability);
-}
 
 // ---------------------------------------------------------------------------
 // Damage roll (app.js dmg + the move-immunity patched layer)

@@ -63,3 +63,21 @@ export function monBlock(mon: Partial<TeamMon>): string {
 export function teamToText(list: Partial<TeamMon>[]): string {
   return list.map(monBlock).join('\n\n');
 }
+
+/**
+ * Remove the set-block matching `target` from raw team text, preserving every
+ * other block verbatim — including sets beyond the six parseTeam displays and
+ * any edits the user made since the last analysis. Prefers a canonical
+ * monBlock match, falls back to species so an edited-but-same mon still hits.
+ * Returns the text unchanged when no block matches.
+ */
+export function removeMonFromText(text: string, target: TeamMon): string {
+  const blocks = String(text || '').split(/\n\s*\n/);
+  const parsed = blocks.map((b) => parseTeam(b)[0]);
+  const targetBlock = monBlock(target);
+  let idx = parsed.findIndex((m) => m && monBlock(m) === targetBlock);
+  if (idx < 0) idx = parsed.findIndex((m) => m && m.species === target.species);
+  if (idx < 0) return text;
+  blocks.splice(idx, 1);
+  return blocks.join('\n\n').trim();
+}

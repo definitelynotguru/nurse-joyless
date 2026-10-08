@@ -16,7 +16,6 @@
   "dependencies": {
     "@pkmn/data": "^0.10.11",
     "@pkmn/dex": "^0.10.11",
-    "@pkmn/sets": "^5.2.0",
     "@smogon/calc": "^0.12.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"

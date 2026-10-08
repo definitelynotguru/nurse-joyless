@@ -166,9 +166,6 @@ export function types(m: Partial<TeamMon> | null | undefined, opt: { tera?: bool
 
 // ----- learnsets -----
 const learnsetCache = new Map<string, Set<string> | null>();
-export type LearnsetStatus = 'not-loaded' | 'loading' | 'loaded' | 'fallback';
-let learnsetsStatus: LearnsetStatus = 'not-loaded';
-
 export async function warmLearnset(species: string): Promise<Set<string> | null> {
   const sid = toId(resolveSpeciesName(species));
   if (learnsetCache.has(sid)) return learnsetCache.get(sid)!;
@@ -176,11 +173,9 @@ export async function warmLearnset(species: string): Promise<Set<string> | null>
     const set = await gen9.learnsets.learnable(species);
     const ids = new Set<string>(set ? Object.keys(set) : []);
     learnsetCache.set(sid, ids);
-    learnsetsStatus = 'loaded';
     return ids;
   } catch {
     learnsetCache.set(sid, null);
-    learnsetsStatus = 'fallback';
     return null;
   }
 }
@@ -188,8 +183,6 @@ export async function warmLearnset(species: string): Promise<Set<string> | null>
 export async function warmLearnsetsFor(speciesList: string[]): Promise<void> {
   await Promise.all(speciesList.map((s) => warmLearnset(s)));
 }
-
-export function getLearnsetsStatus(): LearnsetStatus { return learnsetsStatus; }
 
 /**
  * Synchronous learnset check. true = confirmed learnable, false = confirmed not,

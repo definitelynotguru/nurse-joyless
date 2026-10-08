@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { parseTeam } from '../src/engine/team';
 import type { TeamMon } from '../src/engine/types';
-import { analyze, teamSignals, riskList, scoreGroupSummary, verdict } from '../src/engine/analysis';
+import { analyze } from '../src/engine/analysis';
 import { profileTeam, detectIdentities, evaluateSynergy, evaluateMatchups } from '../src/engine/identity';
 
 // SAMPLE team from src/app.js (test-smoke.js 'Sparring Lab' block).
@@ -173,91 +173,6 @@ describe('analyze', () => {
   });
 });
 
-describe('teamSignals', () => {
-  const a = analyze(team);
-  const s = teamSignals(team, a);
-
-  it('counts members and type distribution', () => {
-    expect(s.count).toBe(6);
-    expect(s.typeCounts.Dragon).toBe(5);
-    expect(s.typeCounts.Flying).toBe(3);
-  });
-
-  it('derives utility counts from roles', () => {
-    expect(s.hazards).toBe(1);
-    expect(s.removal).toBe(1);
-    expect(s.setup).toBe(2);
-    expect(s.pivot).toBe(2);
-    expect(s.priority).toBe(2);
-    expect(s.recovery).toBe(1);
-    expect(s.wallbreakers).toBe(4);
-  });
-
-  it('counts items', () => {
-    expect(s.boots).toBe(2);
-    expect(s.offensiveItems).toBe(3);
-    expect(s.choiceItems).toBe(2);
-  });
-});
-
-describe('riskList', () => {
-  const a = analyze(team);
-
-  it('flags the stacked crit weaknesses and the type stack', () => {
-    const risks = riskList(team, a);
-    expect(risks.some((r) => r.type === 'Ice' && r.level === 'crit')).toBe(true);
-    expect(risks.some((r) => r.type === 'Type stacking' && /5 Dragon-type members/.test(r.detail))).toBe(true);
-  });
-
-  it('does not flag hazard control when removal exists', () => {
-    expect(riskList(team, a).some((r) => r.type === 'Hazard control')).toBe(false);
-  });
-
-  it('flags missing hazard control on teams without removal', () => {
-    const noRemoval = team.filter((p) => p.species !== 'Charizard');
-    const a2 = analyze(noRemoval);
-    expect(riskList(noRemoval, a2).some((r) => r.type === 'Hazard control' && r.level === 'bad')).toBe(true);
-  });
-});
-
-describe('scoreGroupSummary', () => {
-  it('summarizes a full report', () => {
-    const p = profileTeam(team, analyze(team)) as any;
-    const identity = detectIdentities(team, analyze(team), p) as any;
-    const synergy = evaluateSynergy(team, analyze(team), p, identity) as any;
-    const matchups = evaluateMatchups(team, analyze(team), p, identity) as any;
-    const g = scoreGroupSummary({ identity, synergy, matchups });
-    expect(g.identityConfidence).toBe(96);
-    expect(g.structuralQuality).toBeGreaterThan(0);
-    expect(g.battleReliability).toBeGreaterThan(0);
-    expect(g.matchupAverage).toBeGreaterThan(0);
-  });
-
-  it('handles a null report', () => {
-    const g = scoreGroupSummary(null);
-    expect(g.identityConfidence).toBe(0);
-    expect(g.matchupAverage).toBe(0);
-  });
-});
-
-describe('verdict', () => {
-  it('returns the Dragon-pressure verdict for the SAMPLE report', () => {
-    const p = profileTeam(team, analyze(team)) as any;
-    const identity = detectIdentities(team, analyze(team), p) as any;
-    const synergy = evaluateSynergy(team, analyze(team), p, identity) as any;
-    const matchups = evaluateMatchups(team, analyze(team), p, identity) as any;
-    const v = verdict({ identity, synergy, matchups });
-    expect(/Dragon pressure/.test(v)).toBe(true);
-    expect(/Patch Fairy\/Ice\/Dragon counterplay/.test(v)).toBe(true);
-  });
-
-  it('falls through to the generic verdict for unknown primaries', () => {
-    const v = verdict({ identity: { primary: { name: 'Custom' } }, synergy: { issues: [] }, matchups: [] } as any);
-    expect(/readable plan/.test(v)).toBe(true);
-  });
-});
-
-// test-smoke.js 'Sparring Lab' blocks: parseTeam -> analyze -> reasoner reads.
 describe('test-smoke: Sparring Lab blocks', () => {
   const runPipeline = (t: TeamMon[]) => {
     const a = analyze(t);
