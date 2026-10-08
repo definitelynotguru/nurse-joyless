@@ -49,25 +49,29 @@ function SuggestCard({ s, onApply, onReplace }: {
             onError={(e) => { (e.target as HTMLImageElement).style.visibility = 'hidden'; }} />
           <strong>{s.species}</strong>
         </div>
-        <button className="suggest-more-btn" onClick={() => setMenuOpen(!menuOpen)} title="Options">⋯</button>
+        {s.set && <button className="suggest-more-btn" onClick={() => setMenuOpen(!menuOpen)} title="Options">⋯</button>}
       </div>
       <div className="odds">{s.score}</div>
       <p className="meta">{s.roles?.join(' · ')}{s.lane ? ` · ${s.lane}` : ''}</p>
       <ul>{(s.why || []).slice(0, 4).map((w, i) => <li key={i}>{w}</li>)}</ul>
-      <details>
-        <summary>Suggested set</summary>
-        <pre className="code">{s.set}</pre>
-      </details>
-      <div className="suggest-menu">
-        <p className="suggest-menu-title">Actions</p>
-        <button className="suggest-menu-item" onClick={() => onApply(s.set)}>Add to team</button>
-        {s.swapOptions?.slice(0, 3).map((sw, i) => (
-          <button key={i} className="suggest-menu-item" onClick={() => onReplace(sw.teamIndex, s.set)}
-            title={sw.reasons?.join(', ')}>
-            Replace {sw.species} ({sw.score})
-          </button>
-        ))}
-      </div>
+      {s.set && (
+        <>
+          <details>
+            <summary>Suggested set</summary>
+            <pre className="code">{s.set}</pre>
+          </details>
+          <div className="suggest-menu">
+            <p className="suggest-menu-title">Actions</p>
+            <button className="suggest-menu-item" onClick={() => onApply(s.set)}>Add to team</button>
+            {s.swapOptions?.slice(0, 3).map((sw, i) => (
+              <button key={i} className="suggest-menu-item" onClick={() => onReplace(sw.teamIndex, s.set)}
+                title={sw.reasons?.join(', ')}>
+                Replace {sw.species} ({sw.score})
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

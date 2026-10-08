@@ -38,7 +38,11 @@ export default function App() {
     setError('');
     try {
       const team = parseTeam(text);
-      if (!team.length) { setError('Could not parse a team — paste a Showdown importable.'); return; }
+      if (!team.length) {
+        setClinic(null);
+        if (text.trim()) setError('Could not parse a team — paste a Showdown importable.');
+        return;
+      }
       const result = runClinic(text);
       analyzedTextRef.current = text;
       setClinic(result);
