@@ -34,10 +34,14 @@
   }
 
   function controlStatusBlockedAbilities(species='',move=''){
-    if(typeof detectiveAbilities!=='function')return [];
     const moveNameValue=moveName(move);
     if(!moveNameValue)return [];
-    return detectiveAbilities(species).filter(ability=>controlStatusAbilityBlocksMove(ability,moveNameValue));
+    let abilities=typeof detectiveAbilities==='function'?detectiveAbilities(species):[];
+    if((!abilities.length||(abilities.length===1&&abilities[0]==='Unknown'))
+      &&typeof FALLBACK_ABILITIES!=='undefined'&&FALLBACK_ABILITIES[species]){
+      abilities=Object.values(FALLBACK_ABILITIES[species]).filter(Boolean);
+    }
+    return (abilities||[]).filter(ability=>controlStatusAbilityBlocksMove(ability,moveNameValue));
   }
 
   const originalMoveBlockedAbilities=typeof proto.moveBlockedAbilities==='function'?proto.moveBlockedAbilities:null;

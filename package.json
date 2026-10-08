@@ -1,9 +1,13 @@
 {
   "name": "nurse-joyless",
-  "version": "0.1.0",
+  "version": "4.0.0",
   "private": true,
-  "description": "Dependency-free static hackathon MVP for an agentic Pokemon Showdown team doctor.",
+  "description": "Competitive Pokemon Showdown team clinic: structure analysis, matchup diagnosis, KO risk, replay evidence, and hidden-information reasoning.",
   "scripts": {
+    "dev:web": "npm --prefix web run dev",
+    "build:web": "npm --prefix web run build",
+    "test:web": "npm --prefix web test",
+    "typecheck:web": "npm --prefix web run typecheck",
     "serve": "node server.js",
     "serve:static": "python3 -m http.server 8000",
     "check": "node --check src/app.js",

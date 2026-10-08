@@ -223,8 +223,9 @@
   };
 
   proto.moveAbilityBypass=function moveAbilityBypass(state, move=''){
+    const direct=String(state?.bypassAbility||'').trim();
     const moveEvent=this.findRecentOpponentMoveEvent(state, move);
-    const ability=String(moveEvent?.abilityBypass||'').trim();
+    const ability=direct||String(moveEvent?.abilityBypass||'').trim();
     const mode=this.abilityBypassMode(ability);
     if(!mode)return '';
     if(mode==='all')return ability;
