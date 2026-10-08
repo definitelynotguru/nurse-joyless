@@ -17,8 +17,8 @@ export default function AgentConsole({ clinic, open, onClose }: { clinic: Clinic
   const [tab, setTab] = useState<AgentTab>('surgeon');
   const [mode, setMode] = useState<AgentMode>((localStorage.getItem('nj-agent-mode') as AgentMode) || 'local');
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [kimiKey, setKimiKey] = useState(localStorage.getItem('nj-kimi-key') || '');
-  const [ollamaKey, setOllamaKey] = useState(localStorage.getItem('nj-ollama-key') || '');
+  const [kimiKey, setKimiKey] = useState(sessionStorage.getItem('nj-kimi-key') || '');
+  const [ollamaKey, setOllamaKey] = useState(sessionStorage.getItem('nj-ollama-key') || '');
   const [ollamaModel, setOllamaModel] = useState(localStorage.getItem('nj-ollama-model') || 'gpt-oss:20b');
   const [ollamaUrl, setOllamaUrl] = useState(localStorage.getItem('nj-ollama-url') || '');
   const [output, setOutput] = useState('Select an agent to analyze your data.');
@@ -27,8 +27,10 @@ export default function AgentConsole({ clinic, open, onClose }: { clinic: Clinic
   useEffect(() => { localStorage.setItem('nj-agent-mode', mode); }, [mode]);
 
   const save = () => {
-    localStorage.setItem('nj-kimi-key', kimiKey);
-    localStorage.setItem('nj-ollama-key', ollamaKey);
+    // API keys live in sessionStorage: cleared when the tab closes instead of
+    // persisting on-device indefinitely. Non-secret prefs stay in localStorage.
+    sessionStorage.setItem('nj-kimi-key', kimiKey);
+    sessionStorage.setItem('nj-ollama-key', ollamaKey);
     localStorage.setItem('nj-ollama-model', ollamaModel);
     localStorage.setItem('nj-ollama-url', ollamaUrl);
     setStatus('saved ✓'); setTimeout(() => setStatus(''), 1400);

@@ -21,7 +21,7 @@ export type { ReasoningOptions } from './report';
 export { ReplayParser, parseReplay, analyzeReplay, buildReplaySummary, BATTLELOG_DEMO } from './replay';
 export { buildDetectiveRead } from './detective';
 export { dmg, nHitChance, normalizeBattleState, battleStateSummary, swapBattleState, clampStage, stageMultiplier, spreadDamageApplies, getAgentFacts, detectPriorityBlockReveal, PriorityTerrainTracker } from './ko';
-export type { BattleStateInput, BattleState, KoRoll, KoMon, KoHitInput } from './ko';
+export type { BattleStateInput, BattleState, KoRoll, KoMon, KoHitInput, KoOptions } from './ko';
 
 /** Full clinic pipeline in one call. Returns everything the UI renders. */
 export interface ClinicResult {

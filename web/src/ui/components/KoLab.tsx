@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import type { ClinicResult } from '../../engine/api';
 import {
   dmg, nHitChance, normalizeBattleState, battleStateSummary, swapBattleState,
-  survivalMatrix, moveData, TYPES, smogonCalcRange, type BattleStateInput, type KoRoll,
+  survivalMatrix, moveData, TYPES, smogonCalcRange, type BattleStateInput, type KoOptions, type KoRoll,
 } from '../../engine/api';
 import Panel from './Panel';
 
@@ -38,13 +38,13 @@ export default function KoLab({ clinic }: { clinic: ClinicResult | null }) {
     const opt = {
       ...normalizeBattleState(state),
       extraEndSteps: state.extraEndSteps ?? 0,
-      defenderHpPct: hp,
+      hpPct: hp,
       hazards,
       attackerTera: attTera,
       attackerTeraType: attTeraType,
       defenderTera: defTera,
       defenderTeraType: defTeraType,
-    } as BattleStateInput & { hp?: number };
+    } as KoOptions;
     // shallow clones: the ported dmg() may annotate fields on the mons it receives
     return dmg({ ...attacker }, { ...defender }, move, opt);
   }, [attacker, defender, move, state, hp, hazards, attTera, defTera, attTeraType, defTeraType]);

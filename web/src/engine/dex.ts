@@ -193,7 +193,7 @@ export function getLearnsetsStatus(): LearnsetStatus { return learnsetsStatus; }
 
 /**
  * Synchronous learnset check. true = confirmed learnable, false = confirmed not,
- * null = data unavailable. Order: trusted local table → local table → warmed pkmn cache.
+ * null = data unavailable. Order: trusted local table → warmed pkmn cache → local table.
  */
 export function canLearn(species: string, move: string): boolean | null {
   const sid = toId(resolveSpeciesName(species));
@@ -201,10 +201,10 @@ export function canLearn(species: string, move: string): boolean | null {
   const trusted = TRUSTED_FALLBACK_LEARNSETS[resolveSpeciesName(species)]
     || TRUSTED_FALLBACK_LEARNSETS[species];
   if (trusted?.map(toId).includes(mid)) return true;
+  const warmed = learnsetCache.get(sid);
+  if (warmed?.size) return warmed.has(mid);
   const local = LOCAL_LEARNSETS[sid];
   if (local) return local.map(toId).includes(mid);
-  const warmed = learnsetCache.get(sid);
-  if (warmed) return warmed.has(mid);
   return null;
 }
 

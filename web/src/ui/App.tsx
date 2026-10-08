@@ -53,11 +53,14 @@ export default function App() {
   useEffect(() => {
     if (!initialTeamText) return;
     let cancelled = false;
+    const bootClinic = clinic;
     const species = parseTeam(initialTeamText).map((m) => m.species || '');
     void warmLearnsetsFor(species).then(() => {
-      if (!cancelled) setClinic(runClinic(initialTeamText));
+      // only re-run if the user hasn't already analyzed a different team
+      if (!cancelled) setClinic((cur) => (cur === bootClinic ? runClinic(initialTeamText) : cur));
     });
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const share = async () => {
