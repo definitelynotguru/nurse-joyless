@@ -21,7 +21,7 @@ export type { ReasoningOptions } from './report';
 export { ReplayParser, parseReplay, analyzeReplay, buildReplaySummary, BATTLELOG_DEMO } from './replay';
 export { buildDetectiveRead } from './detective';
 export { dmg, nHitChance, normalizeBattleState, battleStateSummary, swapBattleState, clampStage, stageMultiplier, spreadDamageApplies, getAgentFacts, detectPriorityBlockReveal, PriorityTerrainTracker } from './ko';
-export type { BattleStateInput, BattleState, KoRoll, KoMon, KoHitInput, KoOptions } from './ko';
+export type { BattleStateInput, BattleState, KoRoll, KoMon, KoHitInput, KoOptions, AgentFactsContext } from './ko';
 
 /** Full clinic pipeline in one call. Returns everything the UI renders. */
 export interface ClinicResult {
@@ -161,7 +161,7 @@ export function coverageMatrix(team: TeamMon[]): CoverageRow[] {
           .map((md) => md![0]),
       );
       for (const attType of moveTypes) {
-        const mult = CHART[defType]?.[attType] ?? 1;
+        const mult = CHART[attType]?.[defType] ?? 1;
         if (mult > 1) { hitters.push(m.species || '???'); break; }
       }
     }
@@ -214,7 +214,7 @@ function toCalcMon(m: Partial<TeamMon>, teraType?: string): CalcPokemon | null {
       item: m.item || undefined,
       ability: m.ability || undefined,
       nature: m.nature || undefined,
-      level: m.level || 50,
+      level: m.level || 100,
       teraType: teraType || undefined,
       evs: {
         hp: evs.hp || 0, atk: evs.atk || 0, def: evs.def || 0,

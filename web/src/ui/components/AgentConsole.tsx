@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ClinicResult } from '../../engine/api';
-import { getAgentFacts } from '../../engine/api';
+import { getAgentFacts, type AgentFactsContext } from '../../engine/api';
 
 type AgentTab = 'surgeon' | 'actuary' | 'detective' | 'goblin' | 'summary';
 type AgentMode = 'local' | 'kimi' | 'ollama';
@@ -38,7 +38,16 @@ export default function AgentConsole({ clinic, open, onClose }: { clinic: Clinic
 
   const localFacts = (): string => {
     try {
-      const facts = getAgentFacts(tab, { team: clinic?.team, report: clinic?.report } as never);
+      const ctx: AgentFactsContext = {
+        analysis: clinic?.analysis ?? null,
+        reasoner: clinic
+          ? {
+              identity: clinic.identity,
+              suggestions: (clinic.suggestions ?? []).map((s) => ({ pokemon: s.species })),
+            }
+          : null,
+      };
+      const facts = getAgentFacts(tab, ctx);
       return JSON.stringify(facts, null, 2);
     } catch {
       if (!clinic) return `${tab}: no patient loaded — analyze a team first.`;

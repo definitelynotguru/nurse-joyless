@@ -3,10 +3,11 @@ import type { ClinicResult, Suggestion } from '../../engine/api';
 import { spriteUrl, fetchSmogonSets, mergeSuggestSets } from '../../engine/api';
 import Panel from './Panel';
 
-export default function Assistant({ clinic, onApply, onReplace }: {
+export default function Assistant({ clinic, onApply, onReplace, onRefresh }: {
   clinic: ClinicResult | null;
   onApply: (setText: string) => void;
   onReplace: (teamIndex: number, setText: string) => void;
+  onRefresh: () => void;
 }) {
   const [online, setOnline] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -16,7 +17,7 @@ export default function Assistant({ clinic, onApply, onReplace }: {
     setLoading(true);
     try {
       const sets = await fetchSmogonSets('gen9ou');
-      if (Object.keys(sets).length) { mergeSuggestSets(sets); setOnline(true); }
+      if (Object.keys(sets).length) { mergeSuggestSets(sets); setOnline(true); onRefresh(); }
     } catch { setOnline(false); }
     setLoading(false);
   };

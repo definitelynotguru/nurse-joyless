@@ -103,7 +103,7 @@ export default function App() {
         <SparringLab clinic={clinic} />
         <IdentityPanel clinic={clinic} />
         <SynergyPanel clinic={clinic} />
-        <Assistant clinic={clinic} onApply={appendSet} onReplace={replaceSet} />
+        <Assistant clinic={clinic} onApply={appendSet} onReplace={replaceSet} onRefresh={() => analyze(teamText)} />
         <ValidationPanel clinic={clinic} />
         <Exports clinic={clinic} />
         <footer>

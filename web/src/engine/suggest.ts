@@ -204,9 +204,11 @@ export async function fetchSmogonSets(format = 'gen9ou'): Promise<Record<string,
   }
 }
 
-/** Merge fetched set text over the full local fallback table. */
+/** Merge fetched set text into the live fallback table so subsequent
+ * suggestAdditions() runs see the remote sets. Returns the merged table. */
 export function mergeSuggestSets(remote?: Record<string, string> | null): Record<string, string> {
-  return { ...SMOGON_FALLBACK_SETS, ...(remote || {}) };
+  Object.assign(SMOGON_FALLBACK_SETS, remote || {});
+  return SMOGON_FALLBACK_SETS;
 }
 
 // ---------------------------------------------------------------------------

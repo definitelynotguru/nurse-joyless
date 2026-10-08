@@ -21,6 +21,15 @@ export default function Prescription({ clinic, onApply }: { clinic: ClinicResult
       if (keep.length + add.length >= 6) break;
       if (s.set && !used.has(s.species.toLowerCase())) { add.push(s.set); used.add(s.species.toLowerCase()); }
     }
+    // backfill remaining slots with unselected teammates — never emit a
+    // short-handed team when suggestions run out
+    clinic.team.forEach((m, i) => {
+      if (keep.length + add.length >= 6) return;
+      if (!favorites.has(i) && !used.has(m.species.toLowerCase())) {
+        add.push(teamToText([m]).trim());
+        used.add(m.species.toLowerCase());
+      }
+    });
     const sets = [...keep.map((m) => teamToText([m]).trim()), ...add];
     setPrescription(sets.join('\n\n'));
   };
